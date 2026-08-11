@@ -5,6 +5,7 @@ import { FlexItem } from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex
 import { FlexAlign, FlexDirection, FlexJustify } from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexTypes";
 import { Billboard } from "SpectaclesInteractionKit.lspkg/Components/Interaction/Billboard/Billboard";
 import { habitatLabel, selectionText } from "./TaskTextFormatting";
+import { TASK_SELECTION_PANEL_Y_CM } from "../Config/CreatureConfig";
 
 const PANEL_WIDTH = 32;
 
@@ -28,7 +29,7 @@ export class TaskSelectionView {
 
         this.panel = global.scene.createSceneObject("TaskSelectionPanel");
         this.panel.setParent(this.root);
-        this.panel.getTransform().setLocalPosition(new vec3(0, 28, -4));
+        this.panel.getTransform().setLocalPosition(new vec3(0, TASK_SELECTION_PANEL_Y_CM, -4));
         const plate = this.panel.createComponent(BackPlate.getTypeName()) as BackPlate;
         plate.size = new vec2(PANEL_WIDTH, 14);
 
@@ -46,6 +47,7 @@ export class TaskSelectionView {
 
         this.fullText = this.addTextRow(content, flex, "FullTaskText", 5, 41);
         this.progressText = this.addTextRow(content, flex, "ResolveProgress", 2.2, 38);
+        this.setProgress(0);
 
         const buttonObject = global.scene.createSceneObject("Later");
         buttonObject.setParent(content);

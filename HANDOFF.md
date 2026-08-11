@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Day 1 Emotional Prototype / Character Vitality is frozen as the **technical character checkpoint**. Gate 2 Product Truth and Gate 3 Concept Comprehension are implemented and fully LEAF-verified.
+Day 1 Emotional Prototype / Character Vitality is frozen as the **technical character checkpoint**. Gate 2 Product Truth and Gate 3 Concept Comprehension are implemented and fully LEAF-verified. The Wednesday three-task vertical slice is integrated and verified end-to-end in one Preview lifecycle plus a persistence restart.
 
 Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SIK/UIKit installed, `lens-studio` MCP connected and authenticated. Blender is intentionally unavailable and not required.
 
@@ -24,6 +24,8 @@ Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SI
 - `TaskResolutionService` persists an idempotent resolve before emitting one presentation release callback.
 - Shared `TaskInputSource` implementations (`DemoInput` and Specs `KeyboardInput`) create records through one `TaskCreationService` with identical defaults and no deadlines.
 - Short pinch selection, bounded two-line task detail, one `Later` action, a separate 0.7-second resolve hold with visible progress, early-release cancellation, and gesture-role isolation are wired to the technical creature.
+- Each active creature has its own camera-relative habitat home, with a small bounded wander radius and eased return; only the active chaser can leave its home.
+- Selecting the chaser switches it to a stable interaction hold that stops translation while preserving breathing, blink, wobble, and secondary idle motion.
 
 ## Modified files
 
@@ -92,6 +94,12 @@ Preserve existing untracked inspection artifacts:
 - Gate 3 gesture isolation: PASS — the selection gesture could not also resolve, even when held beyond the resolve threshold.
 - Gate 3 Later: PASS — snooze was persisted and selection UI closed.
 - Gate 3 live Preview: PASS for runtime short-pinch selection and enabled UI/text/action inspection. Automated hold semantics are covered by the separate LEAF Preview scenarios.
+- Wednesday clean start: PASS — three habitat assignments, three open tasks, and zero initial chasers were logged.
+- Wednesday advance: PASS — Demo time advanced to `86400001` and the arbiter selected exactly `demo-1`.
+- Wednesday stable selection: PASS — task text and `Later` were enabled; the selected body position was unchanged across a 1.2-second sample.
+- Wednesday hold: PASS — the separate reacquired pinch logged 25/50/75/100 percent progress.
+- Wednesday resolve: PASS — repository completion (`open=2`) preceded exactly one `[ReleaseEffect] play`; the resolved root disappeared and two roots remained active.
+- Wednesday restart: PASS — Preview restored only `demo-2` and `demo-3`, reported `open=2`, and exposed exactly two enabled task creatures.
 
 ## Unresolved issues
 
@@ -111,7 +119,7 @@ These are explicit art-polish tasks, not blockers for the technical character ch
 
 ## Exact next step
 
-Await the next frozen-plan step on explicit direction. Do not expand beyond the accepted input, selection, resolve-hold, and Later loop.
+Review and stage only the vertical-slice files listed by the active Codex session. Do not include unrelated pre-existing changes or MCP inspection artifacts.
 
 ## Do Not Repeat
 

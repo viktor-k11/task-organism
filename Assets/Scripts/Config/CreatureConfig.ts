@@ -23,6 +23,12 @@ export const HABITAT_RADIUS_MAX_CM = 150; // 1.5m
 export const HABITAT_ARC_HALF_ANGLE_DEG = 60;
 /** Fixed vertical offset (cm) below the camera's spawn-time height the creature wanders at. */
 export const HABITAT_VERTICAL_OFFSET_CM = -10;
+/** Three-creature demo habitat: fixed camera-relative homes, safely inside Preview. */
+export const HABITAT_HOME_DEPTH_CM = 147;
+export const HABITAT_HOME_LATERAL_SPACING_CM = 27;
+export const HABITAT_HOME_WANDER_RADIUS_CM = 3;
+export const HABITAT_HOME_CENTER_VERTICAL_CM = 22;
+export const HABITAT_HOME_SIDE_VERTICAL_CM = -8;
 
 // ── Chase ────────────────────────────────────────────────────────────────
 export const CHASE_DISTANCE_MIN_CM = 110; // 1.1m
@@ -130,6 +136,7 @@ export const RESOLVE_HOLD_DURATION_S = 0.7;
 export const LATER_SNOOZE_DURATION_MS = 15 * 60 * 1000;
 export const HABITAT_LABEL_MAX_CHARS = 18;
 export const SELECTION_LINE_MAX_CHARS = 30;
+export const TASK_SELECTION_PANEL_Y_CM = 48;
 
 // ── Lathe geometry (egg/teardrop silhouette, ~16cm tall x ~14cm wide) ──────
 export const LATHE_SEGMENTS = 80;

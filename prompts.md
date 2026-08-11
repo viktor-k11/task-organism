@@ -57,3 +57,14 @@ All five Gate 2 scenario runs returned `succeeded`. Remaining body capture strea
 6. **Later:** `gate3-later-snooze` passed: the selected record gained `snoozedUntilMs`, became ineligible through the existing state path, and the selection closed.
 7. **Live Preview:** A real synthetic short pinch hit the runtime Body interactable. Runtime inspection then showed the enabled task panel with `Send the project update`, `Hold again to complete`, and one `Later` button. A subsequent synthetic hold could not reacquire the moving target, so hold evidence comes from the deterministic LEAF Preview scenarios rather than a retry.
 8. **Verify:** All six Gate 3 scenarios returned `succeeded`; TypeScript compilation and refreshed runtime startup passed without project errors.
+
+## 2026-08-11 — Wednesday vertical slice integration
+
+1. **Habitat:** Assigned the three slots camera-relative homes at lateral offsets `-27/0/+27 cm`, depth `147 cm`, and a `3 cm` wander radius. The center slot is raised to `+22 cm` and the side slots sit at `-8 cm`, keeping the accepted creature scale while separating all three silhouettes from each other and the Preview edges.
+2. **Initial state:** A clean v3 repository start logged three habitat bindings and `[WednesdayDemo] ready open=3 ... chaser=none`.
+3. **Advance:** Triggering the runtime `Advance Demo Time` control logged `now=86400001` and exactly one arbiter choice, `chaser=demo-1`; the other two creatures remained at their habitat homes.
+4. **Selection:** A short synthetic pinch selected `demo-1`. Runtime text inspection showed `Send the project update`, `Hold again to complete`, and `Later`. The selected body stayed at exactly `(-74.71857, -8, -43.18783)` across a later 1.2-second sample while breathing/secondary presentation updates remained active.
+5. **Separate hold:** A second pinch reliably reacquired that stationary body. Evidence logs recorded `25%`, `50%`, `75%`, and `100%` progress for `demo-1`.
+6. **Resolve ordering:** The runtime logged `repository saved completion task=demo-1 open=2`, then one `[ReleaseEffect] play`, then `release requested ... remaining=2`. The authoritative run contained exactly one release-effect start.
+7. **Post-release:** After effect completion, runtime inspection found only `MovementRoot_2` and `MovementRoot_3` enabled and the status text `2 tasks remaining`; both remaining habitat labels stayed active.
+8. **Restart:** A TypeScript recompile passed, then a real Preview restart restored only `demo-2` and `demo-3`, logged `ready open=2 ... chaser=none`, and exposed exactly two enabled creature roots with the remaining task labels.

@@ -9,6 +9,7 @@ import {
     HABITAT_RADIUS_MAX_CM,
     HABITAT_ARC_HALF_ANGLE_DEG,
     HABITAT_VERTICAL_OFFSET_CM,
+    HABITAT_HOME_WANDER_RADIUS_CM,
     CHASE_DISTANCE_MIN_CM,
     CHASE_DISTANCE_MAX_CM,
     CHASE_SIDE_OFFSET_MIN_DEG,
@@ -65,6 +66,7 @@ const eyeBaseMaterialAsset = requireAsset("../../Materials/BlobEye.mat") as Mate
 enum CreaturePresentationState {
     IDLE,
     CHASING,
+    INTERACTING,
     RELEASING,
 }
 
@@ -125,6 +127,11 @@ export class CreatureBehavior extends BaseScriptComponent {
     // fixed world-space zone, not continuously recentered on the camera.
     private habitatCenter: vec3 = vec3.zero();
     private habitatForwardYaw = 0;
+    private homeLateralOffsetCm = 0;
+    private homeDepthCm = 0;
+    private homeVerticalOffsetCm = HABITAT_VERTICAL_OFFSET_CM;
+    private homeWanderRadiusCm = HABITAT_HOME_WANDER_RADIUS_CM;
+    private homeAnchorConfigured = false;
     private wanderTargetY = 0;
     private wanderTarget: vec3 | null = null;
     private wanderPauseTimer = 0;
@@ -187,9 +194,36 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.chaseRadialVel = 0;
     }
 
+    /** Assigns a distinct camera-relative home without changing creature scale or internals. */
+    setHabitatHome(lateralOffsetCm: number, depthCm: number, verticalOffsetCm: number, wanderRadiusCm: number): void {
+        if (this.isReleased || this.state === CreaturePresentationState.RELEASING) return;
+        this.homeLateralOffsetCm = lateralOffsetCm;
+        this.homeDepthCm = depthCm;
+        this.homeVerticalOffsetCm = verticalOffsetCm;
+        this.homeWanderRadiusCm = Math.max(0, wanderRadiusCm);
+        this.homeAnchorConfigured = true;
+        this.recomputeHabitatOrigin();
+        if (this.state === CreaturePresentationState.IDLE) {
+            this.wanderTarget = this.pickWanderTarget();
+            this.isWaitingAtWanderTarget = false;
+        }
+    }
+
+    /** Stops chase translation at the current reacquirable pose; vitality keeps updating. */
+    holdForInteraction(): void {
+        if (this.isReleased || this.state !== CreaturePresentationState.CHASING) return;
+        this.state = CreaturePresentationState.INTERACTING;
+        this.velocity = vec3.zero();
+        this.chaseAngularVel = 0;
+        this.chaseRadialVel = 0;
+        this.hesitationActiveT = 0;
+        this.hesitationAngleOffsetRad = 0;
+        console.log(`[CreatureBehavior] interaction hold root=${this.sceneObject.name}`);
+    }
+
     endChase(): void {
         if (this.isReleased) return;
-        if (this.state !== CreaturePresentationState.CHASING) return;
+        if (this.state !== CreaturePresentationState.CHASING && this.state !== CreaturePresentationState.INTERACTING) return;
 
         // Eased back to idle wander, no snap: keep current position/velocity,
         // just change control mode and hand it a fresh wander destination.
@@ -207,7 +241,7 @@ export class CreatureBehavior extends BaseScriptComponent {
      */
     release(): void {
         if (this.isReleased) return;
-        if (this.state !== CreaturePresentationState.CHASING && this.state !== CreaturePresentationState.IDLE) return;
+        if (this.state !== CreaturePresentationState.CHASING && this.state !== CreaturePresentationState.INTERACTING && this.state !== CreaturePresentationState.IDLE) return;
         if (!this.blobMesh || !this.eyeLeft || !this.eyeRight || !this.particleAnchorObject) return;
 
         this.isReleased = true;
@@ -367,9 +401,16 @@ export class CreatureBehavior extends BaseScriptComponent {
         // centered on where the user can actually see the creature, not on the
         // space behind them.
         const camFwd = camTransform.forward.uniformScale(-1);
-        this.habitatCenter = camPos;
         this.habitatForwardYaw = Math.atan2(camFwd.x, -camFwd.z);
-        this.wanderTargetY = camPos.y + HABITAT_VERTICAL_OFFSET_CM;
+        if (this.homeAnchorConfigured) {
+            const right = new vec3(Math.cos(this.habitatForwardYaw), 0, Math.sin(this.habitatForwardYaw));
+            this.habitatCenter = camPos
+                .add(camFwd.uniformScale(this.homeDepthCm))
+                .add(right.uniformScale(this.homeLateralOffsetCm));
+        } else {
+            this.habitatCenter = camPos;
+        }
+        this.wanderTargetY = camPos.y + (this.homeAnchorConfigured ? this.homeVerticalOffsetCm : HABITAT_VERTICAL_OFFSET_CM);
     }
 
     private onUpdate(): void {
@@ -385,6 +426,8 @@ export class CreatureBehavior extends BaseScriptComponent {
             this.updateIdle(dt);
         } else if (this.state === CreaturePresentationState.CHASING) {
             this.updateChasing(dt);
+        } else if (this.state === CreaturePresentationState.INTERACTING) {
+            this.updateInteractionHold(dt);
         }
 
         this.applyBodyScale(dt);
@@ -481,6 +524,15 @@ export class CreatureBehavior extends BaseScriptComponent {
     }
 
     private pickWanderTarget(): vec3 {
+        if (this.homeAnchorConfigured) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.sqrt(Math.random()) * this.homeWanderRadiusCm;
+            return new vec3(
+                this.habitatCenter.x + Math.cos(angle) * radius,
+                this.wanderTargetY,
+                this.habitatCenter.z + Math.sin(angle) * radius,
+            );
+        }
         const halfArcRad = (HABITAT_ARC_HALF_ANGLE_DEG * Math.PI) / 180;
         const angleOffset = (Math.random() * 2 - 1) * halfArcRad;
         const angle = this.habitatForwardYaw + angleOffset;
@@ -492,6 +544,14 @@ export class CreatureBehavior extends BaseScriptComponent {
         const dirZ = -Math.cos(angle);
 
         return new vec3(this.habitatCenter.x + dirX * dist, this.wanderTargetY, this.habitatCenter.z + dirZ * dist);
+    }
+
+    private updateInteractionHold(dt: number): void {
+        if (!this.cameraObject) return;
+        const camPos = this.cameraObject.getTransform().getWorldPosition();
+        const pos = this.sceneObject.getTransform().getWorldPosition();
+        const toCam = camPos.sub(pos);
+        if (toCam.length > 0.5) this.updateFacing(toCam.normalize(), dt);
     }
 
     // ── CHASING: decoupled polar seek (radius + angle around the camera) ───

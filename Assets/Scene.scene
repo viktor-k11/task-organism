@@ -8,7 +8,9 @@
     - !<own> 75374f86-408c-435c-9827-89f984b767e7
     - !<own> 83b0f170-870a-4121-9f40-6ca784e0c088
     - !<own> a7d29b0e-9b44-478a-ab60-91c36351545b
-    - !<own> 260e39fb-2271-4ce5-9f61-fea3dedfb280
+    - !<own> 0ca0c84f-133a-4d74-97e4-adc482cdcec1
+    - !<own> 17e86b0c-4458-4400-97c0-2e86a435effa
+    - !<own> 5f1ee330-db5f-4274-9646-0571e0065950
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       - id: 1
@@ -384,6 +386,21 @@
     - !<own> d90b4bdf-2fbf-4edc-afa1-d23c2d5ba257
   Components:
     []
+- !<SceneObject/0ca0c84f-133a-4d74-97e4-adc482cdcec1>
+  PrefabRemaps:
+    []
+  Name: LEAF Plugin Bridge
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> b70a7e30-7567-4d5a-8d93-2b99372ca53a
 - !<SceneObject/0cffb60e-73f6-43c5-bb4f-286d39e0f1f6>
   PrefabRemaps:
     []
@@ -501,6 +518,36 @@
     - !<own> a6af4948-9adc-4052-ae22-db902dd2764e
   Components:
     []
+- !<SceneObject/1459af83-3576-48b0-aa21-c36e112bc71d>
+  PrefabRemaps:
+    []
+  Name: EyeLeft
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 2.000000, y: 2.500000, z: -6.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<SceneObject/17e86b0c-4458-4400-97c0-2e86a435effa>
+  PrefabRemaps:
+    []
+  Name: MovementRoot_2
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: -10.000000, z: -130.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> e4e50b31-d5a2-444a-a8fa-3db58d09d767
+  Components:
+    - !<own> f1beb31e-dba9-482f-9c70-d5d17d69a816
 - !<SceneObject/181c239f-175e-4912-94fc-d37a2599b2d6>
   PrefabRemaps:
     []
@@ -509,6 +556,21 @@
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 2.837150, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<SceneObject/1b20fe17-3cfe-49c1-92c7-269aa81c1cbd>
+  PrefabRemaps:
+    []
+  Name: EyeLeft
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 2.000000, y: 2.500000, z: -6.700000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
@@ -612,21 +674,6 @@
     []
   Components:
     []
-- !<SceneObject/260e39fb-2271-4ce5-9f61-fea3dedfb280>
-  PrefabRemaps:
-    []
-  Name: LEAF Plugin Bridge
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 6ac907e7-49db-4300-9d93-90165e5b8d7d
 - !<SceneObject/264571d0-f879-411b-8deb-ff6d9921317f>
   PrefabRemaps:
     []
@@ -729,6 +776,23 @@
     ring-3_end_end_end: !<reference> b93dfa60-41bd-4999-ac0f-4b2f1df2bdaf
     thumb-3_end_end_end_end: !<reference> 08e3cc22-f2e1-49fb-9ddc-145fe6547ce3
     pinky-3_end_end: !<reference> d08269e3-acd4-4156-b5b9-477ca259611d
+- !<AudioComponent/2bd87890-201f-4df3-9cc3-7f571767b75d>
+  PrefabRemaps:
+    []
+  Name: Audio
+  Enabled: true
+  AudioTrack: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableAutoplayLoop: false
+  Volume: 1.000000
+  EnableMixToSnap: false
+  RecordVolume: 1.000000
+  EnableSpatialAudio: false
+  EnableDistanceEffect: false
+  CurveType: Logarithm
+  MinDistance: 0.000000
+  MaxDistance: 100.000000
+  EnableDirectivityEffect: false
+  EnablePositionEffect: false
 - !<SceneObject/2dae2a27-8ce6-466a-8bff-622195c1b3a8>
   PrefabRemaps:
     []
@@ -859,6 +923,21 @@
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 264571d0-f879-411b-8deb-ff6d9921317f
+  Components:
+    []
+- !<SceneObject/3ac99ecc-e98c-41c3-a954-318bfa3fa096>
+  PrefabRemaps:
+    []
+  Name: EyeRight
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -2.000000, y: 2.500000, z: -6.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
   Components:
     []
 - !<SceneObject/3b4f5057-b516-4d3b-9c8d-14c81af2f505>
@@ -1011,6 +1090,22 @@
     []
   Components:
     []
+- !<ScriptComponent/50b5a694-bf23-4915-9e64-78e4f50d3c0d>
+  PrefabRemaps:
+    []
+  Name: CreatureBehavior
+  Enabled: true
+  ScriptAsset: !<reference> 393556ce-9929-4830-a2d0-0cbca7b69713
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      cameraObject: !<reference.SceneObject> 00000000-0000-0065-0000-000000000064
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/52ecefe4-5642-445a-ad16-52ce818076bc>
   PrefabRemaps:
     []
@@ -1056,6 +1151,21 @@
     - !<own> bf2095b6-c6f8-48c8-b840-e0a6cec0dc99
   Components:
     []
+- !<SceneObject/5cc03705-f1ac-47fd-854a-886cb29d331f>
+  PrefabRemaps:
+    []
+  Name: ParticleAnchor
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
 - !<ScriptComponent/5f153ad7-2baa-4fd9-a298-0dcfad86da3b>
   PrefabRemaps:
     []
@@ -1080,6 +1190,21 @@
   ScriptTypes:
     "":
       {}
+- !<SceneObject/5f1ee330-db5f-4274-9646-0571e0065950>
+  PrefabRemaps:
+    []
+  Name: MovementRoot_3
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 45.000000, y: -10.000000, z: -130.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> a32bd839-ca84-439b-983b-720006a4b4cd
+  Components:
+    - !<own> 50b5a694-bf23-4915-9e64-78e4f50d3c0d
 - !<ScriptComponent/62967490-d66e-4479-8829-e5c9da5b5b57>
   PrefabRemaps:
     []
@@ -1252,22 +1377,6 @@
     - !<own> f0394c5d-4c44-4c65-a77c-e1c7e05ca905
   Components:
     []
-- !<ScriptComponent/6ac907e7-49db-4300-9d93-90165e5b8d7d>
-  PrefabRemaps:
-    []
-  Name: MessagingBridge
-  Enabled: true
-  ScriptAsset: !<reference> 9aa407db-2872-4afc-a162-cf7faf2a0f29
-  ScriptInputsDefault:
-    {}
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      {}
-  ScriptTypes:
-    "":
-      {}
 - !<SceneObject/6ae8bf8e-a2cb-4898-a4da-25d119a01856>
   PrefabRemaps:
     []
@@ -1313,6 +1422,21 @@
     - !<own> 4c195c04-c397-454e-bd08-3485f37d84fe
   Components:
     []
+- !<SceneObject/701b97d2-3c0d-41f6-997b-9c0364e63ce5>
+  PrefabRemaps:
+    []
+  Name: ParticleAnchor
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
 - !<SceneObject/7037a633-4899-4f2e-bc97-2e3f35395687>
   PrefabRemaps:
     []
@@ -1343,6 +1467,22 @@
     - !<own> 879ce45b-bd5e-40ff-a3fe-d821523427e4
   Components:
     - !<own> 64f27597-c99d-4c59-8a08-05459cc2258d
+- !<SceneObject/73d9396b-35e8-4fed-a38c-cd2330d6c4fd>
+  PrefabRemaps:
+    []
+  Name: Body
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 1459af83-3576-48b0-aa21-c36e112bc71d
+    - !<own> a92f6af8-164e-4dd5-abae-a78674a9f60c
+  Components:
+    []
 - !<SceneObject/745064c1-b1c3-4d14-b6d1-2544d1624a0a>
   PrefabRemaps:
     []
@@ -1736,6 +1876,23 @@
     - !<own> e9454e66-5d09-4a8a-bcd7-dea762326a48
   Components:
     []
+- !<AudioComponent/95382ab3-e9f7-4680-93a4-227592b471c0>
+  PrefabRemaps:
+    []
+  Name: Audio
+  Enabled: true
+  AudioTrack: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableAutoplayLoop: false
+  Volume: 1.000000
+  EnableMixToSnap: false
+  RecordVolume: 1.000000
+  EnableSpatialAudio: false
+  EnableDistanceEffect: false
+  CurveType: Logarithm
+  MinDistance: 0.000000
+  MaxDistance: 100.000000
+  EnableDirectivityEffect: false
+  EnablePositionEffect: false
 - !<SceneObject/988c408a-99dc-47e6-b7c4-efbf4bf8dc3c>
   PrefabRemaps:
     []
@@ -1812,6 +1969,22 @@
     - !<own> 46ea93d6-d161-4453-9064-6ac11e1d6523
   Components:
     []
+- !<SceneObject/a32bd839-ca84-439b-983b-720006a4b4cd>
+  PrefabRemaps:
+    []
+  Name: VisualRoot
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> b2767c63-40a9-4124-a611-234116e24e8b
+    - !<own> 5cc03705-f1ac-47fd-854a-886cb29d331f
+  Components:
+    - !<own> 2bd87890-201f-4df3-9cc3-7f571767b75d
 - !<SceneObject/a4b1ce71-4840-4493-bc52-58f3c13933e1>
   PrefabRemaps:
     []
@@ -1982,6 +2155,21 @@
   ScriptTypes:
     "":
       {}
+- !<SceneObject/a92f6af8-164e-4dd5-abae-a78674a9f60c>
+  PrefabRemaps:
+    []
+  Name: EyeRight
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -2.000000, y: 2.500000, z: -6.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
 - !<SceneObject/a98a7d22-28b9-4357-97cd-1486e721ac5d>
   PrefabRemaps:
     []
@@ -2025,6 +2213,22 @@
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 3de2c7ea-1525-465a-9056-68565a4014a7
+  Components:
+    []
+- !<SceneObject/b2767c63-40a9-4124-a611-234116e24e8b>
+  PrefabRemaps:
+    []
+  Name: Body
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 1b20fe17-3cfe-49c1-92c7-269aa81c1cbd
+    - !<own> 3ac99ecc-e98c-41c3-a954-318bfa3fa096
   Components:
     []
 - !<SceneObject/b463be13-dddb-4b36-a3dd-c344bd3d8ef5>
@@ -2072,6 +2276,22 @@
     - !<own> fcc185fc-4e88-4e9e-9c71-40bd83b1b0ed
   Components:
     []
+- !<ScriptComponent/b70a7e30-7567-4d5a-8d93-2b99372ca53a>
+  PrefabRemaps:
+    []
+  Name: MessagingBridge
+  Enabled: true
+  ScriptAsset: !<reference> 9aa407db-2872-4afc-a162-cf7faf2a0f29
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      {}
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/b786dabc-29e4-4cfa-8a84-f39604ffcbdd>
   PrefabRemaps:
     []
@@ -2293,11 +2513,11 @@
 - !<SceneObject/cdc728b1-643b-4385-a5db-95971d63b545>
   PrefabRemaps:
     []
-  Name: MovementRoot
+  Name: MovementRoot_1
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: -10.000000, z: -130.000000}
+    Position: {x: -45.000000, y: -10.000000, z: -130.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
@@ -2556,6 +2776,22 @@
     - !<own> 6a7a67db-5675-49bb-8f31-ba0588e3cffc
   Components:
     []
+- !<SceneObject/e4e50b31-d5a2-444a-a8fa-3db58d09d767>
+  PrefabRemaps:
+    []
+  Name: VisualRoot
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 73d9396b-35e8-4fed-a38c-cd2330d6c4fd
+    - !<own> 701b97d2-3c0d-41f6-997b-9c0364e63ce5
+  Components:
+    - !<own> 95382ab3-e9f7-4680-93a4-227592b471c0
 - !<DeviceTracking/e5553c8a-0b7e-4ef4-92d9-3e1318fb82c1>
   PrefabRemaps:
     []
@@ -2634,6 +2870,22 @@
     []
   Components:
     []
+- !<ScriptComponent/f1beb31e-dba9-482f-9c70-d5d17d69a816>
+  PrefabRemaps:
+    []
+  Name: CreatureBehavior
+  Enabled: true
+  ScriptAsset: !<reference> 393556ce-9929-4830-a2d0-0cbca7b69713
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      cameraObject: !<reference.SceneObject> 00000000-0000-0065-0000-000000000064
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/f36287fd-ed56-442d-ba20-78f9ef6f3502>
   PrefabRemaps:
     []

@@ -8,6 +8,10 @@ export interface CreatureEye {
     pupilVisual: RenderMeshVisual;
     eyelid: SceneObject;
     baseScale: vec3;
+    /** This eye's built radius (EYE_RADIUS_CM * sizeScale) — left/right eyes
+     *  are built at slightly different sizeScale, so updateExpression's lid
+     *  sweep math needs the actual baked radius, not the raw config constant. */
+    radius: number;
 }
 
 /**
@@ -66,14 +70,34 @@ export class CreatureEyes {
 
         const baseScale = new vec3(1.0, 1.12, 0.46);
         eyeObject.getTransform().setLocalScale(baseScale);
-        return { root: eyeObject, white: rmv, pupil, pupilVisual, eyelid, baseScale };
+        return { root: eyeObject, white: rmv, pupil, pupilVisual, eyelid, baseScale, radius };
     }
 
-    static updateBlink(eye: CreatureEye, blinkT: number): void {
-        const closure = blinkT > 0 ? 1 - Math.abs(blinkT / BLINK_DURATION_S - 0.5) * 2 : 0;
-        eye.root.getTransform().setLocalScale(eye.baseScale);
-        const lidY = EYE_RADIUS_CM * (0.94 - closure * 0.98);
-        eye.eyelid.getTransform().setLocalPosition(new vec3(0, lidY, -EYE_RADIUS_CM * 0.7));
+    /**
+     * Combines the state-driven resting eyelid closure (0 = wide open, 1 =
+     * half-lidded/shut — see CreatureConfig EYELID_*) with the momentary
+     * blink reflex via Math.max, so a full blink still fully closes the eye
+     * even from a half-lidded CALM resting state. scaleMultiplier widens/
+     * narrows the eye on top of its baked-in baseScale (which itself
+     * preserves the left/right size asymmetry set at build time).
+     */
+    static updateExpression(eye: CreatureEye, restingClosure: number, blinkT: number, scaleMultiplier: number): void {
+        const blinkClosure = blinkT > 0 ? 1 - Math.abs(blinkT / BLINK_DURATION_S - 0.5) * 2 : 0;
+        const closure = Math.max(restingClosure, blinkClosure);
+        eye.root.getTransform().setLocalScale(eye.baseScale.uniformScale(scaleMultiplier));
+
+        // The lid's TOP edge stays pinned at the eye's top; its BOTTOM edge
+        // sweeps down from the top (closure=0, fully retracted/invisible) to
+        // the eye's bottom (closure=1, fully covered) — so it reads as an
+        // actual lid closing over the eye, not a fixed-size band that merely
+        // repositions (that was the earlier, barely-visible version).
+        const r = eye.radius;
+        const eyeTop = r;
+        const bottomY = r * (1 - 2 * closure);
+        const centerY = (eyeTop + bottomY) / 2;
+        const halfHeight = Math.max(0.02, (eyeTop - bottomY) / 2);
+        eye.eyelid.getTransform().setLocalScale(new vec3(1.04, halfHeight / (r * 1.02), 0.26));
+        eye.eyelid.getTransform().setLocalPosition(new vec3(0, centerY, -r * 0.7));
     }
 
     private static buildSphere(object: SceneObject, radius: number, material: Material | null, color: [number, number, number, number]): RenderMeshVisual {

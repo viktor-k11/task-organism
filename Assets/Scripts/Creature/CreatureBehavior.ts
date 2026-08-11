@@ -1,6 +1,7 @@
-import { BlobMeshBuilder } from "./BlobMeshBuilder";
+import { CreaturePetVisual, PetSpecies } from "./CreaturePetVisual";
 import { CreatureEyes, CreatureEye } from "./CreatureEyes";
-import { CreatureAppendages } from "./CreatureAppendages";
+import { CreatureEarsAndTail } from "./CreatureEarsAndTail";
+import { CreatureMouth } from "./CreatureMouth";
 import { buildCreatureShadow } from "./CreatureShadow";
 import { ReleaseEffect } from "./ReleaseEffect";
 import { stepSeekArrive, stepSeekArriveAngular, clamp01, findChildByName } from "./CreatureMovement";
@@ -31,39 +32,82 @@ import {
     CHASE_LOOK_PAUSE_S,
     CHASE_ANTICIPATION_S,
     CHASE_ANTICIPATION_DIP_CM,
-    BREATHE_AMPLITUDE,
-    BREATHE_FREQUENCY_HZ,
-    WANDER_SPEED_CM_S,
-    WANDER_MAX_ACCEL_CM_S2,
+    BREATHE_CALM_AMPLITUDE,
+    BREATHE_CALM_FREQUENCY_HZ,
+    BREATHE_URGENT_AMPLITUDE,
+    BREATHE_URGENT_FREQUENCY_HZ,
+    BREATHE_CHASE_AMPLITUDE,
+    BREATHE_CHASE_FREQUENCY_HZ,
+    POSTURE_EASE_PER_S,
+    POSTURE_CALM_HEIGHT_SCALE,
+    POSTURE_CALM_WIDTH_SCALE,
+    POSTURE_URGENT_HEIGHT_SCALE,
+    POSTURE_URGENT_WIDTH_SCALE,
+    POSTURE_CHASE_HEIGHT_SCALE,
+    POSTURE_CHASE_WIDTH_SCALE,
+    POSTURE_URGENT_TREMOR_AMPLITUDE,
+    POSTURE_URGENT_TREMOR_HZ,
+    GAZE_CALM_YAW_SPEED_DEG_S,
+    GAZE_CALM_DRIFT_RANGE_DEG,
+    GAZE_CALM_DRIFT_HZ,
+    GAZE_URGENT_YAW_SPEED_DEG_S,
+    GAZE_URGENT_TREMOR_DEG,
+    GAZE_URGENT_TREMOR_HZ,
+    TINT_EASE_PER_S,
+    TINT_URGENT_COLOR,
+    TINT_CHASE_COLOR,
+    WANDER_CALM_SPEED_CM_S,
+    WANDER_CALM_MAX_ACCEL_CM_S2,
+    WANDER_CALM_REPICK_PAUSE_MIN_S,
+    WANDER_CALM_REPICK_PAUSE_MAX_S,
+    WANDER_CALM_RADIUS_SCALE,
+    WANDER_URGENT_SPEED_CM_S,
+    WANDER_URGENT_MAX_ACCEL_CM_S2,
+    WANDER_URGENT_REPICK_PAUSE_MIN_S,
+    WANDER_URGENT_REPICK_PAUSE_MAX_S,
+    WANDER_URGENT_RADIUS_SCALE,
     WANDER_ARRIVAL_RADIUS_CM,
     WANDER_DEAD_ZONE_RADIUS_CM,
-    WANDER_REPICK_PAUSE_MIN_S,
-    WANDER_REPICK_PAUSE_MAX_S,
     SQUASH_STRETCH_AMOUNT,
     SQUASH_STRETCH_DURATION_S,
     SQUASH_STRETCH_DIRECTION_DOT_THRESHOLD,
-    GLANCE_INTERVAL_MIN_S,
-    GLANCE_INTERVAL_MAX_S,
-    GLANCE_HOP_HEIGHT_CM,
-    GLANCE_HOP_DURATION_S,
-    GLANCE_HOLD_DURATION_S,
     FACE_TURN_RATE_PER_S,
-    IDLE_YAW_LIMIT_DEG,
-    IDLE_MAX_YAW_SPEED_DEG_S,
     CHASE_MAX_YAW_SPEED_DEG_S,
     BODY_MOVE_TILT_DEG,
     BODY_SECONDARY_SWAY_DEG,
-    EYE_OFFSET_X_CM,
     EYE_OFFSET_Y_CM,
     EYE_OFFSET_Z_CM,
     BLINK_INTERVAL_MIN_S,
     BLINK_INTERVAL_MAX_S,
     BLINK_DURATION_S,
-    VISUAL_BASELINE_SCALE,
+    BLOB_COLOR,
+    EXPRESSION_EASE_PER_S,
+    EYELID_CALM_CLOSURE,
+    EYELID_URGENT_CLOSURE,
+    EYELID_CHASE_CLOSURE,
+    EYE_SCALE_CALM,
+    EYE_SCALE_URGENT,
+    EYE_SCALE_CHASE,
+    EYE_SPACING_CALM_CM,
+    EYE_SPACING_URGENT_CM,
+    EYE_SPACING_CHASE_CM,
+    LEAN_CALM_PITCH_DEG,
+    LEAN_URGENT_PITCH_DEG,
+    LEAN_CHASE_PITCH_DEG,
+    MOUTH_CURVE_CALM,
+    MOUTH_CURVE_URGENT,
+    MOUTH_CURVE_CHASE,
+    GROWTH_SCALE_MAX,
+    GROWTH_EASE_PER_S,
 } from "../Config/CreatureConfig";
 
 const bodyBaseMaterialAsset = requireAsset("../../Materials/BlobBody.mat") as Material;
 const eyeBaseMaterialAsset = requireAsset("../../Materials/BlobEye.mat") as Material;
+/** Ready-made Sketchfab dog/cat GLBs (Assets/3d assets/, see LICENSES.md),
+ *  simplified for SPECS — see CreaturePetVisual.ts and CreatureConfig's
+ *  READYMADE_PET_* doc comment. */
+const dogPrefab = requireAsset("../../GeneratedMeshes/dog_lo.glb") as ObjectPrefab;
+const catPrefab = requireAsset("../../GeneratedMeshes/cat_lo.glb") as ObjectPrefab;
 
 /**
  * Local, presentation-only state — deliberately NOT named `BehaviorState`;
@@ -80,6 +124,18 @@ enum CreaturePresentationState {
 }
 
 /**
+ * The minimal contract CreatureBehavior needs from whichever visual body
+ * implementation is active — currently CreaturePetVisual (ready-made dog/cat
+ * GLBs). CreatureBody.ts's PetCreatureBody (the earlier /build-mesh-generated
+ * mesh, kept in the repo unused) satisfies the same shape and could be
+ * swapped back in by changing only onStart()'s construction call.
+ */
+interface CreatureVisual {
+    readonly renderMeshVisual: RenderMeshVisual | null;
+    applyBaseMaterial(baseMaterial: Material): void;
+}
+
+/**
  * CreatureBehavior — the one @component for the emotional-core creature.
  *
  * Owns: presentation state (IDLE/CHASING/RELEASING), idle wander + periodic
@@ -88,8 +144,12 @@ enum CreaturePresentationState {
  *       breathing + squash&stretch transform-level animation on Body.
  * Delegates to plain TS helpers (per the approved plan, to avoid fragile
  *       cross-object @input wiring for a single creature's interior parts):
- *       BlobMeshBuilder (procedural mesh + wobble), CreatureEyes (static
- *       pupils), ReleaseEffect (one-shot particle/brighten/sound burst).
+ *       CreaturePetVisual (the ready-made dog/cat GLB — see LICENSES.md),
+ *       CreatureEyes/CreatureEarsAndTail/CreatureMouth (built and wired only
+ *       for the earlier procedural/mesh-generated visuals — a static
+ *       ready-made mesh has no rig to hang eyelids/ears/tail off, so these
+ *       stay unused rather than faking parts that aren't there), ReleaseEffect
+ *       (one-shot particle/brighten/sound burst).
  * Public API (the seam a future AttentionArbiter — and the debug trigger —
  *       both call): requestChase(), endChase(), release(), reset().
  * Does NOT own: any TaskRecord/repository/StateEngine knowledge. This piece
@@ -105,6 +165,9 @@ export class CreatureBehavior extends BaseScriptComponent {
     @input
     @hint("The scene's main Camera SceneObject — used to compute the habitat center and the chase target.")
     cameraObject!: SceneObject;
+    @input
+    @hint("Which ready-made model this slot uses: \"dog\" or \"cat\" (see CreaturePetVisual.ts).")
+    petSpecies: string = "dog";
     @ui.group_end
 
     private state: CreaturePresentationState = CreaturePresentationState.IDLE;
@@ -118,10 +181,11 @@ export class CreatureBehavior extends BaseScriptComponent {
     private particleAnchorObject: SceneObject | null = null;
     private audioComponent: AudioComponent | null = null;
 
-    private blobMesh: BlobMeshBuilder | null = null;
+    private body: CreatureVisual | null = null;
     private eyeLeft: CreatureEye | null = null;
     private eyeRight: CreatureEye | null = null;
-    private appendages: CreatureAppendages | null = null;
+    private earsAndTail: CreatureEarsAndTail | null = null;
+    private mouth: CreatureMouth | null = null;
     private releaseEffect: ReleaseEffect | null = null;
 
     private timeS = 0;
@@ -130,7 +194,15 @@ export class CreatureBehavior extends BaseScriptComponent {
 
     // Movement (Creature root world position) + facing (Body local yaw, eased).
     private velocity: vec3 = vec3.zero();
-    private facingDir: vec3 = vec3.forward();
+    // vec3.forward() confusingly returns (0,0,1), NOT (0,0,-1) — verified against
+    // StudioLib.d.ts. vec3.back() is the one that actually returns (0,0,-1), which
+    // is what yaw=0 must resolve to (see faceDirection's convention in
+    // CreatureMovement.ts, replicated inline throughout this class). Seeding with
+    // the wrong constant meant every fresh/reset creature started rotated 180°
+    // from its yaw=0 pose and had to visibly turn itself around over several
+    // seconds (worst-case ~10s at CALM's slow turn rate) before gaze logic caught
+    // up — this is what read as "the creature faces away from the camera".
+    private facingDir: vec3 = vec3.back();
 
     // Habitat / wander — captured once at spawn/reset so the habitat is a
     // fixed world-space zone, not continuously recentered on the camera.
@@ -147,10 +219,26 @@ export class CreatureBehavior extends BaseScriptComponent {
     private isWaitingAtWanderTarget = false;
     private prevMoveDir: vec3 | null = null;
 
-    // Glance-at-camera
-    private glanceTimer = 0;
-    private isGlancing = false;
-    private glanceElapsed = 0;
+    /** CALM vs URGENT presentation, driven externally via setUrgent() — see
+     *  StateEngine.deriveState. Only read by IDLE wander; CHASING/INTERACTING/
+     *  RELEASING are unaffected. */
+    private isUrgent = false;
+
+    // Posture (eased non-uniform Body scale) + color tint — see applyBodyScale
+    // / updateColorTint. Both keyed off emotionalProfile(), not isUrgent alone.
+    private postureHeightScale = 1;
+    private postureWidthScale = 1;
+    private currentTint: vec4 = new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], BLOB_COLOR[3]);
+
+    // Expressive face — every channel eased toward the SAME emotionalProfile()
+    // target each frame (see updateExpression), so eyelids/eye scale/spacing/
+    // lean/mouth can never drift out of sync with each other or with the
+    // posture/breathing/tint channels above.
+    private eyeLidClosure = EYELID_CALM_CLOSURE;
+    private eyeScaleMultiplier = EYE_SCALE_CALM;
+    private eyeSpacingCm = EYE_SPACING_CALM_CM;
+    private leanPitchDeg = LEAN_CALM_PITCH_DEG;
+    private mouthCurve = MOUTH_CURVE_CALM;
 
     // Chase — polar steering (radius + angle around the camera), decoupled so
     // the radial distance can never dip toward the camera while the angle is
@@ -166,6 +254,13 @@ export class CreatureBehavior extends BaseScriptComponent {
     private hesitationActiveT = 0;
     private chaseCueElapsed = 0;
     private presentationScale = HABITAT_VISUAL_SCALE;
+
+    // Whole-body growth (1.0 -> GROWTH_SCALE_MAX as a task ages) — driven
+    // externally via setUrgencyLevel01, eased and multiplied into
+    // updatePresentationScale's existing habitat/chase scale. Works on any
+    // mesh (uniform transform scale), unlike the eye/ear/tail channels above.
+    private growthScale = 1.0;
+    private targetGrowthScale = 1.0;
 
     // Squash & stretch envelope: 1 = just triggered, decays to 0.
     private squashEnvelope = 0;
@@ -183,7 +278,6 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (this.state === CreaturePresentationState.RELEASING) return;
 
         this.state = CreaturePresentationState.CHASING;
-        this.isGlancing = false;
         this.chaseDistanceCm = this.randomRange(CHASE_DISTANCE_MIN_CM, CHASE_DISTANCE_MAX_CM);
         this.chaseSideDeg = this.randomRange(CHASE_SIDE_OFFSET_MIN_DEG, CHASE_SIDE_OFFSET_MAX_DEG) * (Math.random() < 0.5 ? -1 : 1);
         this.hesitationTimer = this.randomRange(CHASE_HESITATION_INTERVAL_MIN_S, CHASE_HESITATION_INTERVAL_MAX_S);
@@ -222,6 +316,30 @@ export class CreatureBehavior extends BaseScriptComponent {
         }
     }
 
+    /**
+     * Sets the CALM/URGENT presentation flag — purely a motion-tuning input
+     * for IDLE wander (speed/pause/retarget-frequency), read every frame from
+     * updateWander/pickWanderTarget. Never changes CreaturePresentationState
+     * itself: an URGENT task that becomes the chaser still transitions via
+     * requestChase() as before, and this flag is simply ignored while chasing.
+     */
+    setUrgent(isUrgent: boolean): void {
+        this.isUrgent = isUrgent;
+    }
+
+    /**
+     * Sets the continuous whole-body growth target from the task's raw
+     * urgency value (StateEngine.urgency(task) — 0 at creation, reaching
+     * CHASE_THRESHOLD's 1.0 when it would become eligible to chase, and
+     * beyond if never resolved). Maps [0,1] -> [1.0, GROWTH_SCALE_MAX] and
+     * clamps, so an old-but-not-yet-urgent task keeps growing right up to
+     * the same threshold the CALM/URGENT channels key off, then holds — an
+     * ignored task literally growing, independent of mesh/rig availability.
+     */
+    setUrgencyLevel01(urgency: number): void {
+        this.targetGrowthScale = 1.0 + (GROWTH_SCALE_MAX - 1.0) * clamp01(urgency);
+    }
+
     /** Stops chase translation at the current reacquirable pose; vitality keeps updating. */
     holdForInteraction(): void {
         if (this.isReleased || this.state !== CreaturePresentationState.CHASING) return;
@@ -256,17 +374,21 @@ export class CreatureBehavior extends BaseScriptComponent {
     release(): void {
         if (this.isReleased) return;
         if (this.state !== CreaturePresentationState.CHASING && this.state !== CreaturePresentationState.INTERACTING && this.state !== CreaturePresentationState.IDLE) return;
-        if (!this.blobMesh || !this.eyeLeft || !this.eyeRight || !this.particleAnchorObject) return;
+        if (!this.body || !this.body.renderMeshVisual || !this.particleAnchorObject) return;
 
         this.isReleased = true;
         this.state = CreaturePresentationState.RELEASING;
 
+        // eyeRmvs is empty when there are no eye parts (ready-made dog/cat
+        // GLBs) — ReleaseEffect.play() accepts an empty list, it just brightens
+        // the body alone.
+        const eyeRmvs = this.eyeLeft && this.eyeRight ? [this.eyeLeft.white, this.eyeRight.white, this.eyeLeft.pupilVisual, this.eyeRight.pupilVisual] : [];
         this.releaseEffect = new ReleaseEffect();
         this.releaseEffect.play(
             this,
             this.particleAnchorObject,
-            this.blobMesh.renderMeshVisual,
-            [this.eyeLeft.white, this.eyeRight.white, this.eyeLeft.pupilVisual, this.eyeRight.pupilVisual],
+            this.body.renderMeshVisual,
+            eyeRmvs,
             this.audioComponent,
             () => {
                 // Guard against a stale completion firing after reset() has already
@@ -325,24 +447,29 @@ export class CreatureBehavior extends BaseScriptComponent {
 
         this.visualRootObject = findChildByName(this.sceneObject, "VisualRoot");
         this.bodyObject = this.visualRootObject ? findChildByName(this.visualRootObject, "Body") : null;
-        this.eyeLeftObject = this.bodyObject ? findChildByName(this.bodyObject, "EyeLeft") : null;
-        this.eyeRightObject = this.bodyObject ? findChildByName(this.bodyObject, "EyeRight") : null;
         this.particleAnchorObject = this.visualRootObject ? findChildByName(this.visualRootObject, "ParticleAnchor") : null;
         this.audioComponent = this.visualRootObject
             ? this.visualRootObject.getComponent("Component.AudioComponent") as AudioComponent
             : null;
+        // EyeLeft/EyeRight are authored placeholders from the earlier
+        // procedural/mesh-generated visuals — still looked up (so a future
+        // switch back to CreaturePetVisual's PetCreatureBody-style sibling
+        // just works again) but NOT required: the ready-made dog/cat GLBs
+        // have no eye sockets to attach to, and CreatureBehavior's
+        // eye-dependent update paths (blink, eyelid/eye-scale/spacing,
+        // mouth) are all separately guarded — only body orientation/gaze/
+        // lean/breathing/posture/tint/growth run unconditionally.
+        this.eyeLeftObject = this.bodyObject ? findChildByName(this.bodyObject, "EyeLeft") : null;
+        this.eyeRightObject = this.bodyObject ? findChildByName(this.bodyObject, "EyeRight") : null;
 
-        if (!this.bodyObject || !this.eyeLeftObject || !this.eyeRightObject || !this.particleAnchorObject) {
-            console.error("[CreatureBehavior] Body/EyeLeft/EyeRight/ParticleAnchor not found. Check the authored scene hierarchy.");
+        if (!this.bodyObject || !this.particleAnchorObject) {
+            console.error("[CreatureBehavior] Body/ParticleAnchor not found. Check the authored scene hierarchy.");
             return;
         }
 
-        this.blobMesh = new BlobMeshBuilder(this.bodyObject, bodyBaseMaterialAsset);
-        this.eyeLeftObject.getTransform().setLocalPosition(new vec3(EYE_OFFSET_X_CM, EYE_OFFSET_Y_CM, EYE_OFFSET_Z_CM));
-        this.eyeRightObject.getTransform().setLocalPosition(new vec3(-EYE_OFFSET_X_CM, EYE_OFFSET_Y_CM + 0.15, EYE_OFFSET_Z_CM));
-        this.eyeLeft = CreatureEyes.build(this.eyeLeftObject, bodyBaseMaterialAsset, eyeBaseMaterialAsset, 1.0);
-        this.eyeRight = CreatureEyes.build(this.eyeRightObject, bodyBaseMaterialAsset, eyeBaseMaterialAsset, 0.88);
-        this.appendages = new CreatureAppendages(this.bodyObject, bodyBaseMaterialAsset);
+        const species: PetSpecies = this.petSpecies === "cat" ? "cat" : "dog";
+        const prefab = species === "cat" ? catPrefab : dogPrefab;
+        this.body = new CreaturePetVisual(this.bodyObject, prefab, species, bodyBaseMaterialAsset);
         this.shadowObject = buildCreatureShadow(this.visualRootObject!, eyeBaseMaterialAsset);
 
         this.resetToIdle();
@@ -361,7 +488,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.state = CreaturePresentationState.IDLE;
         this.timeS = 0;
         this.velocity = vec3.zero();
-        this.facingDir = vec3.forward();
+        this.facingDir = vec3.back(); // see the field declaration's comment — vec3.back() is (0,0,-1), not .forward().
         this.hesitationTimer = 0;
         this.hesitationAngleOffsetRad = 0;
         this.hesitationActiveT = 0;
@@ -369,17 +496,24 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.chaseRadialVel = 0;
         this.squashEnvelope = 0;
         this.prevMoveDir = null;
-        this.isGlancing = false;
-        this.glanceElapsed = 0;
-        this.glanceTimer = this.randomRange(GLANCE_INTERVAL_MIN_S, GLANCE_INTERVAL_MAX_S);
+        this.postureHeightScale = 1;
+        this.postureWidthScale = 1;
+        this.currentTint = new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], BLOB_COLOR[3]);
+        this.eyeLidClosure = EYELID_CALM_CLOSURE;
+        this.eyeScaleMultiplier = EYE_SCALE_CALM;
+        this.eyeSpacingCm = EYE_SPACING_CALM_CM;
+        this.leanPitchDeg = LEAN_CALM_PITCH_DEG;
+        this.mouthCurve = MOUTH_CURVE_CALM;
         this.isWaitingAtWanderTarget = false;
         this.wanderPauseTimer = 0;
         this.releaseEffect = null;
         this.blinkElapsed = 0;
         this.blinkTimer = this.randomRange(BLINK_INTERVAL_MIN_S, BLINK_INTERVAL_MAX_S);
+        this.growthScale = 1.0;
+        this.targetGrowthScale = 1.0;
         if (this.visualRootObject) {
             this.presentationScale = HABITAT_VISUAL_SCALE;
-            this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale));
+            this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale * this.growthScale));
         }
 
         this.recomputeHabitatOrigin();
@@ -390,10 +524,14 @@ export class CreatureBehavior extends BaseScriptComponent {
             this.bodyObject.getTransform().setLocalScale(vec3.one());
         }
 
-        // Restore base (un-brightened) materials — release() never mutates the
-        // shared base asset (clone-before-mutate), so a plain reassignment
-        // is sufficient here; no re-clone needed.
-        if (this.blobMesh) this.blobMesh.renderMeshVisual.mainMaterial = bodyBaseMaterialAsset;
+        // Restore a FRESH per-instance clone of the base (un-brightened) body
+        // material — never reassign the shared bodyBaseMaterialAsset directly,
+        // since updateColorTint() mutates mainPass.baseColor every frame from
+        // here on; mutating the shared asset itself would bleed one
+        // creature's tint onto every sibling using it. release()'s brighten
+        // clone is discarded here, not reused, since it also never touches
+        // the shared asset (clone-before-mutate).
+        if (this.body) this.body.applyBaseMaterial(bodyBaseMaterialAsset);
         if (this.eyeLeft) this.eyeLeft.pupilVisual.mainMaterial = eyeBaseMaterialAsset;
         if (this.eyeRight) this.eyeRight.pupilVisual.mainMaterial = eyeBaseMaterialAsset;
     }
@@ -433,10 +571,6 @@ export class CreatureBehavior extends BaseScriptComponent {
         const dt = getDeltaTime();
         this.timeS += dt;
 
-        if (this.blobMesh) {
-            this.blobMesh.updateWobble(this.timeS);
-        }
-
         if (this.state === CreaturePresentationState.IDLE) {
             this.updateIdle(dt);
         } else if (this.state === CreaturePresentationState.CHASING) {
@@ -447,26 +581,62 @@ export class CreatureBehavior extends BaseScriptComponent {
 
         this.updatePresentationScale(dt);
         this.applyBodyScale(dt);
+        this.updateColorTint(dt);
+        this.updateExpression(dt);
         this.updateFaceAndSecondaryMotion(dt);
     }
 
-    // ── IDLE: breathing (handled in applyBodyScale) + wander + glance ──────
+    /** CALM/URGENT/CHASE — the single switch breathing, posture, tint, gaze
+     *  (for IDLE), and the expressive face below all key off, so every
+     *  amplified channel can never drift out of sync with any other. */
+    private emotionalProfile(): "CALM" | "URGENT" | "CHASE" {
+        if (this.state === CreaturePresentationState.CHASING || this.state === CreaturePresentationState.INTERACTING) return "CHASE";
+        return this.isUrgent ? "URGENT" : "CALM";
+    }
+
+    /**
+     * The expressive face: body lean always eases toward emotionalProfile()'s
+     * target (it's a Body-transform channel, available on any mesh); eyelid
+     * closure, eye scale/spacing, and mouth curve only exist — and only
+     * ease — when EyeLeft/EyeRight are actually present (the ready-made
+     * dog/cat GLBs have none, and CreatureBehavior must not fake parts that
+     * aren't there). Adding a new lean-like channel is a single new eased
+     * field + one three-way pick here — no other method needs to know
+     * about it, per the "single state value drives everything" constraint.
+     */
+    private updateExpression(dt: number): void {
+        const profile = this.emotionalProfile();
+        const alpha = clamp01(dt * EXPRESSION_EASE_PER_S);
+
+        const targetLean = profile === "CALM" ? LEAN_CALM_PITCH_DEG : profile === "URGENT" ? LEAN_URGENT_PITCH_DEG : LEAN_CHASE_PITCH_DEG;
+        this.leanPitchDeg += (targetLean - this.leanPitchDeg) * alpha;
+
+        if (!this.eyeLeftObject || !this.eyeRightObject) return;
+        const targetLid = profile === "CALM" ? EYELID_CALM_CLOSURE : profile === "URGENT" ? EYELID_URGENT_CLOSURE : EYELID_CHASE_CLOSURE;
+        const targetEyeScale = profile === "CALM" ? EYE_SCALE_CALM : profile === "URGENT" ? EYE_SCALE_URGENT : EYE_SCALE_CHASE;
+        const targetSpacing = profile === "CALM" ? EYE_SPACING_CALM_CM : profile === "URGENT" ? EYE_SPACING_URGENT_CM : EYE_SPACING_CHASE_CM;
+        const targetMouth = profile === "CALM" ? MOUTH_CURVE_CALM : profile === "URGENT" ? MOUTH_CURVE_URGENT : MOUTH_CURVE_CHASE;
+
+        this.eyeLidClosure += (targetLid - this.eyeLidClosure) * alpha;
+        this.eyeScaleMultiplier += (targetEyeScale - this.eyeScaleMultiplier) * alpha;
+        this.eyeSpacingCm += (targetSpacing - this.eyeSpacingCm) * alpha;
+        this.mouthCurve += (targetMouth - this.mouthCurve) * alpha;
+
+        this.eyeLeftObject.getTransform().setLocalPosition(new vec3(this.eyeSpacingCm, EYE_OFFSET_Y_CM, EYE_OFFSET_Z_CM));
+        this.eyeRightObject.getTransform().setLocalPosition(new vec3(-this.eyeSpacingCm, EYE_OFFSET_Y_CM + 0.15, EYE_OFFSET_Z_CM));
+
+        if (this.mouth) this.mouth.updateCurve(this.mouthCurve);
+    }
+
+    // ── IDLE: breathing/posture/tint (applyBodyScale/updateColorTint) + wander + gaze ──
 
     private updateIdle(dt: number): void {
-        if (this.isGlancing) {
-            this.updateGlance(dt);
-            return; // movement paused during a glance for a clean, readable beat
-        }
-
-        this.glanceTimer -= dt;
-        if (this.glanceTimer <= 0) {
-            this.isGlancing = true;
-            this.glanceElapsed = 0;
-            return;
-        }
-
         this.updateWander(dt);
-        this.updateCameraFrontBias(dt, true);
+        if (this.isUrgent) {
+            this.updateGazeUrgent(dt);
+        } else {
+            this.updateGazeCalm(dt);
+        }
     }
 
     private updateWander(dt: number): void {
@@ -480,7 +650,9 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (dist <= WANDER_DEAD_ZONE_RADIUS_CM) {
             if (!this.isWaitingAtWanderTarget) {
                 this.isWaitingAtWanderTarget = true;
-                this.wanderPauseTimer = this.randomRange(WANDER_REPICK_PAUSE_MIN_S, WANDER_REPICK_PAUSE_MAX_S);
+                this.wanderPauseTimer = this.isUrgent
+                    ? this.randomRange(WANDER_URGENT_REPICK_PAUSE_MIN_S, WANDER_URGENT_REPICK_PAUSE_MAX_S)
+                    : this.randomRange(WANDER_CALM_REPICK_PAUSE_MIN_S, WANDER_CALM_REPICK_PAUSE_MAX_S);
             }
             this.velocity = vec3.zero();
             this.wanderPauseTimer -= dt;
@@ -496,8 +668,8 @@ export class CreatureBehavior extends BaseScriptComponent {
             pos,
             this.velocity,
             this.wanderTarget,
-            WANDER_SPEED_CM_S,
-            WANDER_MAX_ACCEL_CM_S2,
+            this.isUrgent ? WANDER_URGENT_SPEED_CM_S : WANDER_CALM_SPEED_CM_S,
+            this.isUrgent ? WANDER_URGENT_MAX_ACCEL_CM_S2 : WANDER_CALM_MAX_ACCEL_CM_S2,
             WANDER_ARRIVAL_RADIUS_CM,
             WANDER_DEAD_ZONE_RADIUS_CM,
             dt,
@@ -511,38 +683,43 @@ export class CreatureBehavior extends BaseScriptComponent {
         }
     }
 
-    private updateGlance(dt: number): void {
-        if (!this.bodyObject || !this.cameraObject) return;
-        this.glanceElapsed += dt;
+    /**
+     * CALM gaze: a slow, unhurried sweep centered on habitatForwardYaw — the
+     * direction FROM the camera INTO the habitat, i.e. away from the user
+     * (see recomputeHabitatOrigin). Deliberately ignores the camera's live
+     * position entirely, unlike updateGazeUrgent — that's the whole signal.
+     */
+    private updateGazeCalm(dt: number): void {
+        const driftRad = (GAZE_CALM_DRIFT_RANGE_DEG * Math.PI) / 180 * Math.sin(this.timeS * GAZE_CALM_DRIFT_HZ * Math.PI * 2);
+        const yaw = this.habitatForwardYaw + driftRad;
+        const desiredDir = new vec3(Math.sin(yaw), 0, -Math.cos(yaw));
+        this.updateFacingLimited(desiredDir, dt, GAZE_CALM_YAW_SPEED_DEG_S);
+    }
 
+    /**
+     * URGENT gaze: locks onto the camera's live position (fast turn speed —
+     * "keeps turning to face the user") with a fast small tremor layered on
+     * top so the hold itself reads as anxious, not statically staring.
+     */
+    private updateGazeUrgent(dt: number): void {
+        if (!this.cameraObject || !this.bodyObject) return;
         const camPos = this.cameraObject.getTransform().getWorldPosition();
-        const bodyPos = this.bodyObject.getTransform().getWorldPosition();
-        const toCam = camPos.sub(bodyPos);
-        if (toCam.length > 0.5) {
-            this.updateFacing(toCam.normalize(), dt);
-        }
-
-        // Small hop: single up-down bump over GLANCE_HOP_DURATION_S, held briefly.
-        let hopY = 0;
-        if (this.glanceElapsed < GLANCE_HOP_DURATION_S) {
-            const t = this.glanceElapsed / GLANCE_HOP_DURATION_S;
-            hopY = GLANCE_HOP_HEIGHT_CM * Math.sin(t * Math.PI);
-        }
-        this.bodyObject.getTransform().setLocalPosition(new vec3(0, hopY, 0));
-
-        const totalGlanceDuration = GLANCE_HOP_DURATION_S + GLANCE_HOLD_DURATION_S;
-        if (this.glanceElapsed >= totalGlanceDuration) {
-            this.isGlancing = false;
-            this.glanceElapsed = 0;
-            this.glanceTimer = this.randomRange(GLANCE_INTERVAL_MIN_S, GLANCE_INTERVAL_MAX_S);
-            this.bodyObject.getTransform().setLocalPosition(vec3.zero());
-        }
+        const pos = this.bodyObject.getTransform().getWorldPosition();
+        const toCamera = camPos.sub(pos);
+        toCamera.y = 0;
+        if (toCamera.length < 0.5) return;
+        const baseYaw = Math.atan2(toCamera.x, -toCamera.z);
+        const tremorRad = (GAZE_URGENT_TREMOR_DEG * Math.PI) / 180 * Math.sin(this.timeS * GAZE_URGENT_TREMOR_HZ * Math.PI * 2);
+        const yaw = baseYaw + tremorRad;
+        const desiredDir = new vec3(Math.sin(yaw), 0, -Math.cos(yaw));
+        this.updateFacingLimited(desiredDir, dt, GAZE_URGENT_YAW_SPEED_DEG_S);
     }
 
     private pickWanderTarget(): vec3 {
+        const radiusScale = this.isUrgent ? WANDER_URGENT_RADIUS_SCALE : WANDER_CALM_RADIUS_SCALE;
         if (this.homeAnchorConfigured) {
             const angle = Math.random() * Math.PI * 2;
-            const radius = Math.sqrt(Math.random()) * this.homeWanderRadiusCm;
+            const radius = Math.sqrt(Math.random()) * this.homeWanderRadiusCm * radiusScale;
             return new vec3(
                 this.habitatCenter.x + Math.cos(angle) * radius,
                 this.wanderTargetY,
@@ -552,7 +729,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         const halfArcRad = (HABITAT_ARC_HALF_ANGLE_DEG * Math.PI) / 180;
         const angleOffset = (Math.random() * 2 - 1) * halfArcRad;
         const angle = this.habitatForwardYaw + angleOffset;
-        const dist = this.randomRange(HABITAT_RADIUS_MIN_CM, HABITAT_RADIUS_MAX_CM);
+        const dist = this.randomRange(HABITAT_RADIUS_MIN_CM, HABITAT_RADIUS_MAX_CM) * radiusScale;
 
         // Reconstruct a direction vector from a yaw angle the same way faceDirection's
         // formula reads one back: yaw = atan2(dir.x, -dir.z) => dir = (sin(yaw), 0, -cos(yaw)).
@@ -592,7 +769,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         const cueDuration = CHASE_LOOK_PAUSE_S + CHASE_ANTICIPATION_S;
         if (this.chaseCueElapsed < cueDuration) {
             this.velocity = vec3.zero();
-            this.updateCameraFrontBias(dt, false);
+            this.updateCameraFrontBias(dt);
             if (this.bodyObject) {
                 const anticipationT = clamp01((this.chaseCueElapsed - CHASE_LOOK_PAUSE_S) / CHASE_ANTICIPATION_S);
                 const dip = anticipationT > 0 ? -CHASE_ANTICIPATION_DIP_CM * Math.sin(anticipationT * Math.PI) : 0;
@@ -699,23 +876,16 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.facingDir = vec3.slerp(this.facingDir, desiredDir, alpha).normalize();
     }
 
-    private updateCameraFrontBias(dt: number, clampIdleBias: boolean): void {
+    /** Pre-chase "notice the user" cue only (see updateChasing) — IDLE gaze is
+     *  handled separately by updateGazeCalm/updateGazeUrgent. */
+    private updateCameraFrontBias(dt: number): void {
         if (!this.cameraObject) return;
         const camPos = this.cameraObject.getTransform().getWorldPosition();
         const pos = this.sceneObject.getTransform().getWorldPosition();
-        let toCamera = camPos.sub(pos);
+        const toCamera = camPos.sub(pos);
         toCamera.y = 0;
         if (toCamera.length < 0.5) return;
-        toCamera = toCamera.normalize();
-        if (clampIdleBias) {
-            const directYaw = Math.atan2(toCamera.x, -toCamera.z);
-            const frontYaw = this.habitatForwardYaw + Math.PI;
-            const maxBias = IDLE_YAW_LIMIT_DEG * Math.PI / 180;
-            const bias = this.wrapAngle(directYaw - frontYaw);
-            const limitedYaw = frontYaw + Math.max(-maxBias, Math.min(maxBias, bias));
-            toCamera = new vec3(Math.sin(limitedYaw), 0, -Math.cos(limitedYaw));
-        }
-        this.updateFacingLimited(toCamera, dt, clampIdleBias ? IDLE_MAX_YAW_SPEED_DEG_S : CHASE_MAX_YAW_SPEED_DEG_S);
+        this.updateFacingLimited(toCamera.normalize(), dt, CHASE_MAX_YAW_SPEED_DEG_S);
     }
 
     private updateFacingLimited(desiredDir: vec3, dt: number, maxDegreesPerSecond: number): void {
@@ -732,7 +902,8 @@ export class CreatureBehavior extends BaseScriptComponent {
         const urgent = this.state === CreaturePresentationState.CHASING || this.state === CreaturePresentationState.INTERACTING;
         const target = urgent ? CHASE_VISUAL_SCALE : HABITAT_VISUAL_SCALE;
         this.presentationScale += (target - this.presentationScale) * clamp01(dt * PRESENTATION_SCALE_EASE_PER_S);
-        this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale));
+        this.growthScale += (this.targetGrowthScale - this.growthScale) * clamp01(dt * GROWTH_EASE_PER_S);
+        this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale * this.growthScale));
     }
 
     private wrapAngle(angle: number): number {
@@ -741,23 +912,31 @@ export class CreatureBehavior extends BaseScriptComponent {
         return angle;
     }
 
+    /**
+     * Body orientation (yaw from gaze/facing, pitch from lean + motion
+     * wobble, roll from movement tilt+sway) always runs — this is the
+     * "orientation and gaze toward the user" channel and must work on any
+     * mesh. Blink + eyelid/eye-scale rendering only runs when EyeLeft/
+     * EyeRight actually exist.
+     */
     private updateFaceAndSecondaryMotion(dt: number): void {
-        if (!this.bodyObject || !this.eyeLeft || !this.eyeRight) return;
+        if (!this.bodyObject) return;
+
+        const speed01 = clamp01(this.velocity.length / MAX_SPEED_CM_S);
+        const yaw = Math.atan2(this.facingDir.x, -this.facingDir.z);
+        const roll = ((BODY_MOVE_TILT_DEG * speed01) + BODY_SECONDARY_SWAY_DEG * Math.sin(this.timeS * 3.1)) * Math.PI / 180;
+        const pitch = Math.sin(this.timeS * 2.2) * speed01 * 0.035 + (this.leanPitchDeg * Math.PI) / 180;
+        this.bodyObject.getTransform().setLocalRotation(quat.fromEulerAngles(pitch, yaw, -roll));
+
+        if (!this.eyeLeft || !this.eyeRight) return;
         this.blinkTimer -= dt;
         if (this.blinkTimer <= 0 && this.blinkElapsed <= 0) this.blinkElapsed = BLINK_DURATION_S;
         if (this.blinkElapsed > 0) {
             this.blinkElapsed = Math.max(0, this.blinkElapsed - dt);
             if (this.blinkElapsed === 0) this.blinkTimer = this.randomRange(BLINK_INTERVAL_MIN_S, BLINK_INTERVAL_MAX_S);
         }
-        CreatureEyes.updateBlink(this.eyeLeft, this.blinkElapsed);
-        CreatureEyes.updateBlink(this.eyeRight, this.blinkElapsed);
-
-        const speed01 = clamp01(this.velocity.length / MAX_SPEED_CM_S);
-        const yaw = Math.atan2(this.facingDir.x, -this.facingDir.z);
-        const roll = ((BODY_MOVE_TILT_DEG * speed01) + BODY_SECONDARY_SWAY_DEG * Math.sin(this.timeS * 3.1)) * Math.PI / 180;
-        const pitch = Math.sin(this.timeS * 2.2) * speed01 * 0.035;
-        this.bodyObject.getTransform().setLocalRotation(quat.fromEulerAngles(pitch, yaw, -roll));
-        if (this.appendages) this.appendages.update(this.timeS, speed01);
+        CreatureEyes.updateExpression(this.eyeLeft, this.eyeLidClosure, this.blinkElapsed, this.eyeScaleMultiplier);
+        CreatureEyes.updateExpression(this.eyeRight, this.eyeLidClosure, this.blinkElapsed, this.eyeScaleMultiplier);
     }
 
     private checkSquashStretch(dir: vec3): void {
@@ -770,9 +949,17 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.prevMoveDir = dir;
     }
 
-    /** Breathing pulse (always active, uniform) composed multiplicatively
-     *  with a damped squash-then-stretch-then-settle envelope (anisotropic,
-     *  triggered on direction change) — the two never overwrite each other. */
+    /**
+     * Composes four multiplicative, non-uniform-scale channels onto Body —
+     * no new geometry, per the design constraint:
+     *   1. Breathing — per-state amplitude/frequency (CALM slow+deep,
+     *      URGENT fast+shallow, CHASE intermediate).
+     *   2. Posture — eased per-state height/width target (CALM lower+wider,
+     *      URGENT taller+narrower, CHASE in between).
+     *   3. Tremor — fast small wobble, URGENT only, layered on posture.
+     *   4. Squash/stretch — the pre-existing damped anisotropic envelope
+     *      triggered on direction change (unchanged, still composes here).
+     */
     private applyBodyScale(dt: number): void {
         if (!this.bodyObject) return;
 
@@ -780,18 +967,45 @@ export class CreatureBehavior extends BaseScriptComponent {
             this.squashEnvelope = Math.max(0, this.squashEnvelope - dt / SQUASH_STRETCH_DURATION_S);
         }
 
-        const breathe = 1 + BREATHE_AMPLITUDE * Math.sin(this.timeS * BREATHE_FREQUENCY_HZ * Math.PI * 2);
+        const profile = this.emotionalProfile();
+
+        const breatheAmp = profile === "CALM" ? BREATHE_CALM_AMPLITUDE : profile === "URGENT" ? BREATHE_URGENT_AMPLITUDE : BREATHE_CHASE_AMPLITUDE;
+        const breatheHz = profile === "CALM" ? BREATHE_CALM_FREQUENCY_HZ : profile === "URGENT" ? BREATHE_URGENT_FREQUENCY_HZ : BREATHE_CHASE_FREQUENCY_HZ;
+        const breathe = 1 + breatheAmp * Math.sin(this.timeS * breatheHz * Math.PI * 2);
+
+        const targetHeight = profile === "CALM" ? POSTURE_CALM_HEIGHT_SCALE : profile === "URGENT" ? POSTURE_URGENT_HEIGHT_SCALE : POSTURE_CHASE_HEIGHT_SCALE;
+        const targetWidth = profile === "CALM" ? POSTURE_CALM_WIDTH_SCALE : profile === "URGENT" ? POSTURE_URGENT_WIDTH_SCALE : POSTURE_CHASE_WIDTH_SCALE;
+        const postureAlpha = clamp01(dt * POSTURE_EASE_PER_S);
+        this.postureHeightScale += (targetHeight - this.postureHeightScale) * postureAlpha;
+        this.postureWidthScale += (targetWidth - this.postureWidthScale) * postureAlpha;
+
+        const tremor = profile === "URGENT" ? 1 + POSTURE_URGENT_TREMOR_AMPLITUDE * Math.sin(this.timeS * POSTURE_URGENT_TREMOR_HZ * Math.PI * 2) : 1;
 
         const u = 1 - this.squashEnvelope; // 0 at trigger, 1 once settled
         const wave = Math.cos(u * Math.PI * 1.5) * (1 - u);
         const scaleY = 1 - SQUASH_STRETCH_AMOUNT * wave;
         const scaleXZ = 1 + SQUASH_STRETCH_AMOUNT * 0.5 * wave;
 
-        this.bodyObject.getTransform().setLocalScale(new vec3(breathe * scaleXZ, breathe * scaleY, breathe * scaleXZ));
+        const finalY = breathe * scaleY * this.postureHeightScale * tremor;
+        const finalXZ = breathe * scaleXZ * this.postureWidthScale * tremor;
+
+        this.bodyObject.getTransform().setLocalScale(new vec3(finalXZ, finalY, finalXZ));
         if (this.shadowObject) {
-            const shadowScale = 0.92 + 0.08 * scaleXZ;
+            const shadowScale = 0.92 + 0.08 * finalXZ;
             this.shadowObject.getTransform().setLocalScale(new vec3(shadowScale, 0.06, 0.64 * shadowScale));
         }
+    }
+
+    /** Warm-shifts the per-instance body material toward the state's tint
+     *  target (see CreatureConfig TINT_* — CALM stays at neutral BLOB_COLOR). */
+    private updateColorTint(dt: number): void {
+        if (!this.body || !this.body.renderMeshVisual) return;
+        const profile = this.emotionalProfile();
+        const targetArr = profile === "CALM" ? BLOB_COLOR : profile === "URGENT" ? TINT_URGENT_COLOR : TINT_CHASE_COLOR;
+        const target = new vec4(targetArr[0], targetArr[1], targetArr[2], targetArr[3]);
+        const alpha = clamp01(dt * TINT_EASE_PER_S);
+        this.currentTint = vec4.lerp(this.currentTint, target, alpha);
+        this.body.renderMeshVisual.mainMaterial.mainPass.baseColor = this.currentTint;
     }
 
     private randomRange(min: number, max: number): number {

@@ -24,9 +24,26 @@ import { TaskResolutionService } from "../State/TaskResolutionService";
 import { CreatureInteractionState } from "./CreatureInteractionState";
 import { DemoControlView } from "./DemoControlView";
 import { TaskSelectionView } from "./TaskSelectionView";
+import { buildHabitatFloor } from "./HabitatFloor";
 
-const DEMO_STORAGE_KEY = "task-organism.wednesday-demo.v3.presentation";
-const DEMO_TASK_SPACING_MS = URGENCY_AGE_WINDOW_MS / 2;
+// v4: staggered creation times changed (see seedStaggeredDemoTasks) so a
+// single "Advance Demo Time" press now produces one of each behavior state
+// (CALM/URGENT/CHASING) instead of only CALM/CHASING — bump forces a reseed
+// so a v3 demo save (different creation times) can't produce stale ages.
+const DEMO_STORAGE_KEY = "task-organism.wednesday-demo.v4.presentation";
+/**
+ * Fractions of URGENCY_AGE_WINDOW_MS (the CHASE_THRESHOLD crossing point).
+ * Chosen so that at seed-end (clock = DEMO_TASK2_CREATED_AT_MS) every task's
+ * age is still below the threshold (all calm, matching the initial demo
+ * status text), and after advancing to DEMO_ADVANCE_TARGET_MS the three
+ * tasks land in three different behavior states with comfortable margins:
+ * task0 age 1.8W (highest urgency -> chaser), task1 age 1.4W (eligible but
+ * lower urgency -> URGENT, not selected), task2 age 0.9W (-> still CALM).
+ */
+const DEMO_TASK1_CREATED_AT_MS = URGENCY_AGE_WINDOW_MS * 0.4;
+const DEMO_TASK2_CREATED_AT_MS = URGENCY_AGE_WINDOW_MS * 0.9;
+const DEMO_TASK_CREATION_TIMES_MS = [0, DEMO_TASK1_CREATED_AT_MS, DEMO_TASK2_CREATED_AT_MS];
+const DEMO_ADVANCE_TARGET_MS = URGENCY_AGE_WINDOW_MS * 1.8;
 const SLOT_NAMES = ["MovementRoot_1", "MovementRoot_2", "MovementRoot_3"];
 
 interface CreatureSlot {
@@ -41,6 +58,7 @@ interface CreatureSlot {
 export class TaskOrganismController extends BaseScriptComponent {
     private repository!: TaskRepository;
     private clock!: DemoClock;
+    private stateEngine!: StateEngine;
     private arbiter!: AttentionArbiter;
     private interaction!: CreatureInteractionState;
     private keyboard!: KeyboardInput;
@@ -74,8 +92,8 @@ export class TaskOrganismController extends BaseScriptComponent {
         this.keyboard = new KeyboardInput(creator);
         if (tasks.length === 0) tasks = this.seedStaggeredDemoTasks(demo);
 
-        const stateEngine = new StateEngine(this.clock);
-        this.arbiter = new AttentionArbiter(stateEngine);
+        this.stateEngine = new StateEngine(this.clock);
+        this.arbiter = new AttentionArbiter(this.stateEngine);
         const resolution = new TaskResolutionService(this.repository, (taskId) => this.releaseTask(taskId));
         this.interaction = new CreatureInteractionState(this.repository, resolution, {
             onSelectionChanged: (taskId) => this.onSelectionChanged(taskId),
@@ -83,6 +101,9 @@ export class TaskOrganismController extends BaseScriptComponent {
         });
 
         this.bindCreatureSlots(tasks);
+        const cameraObject = this.findSceneObject("Camera Object");
+        if (cameraObject) buildHabitatFloor(cameraObject);
+        else console.error("[WednesdayDemo] Camera Object not found — habitat floor not built.");
         this.demoControl = new DemoControlView(() => this.advanceDemoTime());
         this.demoControl.setStatus(`${tasks.length} tasks • all calm`);
         this.syncArbiter();
@@ -97,11 +118,8 @@ export class TaskOrganismController extends BaseScriptComponent {
 
     private seedStaggeredDemoTasks(demo: DemoInput): TaskRecord[] {
         const created: TaskRecord[] = [];
-        this.clock.setNowMs(0);
-        const first = demo.submit(DEMO_TASK_FIXTURES[0]);
-        if (first) created.push(first);
-        this.clock.setNowMs(DEMO_TASK_SPACING_MS);
-        for (let i = 1; i < DEMO_TASK_FIXTURES.length; i++) {
+        for (let i = 0; i < DEMO_TASK_FIXTURES.length; i++) {
+            this.clock.setNowMs(DEMO_TASK_CREATION_TIMES_MS[i]);
             const task = demo.submit(DEMO_TASK_FIXTURES[i]);
             if (task) created.push(task);
         }
@@ -170,23 +188,40 @@ export class TaskOrganismController extends BaseScriptComponent {
     private advanceDemoTime(): void {
         if (this.demoAdvanced) return;
         this.demoAdvanced = true;
-        this.clock.advanceMs(DEMO_TASK_SPACING_MS + 1);
+        this.clock.setNowMs(DEMO_ADVANCE_TARGET_MS);
         this.syncArbiter();
         this.demoControl.setAdvanced(true);
-        this.demoControl.setStatus("1 task needs attention");
+        this.demoControl.setStatus("1 chasing • 1 restless • 1 calm");
         console.log(`[WednesdayDemo] time advanced now=${this.clock.nowMs()} chaser=${this.activeChaserId}`);
     }
 
     private syncArbiter(): void {
-        const selected = this.arbiter.selectChaser(this.repository.listOpen());
+        const openTasks = this.repository.listOpen();
+        const selected = this.arbiter.selectChaser(openTasks);
         const nextId = selected ? selected.id : null;
-        if (nextId === this.activeChaserId) return;
-        this.activeChaserId = nextId;
-        for (const slot of this.slots) {
-            if (slot.taskId === nextId) slot.creature.requestChase();
-            else slot.creature.endChase();
+        if (nextId !== this.activeChaserId) {
+            this.activeChaserId = nextId;
+            for (const slot of this.slots) {
+                if (slot.taskId === nextId) slot.creature.requestChase();
+                else slot.creature.endChase();
+            }
+            console.log(`[WednesdayDemo] arbiter chaser=${nextId ?? "none"}`);
         }
-        console.log(`[WednesdayDemo] arbiter chaser=${nextId ?? "none"}`);
+
+        // Presentation-only CALM/URGENT signal for every non-chasing slot —
+        // derived fresh each frame straight from StateEngine (never persisted,
+        // per CLAUDE.md invariant 1). The chaser's own creature ignores this
+        // flag while CHASING/INTERACTING, so it's harmless to still send it.
+        // setUrgencyLevel01 sends the raw continuous value (0 at creation, 1 at
+        // CHASE_THRESHOLD) for the whole-body growth channel — StateEngine.urgency
+        // is already public and used by AttentionArbiter itself; this only reads
+        // it, it does not change StateEngine/AttentionArbiter behavior.
+        for (const slot of this.slots) {
+            const task = openTasks.find((candidate) => candidate.id === slot.taskId);
+            if (!task) continue;
+            slot.creature.setUrgent(this.stateEngine.deriveState(task, slot.taskId === nextId) === "URGENT");
+            slot.creature.setUrgencyLevel01(this.stateEngine.urgency(task));
+        }
     }
 
     private onSelectionChanged(taskId: string | null): void {

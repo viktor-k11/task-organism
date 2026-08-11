@@ -29,6 +29,7 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     cameraObject: false
+    petSpecies: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -39,6 +40,7 @@
     []
   DefaultScriptInputs:
     - cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      petSpecies: dog
   ScriptTypes:
     -
       {}
@@ -48,4 +50,5 @@
     - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">References</span>"}'
     - '// @ui {"widget":"group_start", "label":"References"}'
     - "// @input SceneObject cameraObject {\"hint\":\"The scene's main Camera SceneObject — used to compute the habitat center and the chase target.\"}"
+    - '// @input string petSpecies = "dog" {"hint":"Which ready-made model this slot uses: \"dog\" or \"cat\" (see CreaturePetVisual.ts)."}'
     - '// @ui {"widget":"group_end"}'

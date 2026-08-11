@@ -2,8 +2,10 @@ import { buildLathe } from "./LatheGeometry";
 
 export function buildCreatureShadow(parent: SceneObject, material: Material | null): SceneObject {
     const shadow=global.scene.createSceneObject("ContactShadow"); shadow.setParent(parent);
-    shadow.getTransform().setLocalPosition(new vec3(-0.5,-19.15,1.8));
-    shadow.getTransform().setLocalScale(new vec3(1.0,0.06,0.64));
+    // Y matches READYMADE_PET_HALF_HEIGHT_CM (CreatureConfig) — the ready-made
+    // dog/cat GLBs' foot level under CreaturePetVisual's recenter convention.
+    shadow.getTransform().setLocalPosition(new vec3(-0.5,-17.0,1.8));
+    shadow.getTransform().setLocalScale(new vec3(1.3,0.06,0.9));
     const rmv=shadow.createComponent("Component.RenderMeshVisual") as RenderMeshVisual;
     const builder=new MeshBuilder([{name:"position",components:3},{name:"normal",components:3,normalized:true},{name:"color",components:4}]);
     builder.topology=MeshTopology.Triangles; builder.indexType=MeshIndexType.UInt16;

@@ -5,7 +5,7 @@
  *       references/smooth-surfaces.md buildLathe).
  * Does NOT own: material/color choices, per-frame animation — callers pass
  *       a color and an optional onVertex callback to capture per-vertex
- *       base data (used by BlobMeshBuilder for the organic wobble).
+ *       base data (used by hand-authored parts like eyes/mouth/ears/tail).
  *
  * Profiles must start and end at radius ~0 (poles) — the side-quad winding
  * degenerates naturally into a fan at each pole, so no separate cap fans

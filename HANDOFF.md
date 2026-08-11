@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Day 1 Emotional Prototype / Character Vitality is frozen as the **technical character checkpoint**. It proves the presentation seams and verified behavior, but it is not final art. No task logic has been started.
+Day 1 Emotional Prototype / Character Vitality is frozen as the **technical character checkpoint**. The first data-layer slice is also implemented and LEAF-verified.
 
 Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SIK/UIKit installed, `lens-studio` MCP connected and authenticated. Blender is intentionally unavailable and not required.
 
@@ -15,6 +15,10 @@ Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SI
 - Idempotent presentation-only release API with brighten, particles, optional audio hook, and cleanup.
 - Debug trigger for chase, end-chase, release, reset, habitat recenter, and auto-cycle.
 - Camera, SIK, creature, debug harness, and preview inspection agent are present and wired in the authored scene.
+- Replaceable character presentation is isolated under `VisualRoot`; `MovementRoot` owns movement/controller behavior independently.
+- `TaskRecord`, `Clock` (`RealClock`/`DemoClock`), versioned persistent storage, memory storage, and `TaskRepository` are implemented.
+- Repository enforces six open tasks, copy-on-read, clock-based snooze, idempotent resolve, and removal of completed tasks from storage.
+- LEAF 2.0.2 is installed with a Preview scenario for the data layer.
 
 ## Modified files
 
@@ -65,6 +69,9 @@ Preserve existing untracked inspection artifacts:
 - Release idempotency: PASS. The harness invoked `release()` twice in one tick and produced one `[ReleaseEffect] play` line per Preview lifecycle.
 - TypeScript/runtime: PASS. Compile succeeded; refreshed logs had no errors.
 - Gate 1 silhouette: PASS after redesign. Isolated front/three-quarter captures and the real user-view chase capture show a bottom-heavy tilted pear body, dimensional gaze, two flippers, body lean, and contact grounding.
+- Presentation boundary: PASS. Runtime hierarchy shows `MovementRoot` with the controller only and all replaceable body/face/flipper/shadow/release nodes and audio under `VisualRoot`.
+- Body opacity contract: PASS at asset and runtime state level (alpha/fallback opacity 1, blend disabled, depth test/write enabled). Remaining capture streaking is scheduled material/render polish debt.
+- Data layer: PASS. `task-organism-data-layer` succeeded in LEAF Preview; TypeScript and refreshed runtime logs were clean.
 
 ## Unresolved issues
 
@@ -84,7 +91,7 @@ These are explicit art-polish tasks, not blockers for the technical character ch
 
 ## Exact next step
 
-Begin the data layer from the model and invariants in `CLAUDE.md`. Do not invent scope that depends on the two missing frozen v3 documents.
+Restore the missing frozen v3 documents before selecting the next logic slice. Likely candidates from `CLAUDE.md` are `StateEngine` and urgency derivation, but do not invent their thresholds or sequencing.
 
 ## Do Not Repeat
 

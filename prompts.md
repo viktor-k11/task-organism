@@ -25,3 +25,11 @@
 3. **Opacity:** Audited `BlobBody.mat` and confirmed alpha 1, opacity texture disabled, blend mode Disabled, depth test/write enabled, and back-face culling. Added runtime opaque-pass hardening to every cloned body material, including release-brighten clones.
 4. **Verify:** Recompiled TypeScript, refreshed Preview logs, inspected the live hierarchy/material result, and captured Preview evidence before freezing the technical checkpoint.
 5. **Debt:** Recorded remaining silhouette, face, flipper, material, shadow, effect, and camera-framing work as scheduled polish-phase art debt in `HANDOFF.md`.
+
+## 2026-08-11 — Data layer
+
+1. **Inspect:** Confirmed the frozen v3 plan/playbook files remain absent, then constrained implementation to the model and invariants explicitly present in `CLAUDE.md`.
+2. **Build:** Added `TaskRecord`, `Clock`/`RealClock`/`DemoClock`, schema-versioned persistent and in-memory storage adapters, and a six-open-task repository.
+3. **Guards:** Added safe-empty recovery for invalid/unknown storage payloads, copy-on-read boundaries, duplicate/cap rejection, clock-based snooze, completed-task removal, and idempotent resolve.
+4. **Test:** Installed official LEAF 2.0.2, registered `task-organism-data-layer`, and ran it in Lens Studio Preview.
+5. **Verify:** LEAF passed restore/add/snooze/resolve/restart/corrupt-storage coverage. TypeScript compilation and refreshed runtime logs also passed.

@@ -61,6 +61,17 @@ export const BREATHE_AMPLITUDE = 0.03; // ~3% uniform scale pulse
 export const BREATHE_FREQUENCY_HZ = 0.35;
 
 // ── Organic per-vertex wobble (subtler than breathing) ──────────────────────
+/**
+ * Single on/off switch for the per-vertex wobble. This is the main perf risk
+ * once multiple creatures (up to 6) run simultaneously — each enabled
+ * creature does a per-frame CPU vertex loop + MeshBuilder.updateMesh() call.
+ * Flip this to false to cut both entirely, with no other code changes:
+ * BlobMeshBuilder.updateWobble() no-ops before the loop and before
+ * updateMesh() when this is false. CreatureBehavior always calls
+ * updateWobble() unconditionally — the gating lives here, not in behavior
+ * code, so toggling this one constant is the whole change.
+ */
+export const WOBBLE_ENABLED = true;
 export const WOBBLE_AMPLITUDE_CM = 0.12;
 export const WOBBLE_FREQUENCY_HZ = 0.45;
 /** Phase offset per lathe profile ring (height index) — keeps each ring's wobble

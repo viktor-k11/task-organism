@@ -2098,7 +2098,7 @@
     []
   Name: Audio
   Enabled: true
-  AudioTrack: !<reference> 365a2f12-9283-42a9-b1fb-9838d5bbdf5c
+  AudioTrack: !<reference> 00000000-0000-0000-0000-000000000000
   EnableAutoplayLoop: false
   Volume: 0.800000
   EnableMixToSnap: false

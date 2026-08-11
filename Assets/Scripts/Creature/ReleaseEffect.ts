@@ -57,7 +57,12 @@ export class ReleaseEffect {
             this.spawnParticle(particleAnchor, particleMesh, this.particleMaterial);
         }
 
-        if (audio) {
+        // Placeholder hook: the AudioComponent is wired and this call site is
+        // real, but no track is assigned today (real sound design comes
+        // later this week — see CreatureConfig / plan). audioTrack defaults
+        // to null, so this is a deliberate silent no-op until a track is
+        // assigned, not a missing feature.
+        if (audio && audio.audioTrack) {
             audio.playbackMode = Audio.PlaybackMode.LowLatency;
             audio.play(1);
         }

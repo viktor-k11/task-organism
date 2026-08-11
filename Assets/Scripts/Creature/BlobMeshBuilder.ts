@@ -3,6 +3,7 @@ import {
     BLOB_PROFILE,
     LATHE_SEGMENTS,
     BLOB_COLOR,
+    WOBBLE_ENABLED,
     WOBBLE_AMPLITUDE_CM,
     WOBBLE_FREQUENCY_HZ,
     WOBBLE_PHASE_STEP,
@@ -64,6 +65,12 @@ export class BlobMeshBuilder {
      * top-to-bottom shimmer, distinct from the uniform breathing pulse.
      */
     updateWobble(timeS: number): void {
+        // Single perf gate for up to 6 simultaneous creatures — off skips both
+        // the per-vertex loop AND updateMesh() below, not just the visual
+        // effect. CreatureBehavior calls this unconditionally every frame;
+        // the on/off decision lives entirely in config, not behavior code.
+        if (!WOBBLE_ENABLED) return;
+
         const twoPiFreq = WOBBLE_FREQUENCY_HZ * Math.PI * 2;
         for (let i = 0; i < this.baseVerts.length; i++) {
             const bv = this.baseVerts[i];

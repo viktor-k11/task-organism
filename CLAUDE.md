@@ -97,3 +97,13 @@ Never use the words: kill, die, destroy, "can't ignore", "forces you".
 boids/flocking, generated meshes as a dependency, always-visible labels,
 voice input or voice completion, throw-to-defer, ambient music, full list UI,
 cloud backend, room-anchor restoration.
+
+## Resume After Codex
+
+- Read `HANDOFF.md`, `git status`, and `git diff` before making changes.
+- Treat the frozen v3 plan and playbook as authoritative.
+- Preserve all existing Codex changes.
+- Continue only from `Exact Next Step`.
+- Do not repeat work listed under `Do Not Repeat`.
+- Verify the next step with CLAD and Lens Studio Preview.
+- Update `prompts.md` and `HANDOFF.md` before returning work to Codex.

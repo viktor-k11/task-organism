@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Day 1 Emotional Prototype / Character Vitality is frozen as the **technical character checkpoint**. The first data-layer slice is also implemented and LEAF-verified.
+Day 1 Emotional Prototype / Character Vitality is frozen as the **technical character checkpoint**. Gate 2 Product Truth is implemented and fully LEAF-verified; interaction work has not started.
 
 Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SIK/UIKit installed, `lens-studio` MCP connected and authenticated. Blender is intentionally unavailable and not required.
 
@@ -19,6 +19,9 @@ Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SI
 - `TaskRecord`, `Clock` (`RealClock`/`DemoClock`), versioned persistent storage, memory storage, and `TaskRepository` are implemented.
 - Repository enforces six open tasks, copy-on-read, clock-based snooze, idempotent resolve, and removal of completed tasks from storage.
 - LEAF 2.0.2 is installed with a Preview scenario for the data layer.
+- `StateEngine` derives urgency/state exclusively from an injected `Clock`.
+- `AttentionArbiter` applies the required threshold and selects at most one chaser.
+- `TaskResolutionService` persists an idempotent resolve before emitting one presentation release callback.
 
 ## Modified files
 
@@ -72,6 +75,14 @@ Preserve existing untracked inspection artifacts:
 - Presentation boundary: PASS. Runtime hierarchy shows `MovementRoot` with the controller only and all replaceable body/face/flipper/shadow/release nodes and audio under `VisualRoot`.
 - Body opacity contract: PASS at asset and runtime state level (alpha/fallback opacity 1, blend disabled, depth test/write enabled). Remaining capture streaking is scheduled material/render polish debt.
 - Data layer: PASS. `task-organism-data-layer` succeeded in LEAF Preview; TypeScript and refreshed runtime logs were clean.
+- Gate 2.1: PASS — three fresh tasks produced zero chasers.
+- Gate 2.2: PASS — one threshold-crossing task produced exactly one chaser.
+- Gate 2.3: PASS — snoozing that task produced zero chasers.
+- Gate 2.4: PASS — advancing beyond snooze expiry restored exactly one chaser.
+- Gate 2.5: PASS — separate seed/restore LEAF runs restored the same task id and text across a Lens reset.
+- Gate 2.6: PASS — a restored task transitioned from elapsed time immediately under `DemoClock`.
+- Gate 2.7: PASS — two resolve calls caused one repository save and one release callback.
+- Gate 2.8: PASS — `StateEngine` contains no `Date.now()`; time is injected through `Clock`.
 
 ## Unresolved issues
 
@@ -91,10 +102,10 @@ These are explicit art-polish tasks, not blockers for the technical character ch
 
 ## Exact next step
 
-Restore the missing frozen v3 documents before selecting the next logic slice. Likely candidates from `CLAUDE.md` are `StateEngine` and urgency derivation, but do not invent their thresholds or sequencing.
+Begin the frozen interaction slice only on explicit direction: short pinch selects, 0.6–0.8 s hold resolves with progress, and early release cancels. Preserve the rule that select and resolve never fire from the same gesture.
 
 ## Do Not Repeat
 
 - Do not rebuild the procedural blob, movement, eyes, or release effect.
 - Do not re-diagnose the old one-eye screenshot; live chase verification established that the face is readable.
-- Do not add task model, repository, urgency, persistence, selection, or resolve interaction logic without explicit approval.
+- Do not start selection/hold interaction wiring before the Gate 2 checkpoint is accepted.

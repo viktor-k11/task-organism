@@ -33,3 +33,16 @@
 3. **Guards:** Added safe-empty recovery for invalid/unknown storage payloads, copy-on-read boundaries, duplicate/cap rejection, clock-based snooze, completed-task removal, and idempotent resolve.
 4. **Test:** Installed official LEAF 2.0.2, registered `task-organism-data-layer`, and ran it in Lens Studio Preview.
 5. **Verify:** LEAF passed restore/add/snooze/resolve/restart/corrupt-storage coverage. TypeScript compilation and refreshed runtime logs also passed.
+
+## 2026-08-11 — Gate 2 Product Truth
+
+1. **Fresh threshold:** `gate2-1-4-chaser-lifecycle` asserted three fresh open tasks produce `null` from `AttentionArbiter.selectChaser`.
+2. **Single chaser:** Advanced `DemoClock` past one task's demo deadline while the other two remained below the age threshold; the arbiter selected exactly `urgent`.
+3. **Snooze suppression:** Snoozed `urgent`; the arbiter immediately returned zero chasers.
+4. **Snooze expiry:** Advanced `DemoClock` beyond the snooze timestamp; the arbiter again selected exactly `urgent`.
+5. **Real restart restore:** Ran `gate2-5-persistence-seed`, then `gate2-5-persistence-restore` as separate LEAF Preview runs (and therefore separate Lens resets). Restored `id=persist-id` and `text=Persisted task text` exactly.
+6. **Elapsed restore:** `gate2-6-8-elapsed-clock` restored an old task with `DemoClock` already beyond the age window and selected it immediately, with no real-time wait.
+7. **Resolve idempotency:** `gate2-7-resolve-idempotency` called resolve twice and asserted one storage save plus one release callback.
+8. **Clock isolation:** The elapsed scenario proved injected-clock behavior; static `rg` found no `Date.now()` under `Assets/Scripts/State`. The sole project call is inside `RealClock.nowMs()`.
+
+All five Gate 2 scenario runs returned `succeeded`. Remaining body capture streaking/transparency appearance remains non-blocking polish-phase art debt.

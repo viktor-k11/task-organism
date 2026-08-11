@@ -119,6 +119,12 @@ export const FACE_TURN_RATE_PER_S = 6;
  */
 export const MAX_STEP_DT_S = 1 / 15;
 
+// ── Task urgency / attention (derived, never persisted) ──────────────────
+/** Normal tasks cross the chase threshold after one day; tests advance DemoClock. */
+export const URGENCY_AGE_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const CHASE_THRESHOLD = 1;
+export const HIGH_IMPORTANCE_URGENCY_BONUS = 0.5;
+
 // ── Lathe geometry (egg/teardrop silhouette, ~16cm tall x ~14cm wide) ──────
 export const LATHE_SEGMENTS = 80;
 export const VISUAL_BASELINE_SCALE = 0.88;

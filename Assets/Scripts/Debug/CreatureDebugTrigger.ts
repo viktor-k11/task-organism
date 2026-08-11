@@ -89,6 +89,10 @@ export class CreatureDebugTrigger extends BaseScriptComponent {
         }
         if (this.triggerRelease) {
             this.creature.release();
+            // Deliberately repeat the request in the same runtime tick. This
+            // keeps the Preview-only harness honest: CreatureBehavior's
+            // idempotency guard must suppress the second presentation event.
+            this.creature.release();
             this.triggerRelease = false;
         }
         if (this.triggerReset) {

@@ -43,6 +43,8 @@ export class ReleaseEffect {
         audio: AudioComponent | null,
         onComplete: () => void,
     ): void {
+        console.log("[ReleaseEffect] play");
+
         // Brighten body + eyes (clone-before-mutate, never mutate the shared base material).
         const brightBody = brightenMaterial(bodyRmv, RELEASE_BRIGHTEN_LERP);
         eyeRmvs.forEach((rmv) => brightenMaterial(rmv, RELEASE_BRIGHTEN_LERP));

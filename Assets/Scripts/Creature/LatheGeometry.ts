@@ -13,7 +13,7 @@
  */
 export function buildLathe(
     builder: MeshBuilder,
-    profile: [number, number][],
+    profile: [number, number, number?][],
     segments: number,
     color: [number, number, number, number],
     onVertex?: (vertexIndex: number, profileIndex: number, pos: vec3, normal: vec3) => void,
@@ -39,9 +39,9 @@ export function buildLathe(
         const c = Math.cos(theta);
         const s = Math.sin(theta);
         for (let j = 0; j < P; j++) {
-            const [r, y] = profile[j];
+            const [r, y, xOffset = 0] = profile[j];
             const [n2x, n2y] = prof2dN[j];
-            const px = r * c;
+            const px = r * c + xOffset;
             const py = y;
             const pz = r * s;
             const nx = n2x * c;

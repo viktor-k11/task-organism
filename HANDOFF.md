@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Day 1 Emotional Prototype / Character Vitality is implemented, wired, and verified in Lens Studio Preview. No task logic has been started. The earlier one-eye sample was a framing/side-on wander artifact; recentered chase verification shows a readable two-eye front.
+Day 1 Emotional Prototype / Character Vitality is redesigned and verified in Lens Studio Preview after Gate 1 visual feedback. No task logic has been started. The character now reads as a small living pear/bean creature rather than a decorated sphere.
 
 Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SIK/UIKit installed, `lens-studio` MCP connected and authenticated. Blender is intentionally unavailable and not required.
 
@@ -39,6 +39,12 @@ Modified in this session:
 - `Assets/Scripts/Creature/ReleaseEffect.ts` — one release-start log for deterministic Preview verification.
 - `prompts.md` — real CLAD inspect/observe/test/verify cycles.
 - `HANDOFF.md` — acceptance status and next step.
+- `Assets/Scripts/Config/CreatureConfig.ts` — pear profile, stronger deformation, tilt, eye, and blink constants.
+- `Assets/Scripts/Creature/LatheGeometry.ts` — optional per-ring X offsets for asymmetric lathed forms.
+- `Assets/Scripts/Creature/CreatureEyes.ts` — dimensional unequal eyes, pupils, gaze offset, and blinking.
+- `Assets/Scripts/Creature/CreatureAppendages.ts` — procedural flippers with secondary lag.
+- `Assets/Scripts/Creature/CreatureShadow.ts` — lightweight unlit contact shadow.
+- `Assets/Scripts/Creature/CreatureBehavior.ts` — presentation assembly and whole-body secondary motion.
 
 Preserve existing untracked inspection artifacts:
 
@@ -58,6 +64,7 @@ Preserve existing untracked inspection artifacts:
 - Chase comfort: PASS. Observed distance ~126 cm and side offset ~8.5°, within the frozen 1.1–1.3 m and 8–12° ranges and outside the 1 m hard stop.
 - Release idempotency: PASS. The harness invoked `release()` twice in one tick and produced one `[ReleaseEffect] play` line per Preview lifecycle.
 - TypeScript/runtime: PASS. Compile succeeded; refreshed logs had no errors.
+- Gate 1 silhouette: PASS after redesign. Isolated front/three-quarter captures and the real user-view chase capture show a bottom-heavy tilted pear body, dimensional gaze, two flippers, body lean, and contact grounding.
 
 ## Unresolved issues
 

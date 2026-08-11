@@ -87,8 +87,10 @@ export const WANDER_REPICK_PAUSE_MIN_S = 1.5;
 export const WANDER_REPICK_PAUSE_MAX_S = 4.0;
 
 // ── Squash & stretch (on direction change, composes multiplicatively with breathing) ──
-export const SQUASH_STRETCH_AMOUNT = 0.1; // ~10% axis deviation at peak
+export const SQUASH_STRETCH_AMOUNT = 0.18;
 export const SQUASH_STRETCH_DURATION_S = 0.35;
+export const BODY_MOVE_TILT_DEG = 8;
+export const BODY_SECONDARY_SWAY_DEG = 2.5;
 /** Dot product of (prevDir, newDir) below this = "direction changed enough to trigger". */
 export const SQUASH_STRETCH_DIRECTION_DOT_THRESHOLD = 0.4;
 
@@ -119,26 +121,29 @@ export const MAX_STEP_DT_S = 1 / 15;
 
 // ── Lathe geometry (egg/teardrop silhouette, ~16cm tall x ~14cm wide) ──────
 export const LATHE_SEGMENTS = 18;
-/** [radius_cm, height_cm] points, bottom pole -> equator bulge -> top pole. Centered on Y=0. */
-export const BLOB_PROFILE: [number, number][] = [
-    [0.0, -8.0],
-    [3.2, -7.4],
-    [6.0, -5.0],
-    [7.0, -1.5],
-    [6.6, 1.5],
-    [5.2, 4.5],
-    [3.0, 6.6],
-    [0.0, 8.0],
+/** [radius_cm, height_cm, x_offset_cm] — offset rings create a tilted bean silhouette. */
+export const BLOB_PROFILE: [number, number, number?][] = [
+    [0.0, -8.5, -0.4],
+    [4.5, -8.0, -0.3],
+    [7.4, -5.6, -0.1],
+    [7.8, -2.0, 0.2],
+    [6.4, 1.4, 0.6],
+    [4.4, 4.5, 1.15],
+    [2.35, 7.0, 1.55],
+    [0.0, 8.4, 1.85],
 ];
 /** Warm cream/peach, unlit — matches the "cat-like, never monstrous" tone. */
 export const BLOB_COLOR: [number, number, number, number] = [0.96, 0.82, 0.68, 1.0];
 
 // ── Eyes (simple dark unlit pupils, fixed on Body's local -Z front) ────────
-export const EYE_RADIUS_CM = 0.9;
-export const EYE_OFFSET_X_CM = 2.0;
-export const EYE_OFFSET_Y_CM = 2.5;
-export const EYE_OFFSET_Z_CM = -6.7;
+export const EYE_RADIUS_CM = 1.25;
+export const EYE_OFFSET_X_CM = 2.15;
+export const EYE_OFFSET_Y_CM = 2.35;
+export const EYE_OFFSET_Z_CM = -5.9;
 export const EYE_COLOR: [number, number, number, number] = [0.12, 0.1, 0.09, 1.0];
+export const BLINK_INTERVAL_MIN_S = 2.8;
+export const BLINK_INTERVAL_MAX_S = 5.5;
+export const BLINK_DURATION_S = 0.16;
 
 // ── Release (one-shot, idempotent — see CreatureBehavior.release()) ────────
 export const RELEASE_DURATION_S = 1.5;

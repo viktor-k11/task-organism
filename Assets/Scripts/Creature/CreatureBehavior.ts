@@ -1,7 +1,9 @@
 import { BlobMeshBuilder } from "./BlobMeshBuilder";
-import { CreatureEyes } from "./CreatureEyes";
+import { CreatureEyes, CreatureEye } from "./CreatureEyes";
+import { CreatureAppendages } from "./CreatureAppendages";
+import { buildCreatureShadow } from "./CreatureShadow";
 import { ReleaseEffect } from "./ReleaseEffect";
-import { stepSeekArrive, stepSeekArriveAngular, faceDirection, clamp01, findChildByName } from "./CreatureMovement";
+import { stepSeekArrive, stepSeekArriveAngular, clamp01, findChildByName } from "./CreatureMovement";
 import {
     HABITAT_RADIUS_MIN_CM,
     HABITAT_RADIUS_MAX_CM,
@@ -39,6 +41,14 @@ import {
     GLANCE_HOP_DURATION_S,
     GLANCE_HOLD_DURATION_S,
     FACE_TURN_RATE_PER_S,
+    BODY_MOVE_TILT_DEG,
+    BODY_SECONDARY_SWAY_DEG,
+    EYE_OFFSET_X_CM,
+    EYE_OFFSET_Y_CM,
+    EYE_OFFSET_Z_CM,
+    BLINK_INTERVAL_MIN_S,
+    BLINK_INTERVAL_MAX_S,
+    BLINK_DURATION_S,
 } from "../Config/CreatureConfig";
 
 const bodyBaseMaterialAsset = requireAsset("../../Materials/BlobBody.mat") as Material;
@@ -95,11 +105,14 @@ export class CreatureBehavior extends BaseScriptComponent {
     private audioComponent: AudioComponent | null = null;
 
     private blobMesh: BlobMeshBuilder | null = null;
-    private eyeLeftRmv: RenderMeshVisual | null = null;
-    private eyeRightRmv: RenderMeshVisual | null = null;
+    private eyeLeft: CreatureEye | null = null;
+    private eyeRight: CreatureEye | null = null;
+    private appendages: CreatureAppendages | null = null;
     private releaseEffect: ReleaseEffect | null = null;
 
     private timeS = 0;
+    private blinkTimer = 0;
+    private blinkElapsed = 0;
 
     // Movement (Creature root world position) + facing (Body local yaw, eased).
     private velocity: vec3 = vec3.zero();
@@ -192,7 +205,7 @@ export class CreatureBehavior extends BaseScriptComponent {
     release(): void {
         if (this.isReleased) return;
         if (this.state !== CreaturePresentationState.CHASING && this.state !== CreaturePresentationState.IDLE) return;
-        if (!this.blobMesh || !this.eyeLeftRmv || !this.eyeRightRmv || !this.particleAnchorObject) return;
+        if (!this.blobMesh || !this.eyeLeft || !this.eyeRight || !this.particleAnchorObject) return;
 
         this.isReleased = true;
         this.state = CreaturePresentationState.RELEASING;
@@ -202,7 +215,7 @@ export class CreatureBehavior extends BaseScriptComponent {
             this,
             this.particleAnchorObject,
             this.blobMesh.renderMeshVisual,
-            [this.eyeLeftRmv, this.eyeRightRmv],
+            [this.eyeLeft.white, this.eyeRight.white, this.eyeLeft.pupilVisual, this.eyeRight.pupilVisual],
             this.audioComponent,
             () => {
                 // Guard against a stale completion firing after reset() has already
@@ -271,8 +284,12 @@ export class CreatureBehavior extends BaseScriptComponent {
         }
 
         this.blobMesh = new BlobMeshBuilder(this.bodyObject, bodyBaseMaterialAsset);
-        this.eyeLeftRmv = CreatureEyes.build(this.eyeLeftObject, eyeBaseMaterialAsset);
-        this.eyeRightRmv = CreatureEyes.build(this.eyeRightObject, eyeBaseMaterialAsset);
+        this.eyeLeftObject.getTransform().setLocalPosition(new vec3(EYE_OFFSET_X_CM, EYE_OFFSET_Y_CM, EYE_OFFSET_Z_CM));
+        this.eyeRightObject.getTransform().setLocalPosition(new vec3(-EYE_OFFSET_X_CM, EYE_OFFSET_Y_CM + 0.15, EYE_OFFSET_Z_CM));
+        this.eyeLeft = CreatureEyes.build(this.eyeLeftObject, bodyBaseMaterialAsset, eyeBaseMaterialAsset, 1.0);
+        this.eyeRight = CreatureEyes.build(this.eyeRightObject, bodyBaseMaterialAsset, eyeBaseMaterialAsset, 0.88);
+        this.appendages = new CreatureAppendages(this.bodyObject, bodyBaseMaterialAsset);
+        buildCreatureShadow(this.sceneObject, eyeBaseMaterialAsset);
 
         this.resetToIdle();
     }
@@ -304,6 +321,8 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.isWaitingAtWanderTarget = false;
         this.wanderPauseTimer = 0;
         this.releaseEffect = null;
+        this.blinkElapsed = 0;
+        this.blinkTimer = this.randomRange(BLINK_INTERVAL_MIN_S, BLINK_INTERVAL_MAX_S);
 
         this.recomputeHabitatOrigin();
         this.wanderTarget = this.pickWanderTarget();
@@ -317,8 +336,8 @@ export class CreatureBehavior extends BaseScriptComponent {
         // shared base asset (clone-before-mutate), so a plain reassignment
         // is sufficient here; no re-clone needed.
         if (this.blobMesh) this.blobMesh.renderMeshVisual.mainMaterial = bodyBaseMaterialAsset;
-        if (this.eyeLeftRmv) this.eyeLeftRmv.mainMaterial = eyeBaseMaterialAsset;
-        if (this.eyeRightRmv) this.eyeRightRmv.mainMaterial = eyeBaseMaterialAsset;
+        if (this.eyeLeft) this.eyeLeft.pupilVisual.mainMaterial = eyeBaseMaterialAsset;
+        if (this.eyeRight) this.eyeRight.pupilVisual.mainMaterial = eyeBaseMaterialAsset;
     }
 
     /**
@@ -360,6 +379,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         }
 
         this.applyBodyScale(dt);
+        this.updateFaceAndSecondaryMotion(dt);
     }
 
     // ── IDLE: breathing (handled in applyBodyScale) + wander + glance ──────
@@ -578,7 +598,25 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (!this.bodyObject) return;
         const alpha = clamp01(dt * FACE_TURN_RATE_PER_S);
         this.facingDir = vec3.slerp(this.facingDir, desiredDir, alpha).normalize();
-        faceDirection(this.bodyObject, this.facingDir);
+    }
+
+    private updateFaceAndSecondaryMotion(dt: number): void {
+        if (!this.bodyObject || !this.eyeLeft || !this.eyeRight) return;
+        this.blinkTimer -= dt;
+        if (this.blinkTimer <= 0 && this.blinkElapsed <= 0) this.blinkElapsed = BLINK_DURATION_S;
+        if (this.blinkElapsed > 0) {
+            this.blinkElapsed = Math.max(0, this.blinkElapsed - dt);
+            if (this.blinkElapsed === 0) this.blinkTimer = this.randomRange(BLINK_INTERVAL_MIN_S, BLINK_INTERVAL_MAX_S);
+        }
+        CreatureEyes.updateBlink(this.eyeLeft, this.blinkElapsed);
+        CreatureEyes.updateBlink(this.eyeRight, this.blinkElapsed);
+
+        const speed01 = clamp01(this.velocity.length / MAX_SPEED_CM_S);
+        const yaw = Math.atan2(this.facingDir.x, -this.facingDir.z);
+        const roll = ((BODY_MOVE_TILT_DEG * speed01) + BODY_SECONDARY_SWAY_DEG * Math.sin(this.timeS * 3.1)) * Math.PI / 180;
+        const pitch = Math.sin(this.timeS * 2.2) * speed01 * 0.035;
+        this.bodyObject.getTransform().setLocalRotation(quat.fromEulerAngles(pitch, yaw, -roll));
+        if (this.appendages) this.appendages.update(this.timeS, speed01);
     }
 
     private checkSquashStretch(dir: vec3): void {

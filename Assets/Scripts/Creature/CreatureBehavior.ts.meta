@@ -1,0 +1,51 @@
+- !<AssetImportMetadata/06182cf0-4487-49b1-8cad-f603174411a7>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 393556ce-9929-4830-a2d0-0cbca7b69713
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 393556ce-9929-4830-a2d0-0cbca7b69713
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> dfd6b6ac-0ee1-4ae6-a691-7b897c4f6c34
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/dfd6b6ac-0ee1-4ae6-a691-7b897c4f6c34>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 691b930b-08ad-406d-9eb6-31bcdb59fcf3
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    cameraObject: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">CreatureBehavior – emotional-core presentation</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">References</span>"}'
+    - '// @ui {"widget":"group_start", "label":"References"}'
+    - "// @input SceneObject cameraObject {\"hint\":\"The scene's main Camera SceneObject — used to compute the habitat center and the chase target.\"}"
+    - '// @ui {"widget":"group_end"}'

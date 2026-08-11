@@ -1,0 +1,77 @@
+- !<AssetImportMetadata/03ef2150-eeaf-490f-bb7f-efbb35936f56>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 99c6a515-ee02-413e-969c-03e583431e64
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 99c6a515-ee02-413e-969c-03e583431e64
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 8ee5181f-e99b-4bbb-92b7-113df38a9c11
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/8ee5181f-e99b-4bbb-92b7-113df38a9c11>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 2ebb7daf-050a-420a-93ba-a7abd3d43a61
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    autoCycle: false
+    autoCyclePhaseDurationS: false
+    creature: false
+    triggerChase: false
+    triggerEndChase: false
+    triggerRelease: false
+    triggerReset: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - creature: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      triggerChase: false
+      triggerEndChase: false
+      triggerRelease: false
+      triggerReset: false
+      autoCycle: false
+      autoCyclePhaseDurationS: !<float> 4.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">CreatureDebugTrigger – manual test harness</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">References</span>"}'
+    - '// @ui {"widget":"group_start", "label":"References"}'
+    - '// @input AssignableType_1 creature {"hint":"The CreatureBehavior component to drive."}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">Manual triggers (auto-reset after firing)</span>"}'
+    - '// @ui {"widget":"group_start", "label":"Manual triggers"}'
+    - '// @input bool triggerChase {"hint":"Toggle ON to fire requestChase() once."}'
+    - '// @input bool triggerEndChase {"hint":"Toggle ON to fire endChase() once (return to idle wander, no snap)."}'
+    - '// @input bool triggerRelease {"hint":"Toggle ON to fire release() once (idempotent — repeat toggles after the first are no-ops)."}'
+    - '// @input bool triggerReset {"hint":"Toggle ON to re-enable the Creature and start a fresh IDLE lifecycle, for repeat testing."}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">Auto-cycle demo</span>"}'
+    - '// @ui {"widget":"group_start", "label":"Auto-cycle demo"}'
+    - '// @input bool autoCycle {"hint":"When ON, auto-cycles idle -> chase -> release -> reset -> idle indefinitely for hands-off demoing."}'
+    - '// @input float autoCyclePhaseDurationS = 4 {"hint":"Seconds spent in each of the idle/chase auto-cycle phases before advancing.", "widget":"slider", "min":1, "max":10, "step":0.5}'
+    - '// @ui {"widget":"group_end"}'

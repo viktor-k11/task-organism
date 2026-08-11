@@ -4,6 +4,9 @@
     - !<own> 00000000-0000-0065-0000-000000000064
     - !<own> 0005641c-028d-459a-0000-000000014b4d
     - !<own> f5d74682-203a-4970-81ea-9fa7b88c96bb
+    - !<own> cdc728b1-643b-4385-a5db-95971d63b545
+    - !<own> 75374f86-408c-435c-9827-89f984b767e7
+    - !<own> 0b09d00d-eb7e-4900-b543-61f1f0bc6c0b
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       - id: 1
@@ -364,6 +367,21 @@
     - !<own> 05147ea1-cb6b-4629-9484-199a4aa4d92a
   Components:
     []
+- !<SceneObject/0b09d00d-eb7e-4900-b543-61f1f0bc6c0b>
+  PrefabRemaps:
+    []
+  Name: AiPreviewAgent Handler
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 8c6f6755-1706-4ef5-b56d-66fa3f27c515
 - !<SceneObject/0c355300-e635-47c1-a8c3-5ddef30b8824>
   PrefabRemaps:
     []
@@ -559,6 +577,22 @@
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 83ef588c-5040-4344-b15f-0554c739da0b
+  Components:
+    []
+- !<SceneObject/233ec067-3434-4439-8b35-03a266dab0b9>
+  PrefabRemaps:
+    []
+  Name: Body
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 745064c1-b1c3-4d14-b6d1-2544d1624a0a
+    - !<own> ce7034ac-b79a-4a56-9aad-0e78c3666097
   Components:
     []
 - !<SceneObject/23861703-e5d4-4885-be1b-c3358c1877a4>
@@ -944,6 +978,21 @@
     []
   Components:
     - !<own> 5f153ad7-2baa-4fd9-a298-0dcfad86da3b
+- !<SceneObject/4e071a36-374d-4c04-b74e-aa315d0f2287>
+  PrefabRemaps:
+    []
+  Name: ParticleAnchor
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
 - !<SceneObject/52ecefe4-5642-445a-ad16-52ce818076bc>
   PrefabRemaps:
     []
@@ -1244,6 +1293,21 @@
     - !<own> 879ce45b-bd5e-40ff-a3fe-d821523427e4
   Components:
     - !<own> 64f27597-c99d-4c59-8a08-05459cc2258d
+- !<SceneObject/745064c1-b1c3-4d14-b6d1-2544d1624a0a>
+  PrefabRemaps:
+    []
+  Name: EyeLeft
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 2.000000, y: 2.500000, z: -6.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
 - !<SceneObject/74d13517-1dbf-42e6-b536-27afc4909c65>
   PrefabRemaps:
     []
@@ -1259,6 +1323,21 @@
     - !<own> f666b5eb-6a03-4db0-9d84-5b34c6e8905a
   Components:
     []
+- !<SceneObject/75374f86-408c-435c-9827-89f984b767e7>
+  PrefabRemaps:
+    []
+  Name: Debug
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> a8b93c0a-b568-4fc2-83f7-07da4d2ded3f
 - !<SceneObject/7605c62c-4c45-4fc0-b364-2d76d26f2b82>
   PrefabRemaps:
     []
@@ -1476,6 +1555,22 @@
     - !<own> 1fc7fa3e-6910-4741-b8a7-1b6660a39a9d
   Components:
     - !<own> 28e05826-1521-46fa-a54c-80f2957ec80c
+- !<ScriptComponent/88e8e796-b031-4ece-83f8-14f79ceb2d18>
+  PrefabRemaps:
+    []
+  Name: CreatureBehavior
+  Enabled: true
+  ScriptAsset: !<reference> 393556ce-9929-4830-a2d0-0cbca7b69713
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      cameraObject: !<reference.SceneObject> 00000000-0000-0065-0000-000000000064
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/8b877074-7eee-4be1-b669-714f8d5a1da3>
   PrefabRemaps:
     []
@@ -1514,6 +1609,22 @@
     Fingers_length: 0.000000
     Thumb_inflate: 0.000000
     Thumb_length: 0.000000
+- !<ScriptComponent/8c6f6755-1706-4ef5-b56d-66fa3f27c515>
+  PrefabRemaps:
+    []
+  Name: AgentInspectScript
+  Enabled: true
+  ScriptAsset: !<reference> 0b25079c-f5bf-4c6d-96c4-f43b89dfa213
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      {}
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/8cb3dd13-6ebf-41e6-9a23-94a69dd96f87>
   PrefabRemaps:
     []
@@ -1745,6 +1856,33 @@
     - !<own> 0c355300-e635-47c1-a8c3-5ddef30b8824
   Components:
     []
+- !<ScriptComponent/a8b93c0a-b568-4fc2-83f7-07da4d2ded3f>
+  PrefabRemaps:
+    []
+  Name: CreatureDebugTrigger
+  Enabled: true
+  ScriptAsset: !<reference> 99c6a515-ee02-413e-969c-03e583431e64
+  ScriptInputsDefault:
+    triggerChase: true
+    triggerEndChase: true
+    triggerRelease: true
+    triggerReset: true
+    autoCycle: true
+    autoCyclePhaseDurationS: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      creature: !<MappingBased.AssignableType_1> 88e8e796-b031-4ece-83f8-14f79ceb2d18
+      triggerChase: false
+      triggerEndChase: false
+      triggerRelease: false
+      triggerReset: false
+      autoCycle: false
+      autoCyclePhaseDurationS: !<float> 4.000000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/a98a7d22-28b9-4357-97cd-1486e721ac5d>
   PrefabRemaps:
     []
@@ -1955,6 +2093,23 @@
     []
   Components:
     []
+- !<AudioComponent/c89414a9-bd21-4672-a1c3-2991e3e028af>
+  PrefabRemaps:
+    []
+  Name: Audio
+  Enabled: true
+  AudioTrack: !<reference> 365a2f12-9283-42a9-b1fb-9838d5bbdf5c
+  EnableAutoplayLoop: false
+  Volume: 0.800000
+  EnableMixToSnap: false
+  RecordVolume: 1.000000
+  EnableSpatialAudio: false
+  EnableDistanceEffect: false
+  CurveType: Logarithm
+  MinDistance: 0.000000
+  MaxDistance: 100.000000
+  EnableDirectivityEffect: false
+  EnablePositionEffect: false
 - !<ScriptComponent/c8e031d3-a8a1-468a-a419-427f8556de4c>
   PrefabRemaps:
     []
@@ -2053,6 +2208,23 @@
     index-2: !<reference> 2dae2a27-8ce6-466a-8bff-622195c1b3a8
     thumb-3_end_end_end_end: !<reference> bf2095b6-c6f8-48c8-b840-e0a6cec0dc99
     wrist_to_pinky: !<reference> 3b4f5057-b516-4d3b-9c8d-14c81af2f505
+- !<SceneObject/cdc728b1-643b-4385-a5db-95971d63b545>
+  PrefabRemaps:
+    []
+  Name: Creature
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: -10.000000, z: -130.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 233ec067-3434-4439-8b35-03a266dab0b9
+    - !<own> 4e071a36-374d-4c04-b74e-aa315d0f2287
+  Components:
+    - !<own> 88e8e796-b031-4ece-83f8-14f79ceb2d18
+    - !<own> c89414a9-bd21-4672-a1c3-2991e3e028af
 - !<SceneObject/ce2213a1-7aa1-4201-a3c7-c2aaa06fd4ff>
   PrefabRemaps:
     []
@@ -2066,6 +2238,21 @@
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 7b49000e-c7d9-48c6-8abb-b6c8abcd4655
+  Components:
+    []
+- !<SceneObject/ce7034ac-b79a-4a56-9aad-0e78c3666097>
+  PrefabRemaps:
+    []
+  Name: EyeRight
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -2.000000, y: 2.500000, z: -6.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
   Components:
     []
 - !<SceneObject/cec12eef-3a06-4b4a-b0ba-3de212ca34dc>

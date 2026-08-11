@@ -8,6 +8,7 @@
     - !<own> 75374f86-408c-435c-9827-89f984b767e7
     - !<own> 83b0f170-870a-4121-9f40-6ca784e0c088
     - !<own> a7d29b0e-9b44-478a-ab60-91c36351545b
+    - !<own> 260e39fb-2271-4ce5-9f61-fea3dedfb280
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       - id: 1
@@ -611,6 +612,21 @@
     []
   Components:
     []
+- !<SceneObject/260e39fb-2271-4ce5-9f61-fea3dedfb280>
+  PrefabRemaps:
+    []
+  Name: LEAF Plugin Bridge
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 6ac907e7-49db-4300-9d93-90165e5b8d7d
 - !<SceneObject/264571d0-f879-411b-8deb-ff6d9921317f>
   PrefabRemaps:
     []
@@ -1236,6 +1252,22 @@
     - !<own> f0394c5d-4c44-4c65-a77c-e1c7e05ca905
   Components:
     []
+- !<ScriptComponent/6ac907e7-49db-4300-9d93-90165e5b8d7d>
+  PrefabRemaps:
+    []
+  Name: MessagingBridge
+  Enabled: true
+  ScriptAsset: !<reference> 9aa407db-2872-4afc-a162-cf7faf2a0f29
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      {}
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/6ae8bf8e-a2cb-4898-a4da-25d119a01856>
   PrefabRemaps:
     []
@@ -1601,6 +1633,22 @@
   ScriptInputs:
     "":
       cameraObject: !<reference.SceneObject> 00000000-0000-0065-0000-000000000064
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/89362762-7124-4bab-8954-9352d25584a2>
+  PrefabRemaps:
+    []
+  Name: TaskOrganismController
+  Enabled: true
+  ScriptAsset: !<reference> 29659244-0790-4c6e-a556-0084d676053f
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      {}
   ScriptTypes:
     "":
       {}
@@ -2257,6 +2305,7 @@
     - !<own> 2ecf7402-5427-40c6-8d95-94a437e39d1e
   Components:
     - !<own> 88e8e796-b031-4ece-83f8-14f79ceb2d18
+    - !<own> 89362762-7124-4bab-8954-9352d25584a2
 - !<SceneObject/ce2213a1-7aa1-4201-a3c7-c2aaa06fd4ff>
   PrefabRemaps:
     []

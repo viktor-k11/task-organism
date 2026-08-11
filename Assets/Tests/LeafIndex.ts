@@ -6,6 +6,12 @@ import { Gate2PersistenceSeedScenario } from "./Gate2PersistenceSeedScenario";
 import { Gate2PersistenceRestoreScenario } from "./Gate2PersistenceRestoreScenario";
 import { Gate2ElapsedRestoreScenario } from "./Gate2ElapsedRestoreScenario";
 import { Gate2ResolveScenario } from "./Gate2ResolveScenario";
+import { Gate3InputParityScenario } from "./Gate3InputParityScenario";
+import { Gate3ShortPinchScenario } from "./Gate3ShortPinchScenario";
+import { Gate3EarlyCancelScenario } from "./Gate3EarlyCancelScenario";
+import { Gate3CompletedHoldScenario } from "./Gate3CompletedHoldScenario";
+import { Gate3NoConflictScenario } from "./Gate3NoConflictScenario";
+import { Gate3LaterScenario } from "./Gate3LaterScenario";
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -20,5 +26,11 @@ export class LeafIndex extends BaseScriptComponent {
         { id: "gate2-5-persistence-restore", typename: Gate2PersistenceRestoreScenario.getTypeName() },
         { id: "gate2-6-8-elapsed-clock", typename: Gate2ElapsedRestoreScenario.getTypeName() },
         { id: "gate2-7-resolve-idempotency", typename: Gate2ResolveScenario.getTypeName() },
+        { id: "gate3-input-parity", typename: Gate3InputParityScenario.getTypeName() },
+        { id: "gate3-short-pinch-select", typename: Gate3ShortPinchScenario.getTypeName() },
+        { id: "gate3-early-hold-cancel", typename: Gate3EarlyCancelScenario.getTypeName() },
+        { id: "gate3-completed-hold", typename: Gate3CompletedHoldScenario.getTypeName() },
+        { id: "gate3-no-gesture-conflict", typename: Gate3NoConflictScenario.getTypeName() },
+        { id: "gate3-later-snooze", typename: Gate3LaterScenario.getTypeName() },
     ];
 }

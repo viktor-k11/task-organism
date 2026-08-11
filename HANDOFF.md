@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Day 1 Emotional Prototype / Character Vitality is frozen as the **technical character checkpoint**. Gate 2 Product Truth is implemented and fully LEAF-verified; interaction work has not started.
+Day 1 Emotional Prototype / Character Vitality is frozen as the **technical character checkpoint**. Gate 2 Product Truth and Gate 3 Concept Comprehension are implemented and fully LEAF-verified.
 
 Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SIK/UIKit installed, `lens-studio` MCP connected and authenticated. Blender is intentionally unavailable and not required.
 
@@ -22,6 +22,8 @@ Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SI
 - `StateEngine` derives urgency/state exclusively from an injected `Clock`.
 - `AttentionArbiter` applies the required threshold and selects at most one chaser.
 - `TaskResolutionService` persists an idempotent resolve before emitting one presentation release callback.
+- Shared `TaskInputSource` implementations (`DemoInput` and Specs `KeyboardInput`) create records through one `TaskCreationService` with identical defaults and no deadlines.
+- Short pinch selection, bounded two-line task detail, one `Later` action, a separate 0.7-second resolve hold with visible progress, early-release cancellation, and gesture-role isolation are wired to the technical creature.
 
 ## Modified files
 
@@ -83,6 +85,13 @@ Preserve existing untracked inspection artifacts:
 - Gate 2.6: PASS — a restored task transitioned from elapsed time immediately under `DemoClock`.
 - Gate 2.7: PASS — two resolve calls caused one repository save and one release callback.
 - Gate 2.8: PASS — `StateEngine` contains no `Date.now()`; time is injected through `Clock`.
+- Gate 3 input parity: PASS — Demo and Keyboard inputs created equivalent records through the same repository path.
+- Gate 3 short pinch: PASS — selection opened without resolving or saving.
+- Gate 3 early release: PASS — progress cancelled, selection remained, and no repository change occurred.
+- Gate 3 completed hold: PASS — the repository saved completion before exactly one release event.
+- Gate 3 gesture isolation: PASS — the selection gesture could not also resolve, even when held beyond the resolve threshold.
+- Gate 3 Later: PASS — snooze was persisted and selection UI closed.
+- Gate 3 live Preview: PASS for runtime short-pinch selection and enabled UI/text/action inspection. Automated hold semantics are covered by the separate LEAF Preview scenarios.
 
 ## Unresolved issues
 
@@ -102,10 +111,10 @@ These are explicit art-polish tasks, not blockers for the technical character ch
 
 ## Exact next step
 
-Begin the frozen interaction slice only on explicit direction: short pinch selects, 0.6–0.8 s hold resolves with progress, and early release cancels. Preserve the rule that select and resolve never fire from the same gesture.
+Await the next frozen-plan step on explicit direction. Do not expand beyond the accepted input, selection, resolve-hold, and Later loop.
 
 ## Do Not Repeat
 
 - Do not rebuild the procedural blob, movement, eyes, or release effect.
 - Do not re-diagnose the old one-eye screenshot; live chase verification established that the face is readable.
-- Do not start selection/hold interaction wiring before the Gate 2 checkpoint is accepted.
+- Do not redesign the accepted Gate 3 interaction architecture during later slices.

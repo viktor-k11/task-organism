@@ -125,6 +125,12 @@ export const URGENCY_AGE_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const CHASE_THRESHOLD = 1;
 export const HIGH_IMPORTANCE_URGENCY_BONUS = 0.5;
 
+// ── Gate 3 input / interaction ───────────────────────────────────────────
+export const RESOLVE_HOLD_DURATION_S = 0.7;
+export const LATER_SNOOZE_DURATION_MS = 15 * 60 * 1000;
+export const HABITAT_LABEL_MAX_CHARS = 18;
+export const SELECTION_LINE_MAX_CHARS = 30;
+
 // ── Lathe geometry (egg/teardrop silhouette, ~16cm tall x ~14cm wide) ──────
 export const LATHE_SEGMENTS = 80;
 export const VISUAL_BASELINE_SCALE = 0.88;

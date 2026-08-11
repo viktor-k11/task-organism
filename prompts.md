@@ -46,3 +46,14 @@
 8. **Clock isolation:** The elapsed scenario proved injected-clock behavior; static `rg` found no `Date.now()` under `Assets/Scripts/State`. The sole project call is inside `RealClock.nowMs()`.
 
 All five Gate 2 scenario runs returned `succeeded`. Remaining body capture streaking/transparency appearance remains non-blocking polish-phase art debt.
+
+## 2026-08-11 — Gate 3 Concept Comprehension
+
+1. **Input parity:** Added `TaskInputSource`, deterministic `DemoInput`, and Specs `KeyboardInput`; both delegate record creation and defaults to one `TaskCreationService`. `gate3-input-parity` passed exact-record comparison with no deadline.
+2. **Selection:** Added SIK short-pinch selection and a UIKit task panel with a short habitat label, bounded two-line task text, and one `Later` action. `gate3-short-pinch-select` passed with no repository write or release.
+3. **Resolve cancellation:** Added a visible 0.7-second hold-progress state. `gate3-early-hold-cancel` passed: early release reset progress, retained selection, and caused no repository write.
+4. **Resolve completion:** Routed completion through `TaskResolutionService` before the existing idempotent creature release. `gate3-completed-hold` passed with exactly one save and one release despite repeated completion/end calls.
+5. **Gesture separation:** Froze each press role at gesture start. `gate3-no-gesture-conflict` passed: even a long first gesture only selected; resolve required a separate press.
+6. **Later:** `gate3-later-snooze` passed: the selected record gained `snoozedUntilMs`, became ineligible through the existing state path, and the selection closed.
+7. **Live Preview:** A real synthetic short pinch hit the runtime Body interactable. Runtime inspection then showed the enabled task panel with `Send the project update`, `Hold again to complete`, and one `Later` button. A subsequent synthetic hold could not reacquire the moving target, so hold evidence comes from the deterministic LEAF Preview scenarios rather than a retry.
+8. **Verify:** All six Gate 3 scenarios returned `succeeded`; TypeScript compilation and refreshed runtime startup passed without project errors.

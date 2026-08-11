@@ -33,6 +33,7 @@
     creature: false
     triggerChase: false
     triggerEndChase: false
+    triggerRecenterHabitat: false
     triggerRelease: false
     triggerReset: false
   ScriptTypesHidden:
@@ -49,6 +50,7 @@
       triggerEndChase: false
       triggerRelease: false
       triggerReset: false
+      triggerRecenterHabitat: false
       autoCycle: false
       autoCyclePhaseDurationS: !<float> 4.000000
   ScriptTypes:
@@ -68,6 +70,7 @@
     - '// @input bool triggerEndChase {"hint":"Toggle ON to fire endChase() once (return to idle wander, no snap)."}'
     - '// @input bool triggerRelease {"hint":"Toggle ON to fire release() once (idempotent — repeat toggles after the first are no-ops)."}'
     - '// @input bool triggerReset {"hint":"Toggle ON to re-enable the Creature and start a fresh IDLE lifecycle, for repeat testing."}'
+    - "// @input bool triggerRecenterHabitat {\"hint\":\"Toggle ON to re-anchor the habitat on the camera's CURRENT position/forward (preview/recording only — the habitat is otherwise world-anchored, not camera-following).\"}"
     - '// @ui {"widget":"group_end"}'
     - '// @ui {"widget":"separator"}'
     - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">Auto-cycle demo</span>"}'

@@ -226,6 +226,31 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.resetToIdle();
     }
 
+    /**
+     * Debug-only: re-anchors the world-space habitat zone on the camera's
+     * CURRENT position/forward, without touching lifecycle/state — for
+     * preview and recording, when the camera has moved far from where the
+     * habitat was last anchored and the creature needs to be brought back
+     * into shot. The habitat stays world-anchored otherwise (captured once
+     * at spawn/reset, not continuously recentered on the camera) per the
+     * design; this is a manual one-shot nudge, not a change to that rule.
+     */
+    recenterHabitat(): void {
+        if (this.isReleased) return;
+        if (this.state === CreaturePresentationState.RELEASING) return;
+
+        this.recomputeHabitatOrigin();
+
+        if (this.state === CreaturePresentationState.IDLE) {
+            // Only IDLE actually reads habitatCenter for movement (chase computes
+            // its target from the live camera every frame, independent of this) —
+            // pick a fresh wander target now so the recenter has a visible effect
+            // immediately instead of waiting for the current leg to finish.
+            this.wanderTarget = this.pickWanderTarget();
+            this.isWaitingAtWanderTarget = false;
+        }
+    }
+
     // ── Lifecycle ────────────────────────────────────────────────────────
 
     private onStart(): void {
@@ -280,20 +305,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.wanderPauseTimer = 0;
         this.releaseEffect = null;
 
-        if (this.cameraObject) {
-            const camTransform = this.cameraObject.getTransform();
-            const camPos = camTransform.getWorldPosition();
-            // Verified empirically (console.log + Preview panel capture): for this
-            // project's Camera Object, Transform.forward reports the OPPOSITE of the
-            // direction the camera actually renders toward (returns +Z while the
-            // camera visibly looks down -Z) — negate it here so the habitat is
-            // centered on where the user can actually see the creature, not on the
-            // space behind them.
-            const camFwd = camTransform.forward.uniformScale(-1);
-            this.habitatCenter = camPos;
-            this.habitatForwardYaw = Math.atan2(camFwd.x, -camFwd.z);
-            this.wanderTargetY = camPos.y + HABITAT_VERTICAL_OFFSET_CM;
-        }
+        this.recomputeHabitatOrigin();
         this.wanderTarget = this.pickWanderTarget();
 
         if (this.bodyObject) {
@@ -307,6 +319,29 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (this.blobMesh) this.blobMesh.renderMeshVisual.mainMaterial = bodyBaseMaterialAsset;
         if (this.eyeLeftRmv) this.eyeLeftRmv.mainMaterial = eyeBaseMaterialAsset;
         if (this.eyeRightRmv) this.eyeRightRmv.mainMaterial = eyeBaseMaterialAsset;
+    }
+
+    /**
+     * Reads the camera's CURRENT position/forward into habitatCenter /
+     * habitatForwardYaw / wanderTargetY. Shared by resetToIdle() (habitat is
+     * anchored once at spawn/reset) and the debug-only recenterHabitat()
+     * (a manual re-anchor for preview/recording) — the habitat is otherwise
+     * world-anchored, not continuously recentered on the camera every frame.
+     */
+    private recomputeHabitatOrigin(): void {
+        if (!this.cameraObject) return;
+        const camTransform = this.cameraObject.getTransform();
+        const camPos = camTransform.getWorldPosition();
+        // Verified empirically (console.log + Preview panel capture): for this
+        // project's Camera Object, Transform.forward reports the OPPOSITE of the
+        // direction the camera actually renders toward (returns +Z while the
+        // camera visibly looks down -Z) — negate it here so the habitat is
+        // centered on where the user can actually see the creature, not on the
+        // space behind them.
+        const camFwd = camTransform.forward.uniformScale(-1);
+        this.habitatCenter = camPos;
+        this.habitatForwardYaw = Math.atan2(camFwd.x, -camFwd.z);
+        this.wanderTargetY = camPos.y + HABITAT_VERTICAL_OFFSET_CM;
     }
 
     private onUpdate(): void {

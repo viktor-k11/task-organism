@@ -5,9 +5,9 @@ type AutoCyclePhase = "IDLE" | "CHASING" | "RELEASED";
 
 /**
  * CreatureDebugTrigger — Inspector toggles for requestChase()/endChase()/
- * release()/reset() plus an auto-cycling idle->chase->release->reset demo
- * loop. This is how Piece 1 is tested manually since no task/arbiter exists
- * yet (see CLAUDE.md "Out of scope this week"). Isolated on its own "Debug"
+ * release()/reset()/recenterHabitat() plus an auto-cycling idle->chase->
+ * release->reset demo loop. This is how Piece 1 is tested manually since
+ * no task/arbiter exists yet (see CLAUDE.md "Out of scope this week"). Isolated on its own "Debug"
  * SceneObject so it's a one-line deletion once a real AttentionArbiter
  * exists to drive requestChase()/release() instead.
  *
@@ -43,6 +43,10 @@ export class CreatureDebugTrigger extends BaseScriptComponent {
     @input
     @hint("Toggle ON to re-enable the Creature and start a fresh IDLE lifecycle, for repeat testing.")
     triggerReset: boolean = false;
+
+    @input
+    @hint("Toggle ON to re-anchor the habitat on the camera's CURRENT position/forward (preview/recording only — the habitat is otherwise world-anchored, not camera-following).")
+    triggerRecenterHabitat: boolean = false;
     @ui.group_end
 
     @ui.separator
@@ -92,6 +96,10 @@ export class CreatureDebugTrigger extends BaseScriptComponent {
             this.triggerReset = false;
             this.autoCyclePhase = "IDLE";
             this.autoCycleTimer = 0;
+        }
+        if (this.triggerRecenterHabitat) {
+            this.creature.recenterHabitat();
+            this.triggerRecenterHabitat = false;
         }
 
         if (this.autoCycle) {

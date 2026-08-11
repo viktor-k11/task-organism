@@ -1867,6 +1867,7 @@
     triggerEndChase: true
     triggerRelease: true
     triggerReset: true
+    triggerRecenterHabitat: true
     autoCycle: true
     autoCyclePhaseDurationS: true
   ScriptTypesDefault:
@@ -1878,6 +1879,7 @@
       triggerEndChase: false
       triggerRelease: false
       triggerReset: false
+      triggerRecenterHabitat: false
       autoCycle: false
       autoCyclePhaseDurationS: !<float> 4.000000
   ScriptTypes:

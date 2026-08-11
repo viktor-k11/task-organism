@@ -15,11 +15,12 @@ The project is currently a clean Specs Base Template — no `Assets/Scripts/`, n
 
 ## Adjustments (day 1, before build)
 
-Three changes to the plan above, made before implementation started:
+Four changes to the plan above, made before implementation started:
 
 1. **Wobble perf gate**: keep the per-vertex wobble, but gate it behind a `WOBBLE_ENABLED` constant in `CreatureConfig.ts`. `BlobMeshBuilder.updateWobble()` early-returns before both the per-vertex loop and the `builder.updateMesh()` call when disabled — `CreatureBehavior` keeps calling `updateWobble()` unconditionally every frame, so the on/off decision lives entirely in config, not behavior code. This is the main perf risk once multiple creatures (up to 6) run simultaneously, and needs to be a one-line toggle.
 2. **Skip `build-sfx` today**: no chime is generated. The `AudioComponent` is still wired on `Creature` and `ReleaseEffect.play()` still calls it — but the wiring is a guarded no-op (`if (audio && audio.audioTrack)`) since `audioTrack` is left unassigned (defaults to `null`). Real sound design happens later in the week; only the hookup needs to exist today.
 3. **Skip the LEAF scenario today**: manual preview verification only (see Verification below). No behavior change beyond making sure the public API — `requestChase()`, `endChase()`, `release()`, all zero-arg `void` — stays stable enough to write that scenario against later without a signature change.
+4. **Habitat stays world-anchored; add a debug-only recenter action**: no change to the world-anchoring design — the habitat is still captured once at spawn/reset, not continuously recentered on the camera. Added `CreatureBehavior.recenterHabitat()` (a new public method, distinct from the AttentionArbiter-facing API) that re-reads the camera's current position/forward into `habitatCenter`/`habitatForwardYaw`/`wanderTargetY` and, if currently `IDLE`, immediately picks a fresh wander target so the effect is visible right away. Exposed as `triggerRecenterHabitat` on `CreatureDebugTrigger`, needed only for preview/recording — e.g. after the camera has drifted far from where the habitat was last anchored and the creature needs to be brought back into shot.
 
 ## File structure
 

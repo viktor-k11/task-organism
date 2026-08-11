@@ -24,17 +24,22 @@ export const HABITAT_ARC_HALF_ANGLE_DEG = 60;
 /** Fixed vertical offset (cm) below the camera's spawn-time height the creature wanders at. */
 export const HABITAT_VERTICAL_OFFSET_CM = -10;
 /** Three-creature demo habitat: fixed camera-relative homes, safely inside Preview. */
-export const HABITAT_HOME_DEPTH_CM = 147;
-export const HABITAT_HOME_LATERAL_SPACING_CM = 27;
+export const HABITAT_HOME_DEPTH_CM = 240;
+export const HABITAT_HOME_LATERAL_SPACING_CM = 18;
+export const HABITAT_HOME_GROUP_LATERAL_CM = -24;
+export const HABITAT_HOME_SIDE_DEPTH_OFFSET_CM = 6;
 export const HABITAT_HOME_WANDER_RADIUS_CM = 3;
-export const HABITAT_HOME_CENTER_VERTICAL_CM = 22;
-export const HABITAT_HOME_SIDE_VERTICAL_CM = -8;
+export const HABITAT_HOME_FLOOR_Y_CM = -8;
+/** Presentation height: ~28 cm calm, easing toward ~37 cm while urgent. */
+export const HABITAT_VISUAL_SCALE = 0.68;
+export const CHASE_VISUAL_SCALE = 0.95;
+export const PRESENTATION_SCALE_EASE_PER_S = 2.8;
 
 // ── Chase ────────────────────────────────────────────────────────────────
 export const CHASE_DISTANCE_MIN_CM = 110; // 1.1m
 export const CHASE_DISTANCE_MAX_CM = 130; // 1.3m
-export const CHASE_SIDE_OFFSET_MIN_DEG = 8;
-export const CHASE_SIDE_OFFSET_MAX_DEG = 12;
+export const CHASE_SIDE_OFFSET_MIN_DEG = 0;
+export const CHASE_SIDE_OFFSET_MAX_DEG = 0;
 export const CHASE_STOP_DISTANCE_CM = 100; // 1.0m hard stop, never gets closer
 export const MAX_SPEED_CM_S = 50; // 0.5 m/s hard cap (CLAUDE.md)
 export const CHASE_MAX_ACCEL_CM_S2 = 90;
@@ -61,6 +66,9 @@ export const CHASE_HESITATION_INTERVAL_MAX_S = 2.0;
  */
 export const CHASE_HESITATION_ANGLE_DEG = 6;
 export const CHASE_HESITATION_DURATION_S = 0.5;
+export const CHASE_LOOK_PAUSE_S = 0.3;
+export const CHASE_ANTICIPATION_S = 0.28;
+export const CHASE_ANTICIPATION_DIP_CM = 1.4;
 
 // ── Breathing (always active, every state except RELEASING) ────────────────
 export const BREATHE_AMPLITUDE = 0.03; // ~3% uniform scale pulse
@@ -109,7 +117,10 @@ export const GLANCE_HOLD_DURATION_S = 0.6;
 
 // ── Facing / rotation smoothing ─────────────────────────────────────────────
 /** How quickly Body's facing direction eases toward the desired direction (per second). */
-export const FACE_TURN_RATE_PER_S = 6;
+export const FACE_TURN_RATE_PER_S = 4;
+export const IDLE_YAW_LIMIT_DEG = 20;
+export const IDLE_MAX_YAW_SPEED_DEG_S = 24;
+export const CHASE_MAX_YAW_SPEED_DEG_S = 90;
 
 // ── Integration safety ──────────────────────────────────────────────────────
 /**
@@ -132,11 +143,11 @@ export const CHASE_THRESHOLD = 1;
 export const HIGH_IMPORTANCE_URGENCY_BONUS = 0.5;
 
 // ── Gate 3 input / interaction ───────────────────────────────────────────
-export const RESOLVE_HOLD_DURATION_S = 0.7;
+export const RESOLVE_HOLD_DURATION_S = 1.5;
 export const LATER_SNOOZE_DURATION_MS = 15 * 60 * 1000;
 export const HABITAT_LABEL_MAX_CHARS = 18;
 export const SELECTION_LINE_MAX_CHARS = 30;
-export const TASK_SELECTION_PANEL_Y_CM = 48;
+export const TASK_SELECTION_PANEL_Y_CM = 25;
 
 // ── Lathe geometry (egg/teardrop silhouette, ~16cm tall x ~14cm wide) ──────
 export const LATHE_SEGMENTS = 80;

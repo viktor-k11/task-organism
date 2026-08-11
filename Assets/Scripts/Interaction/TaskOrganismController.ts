@@ -1,9 +1,10 @@
 import { Interactable } from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable";
 import {
     HABITAT_HOME_DEPTH_CM,
-    HABITAT_HOME_CENTER_VERTICAL_CM,
+    HABITAT_HOME_FLOOR_Y_CM,
     HABITAT_HOME_LATERAL_SPACING_CM,
-    HABITAT_HOME_SIDE_VERTICAL_CM,
+    HABITAT_HOME_GROUP_LATERAL_CM,
+    HABITAT_HOME_SIDE_DEPTH_OFFSET_CM,
     HABITAT_HOME_WANDER_RADIUS_CM,
     RESOLVE_HOLD_DURATION_S,
     URGENCY_AGE_WINDOW_MS,
@@ -24,7 +25,7 @@ import { CreatureInteractionState } from "./CreatureInteractionState";
 import { DemoControlView } from "./DemoControlView";
 import { TaskSelectionView } from "./TaskSelectionView";
 
-const DEMO_STORAGE_KEY = "task-organism.wednesday-demo.v3";
+const DEMO_STORAGE_KEY = "task-organism.wednesday-demo.v3.presentation";
 const DEMO_TASK_SPACING_MS = URGENCY_AGE_WINDOW_MS / 2;
 const SLOT_NAMES = ["MovementRoot_1", "MovementRoot_2", "MovementRoot_3"];
 
@@ -138,14 +139,14 @@ export class TaskOrganismController extends BaseScriptComponent {
             });
             view.setTaskText(task.text);
             creature.setHabitatHome(
-                (i - 1) * HABITAT_HOME_LATERAL_SPACING_CM,
-                HABITAT_HOME_DEPTH_CM,
-                i === 1 ? HABITAT_HOME_CENTER_VERTICAL_CM : HABITAT_HOME_SIDE_VERTICAL_CM,
+                HABITAT_HOME_GROUP_LATERAL_CM + (i - 1) * HABITAT_HOME_LATERAL_SPACING_CM,
+                HABITAT_HOME_DEPTH_CM + (i === 1 ? HABITAT_HOME_SIDE_DEPTH_OFFSET_CM : 0),
+                HABITAT_HOME_FLOOR_Y_CM,
                 HABITAT_HOME_WANDER_RADIUS_CM,
             );
             this.attachInteraction(body, task.id);
             this.slots.push({ taskId: task.id, root, creature, view });
-            console.log(`[WednesdayEvidence] habitat task=${task.id} slot=${i + 1} lateral=${(i - 1) * HABITAT_HOME_LATERAL_SPACING_CM}`);
+            console.log(`[WednesdayEvidence] habitat task=${task.id} slot=${i + 1} lateral=${HABITAT_HOME_GROUP_LATERAL_CM + (i - 1) * HABITAT_HOME_LATERAL_SPACING_CM}`);
         }
     }
 

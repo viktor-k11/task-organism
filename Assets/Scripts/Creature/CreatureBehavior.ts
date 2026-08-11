@@ -10,6 +10,9 @@ import {
     HABITAT_ARC_HALF_ANGLE_DEG,
     HABITAT_VERTICAL_OFFSET_CM,
     HABITAT_HOME_WANDER_RADIUS_CM,
+    HABITAT_VISUAL_SCALE,
+    CHASE_VISUAL_SCALE,
+    PRESENTATION_SCALE_EASE_PER_S,
     CHASE_DISTANCE_MIN_CM,
     CHASE_DISTANCE_MAX_CM,
     CHASE_SIDE_OFFSET_MIN_DEG,
@@ -25,6 +28,9 @@ import {
     CHASE_HESITATION_INTERVAL_MAX_S,
     CHASE_HESITATION_ANGLE_DEG,
     CHASE_HESITATION_DURATION_S,
+    CHASE_LOOK_PAUSE_S,
+    CHASE_ANTICIPATION_S,
+    CHASE_ANTICIPATION_DIP_CM,
     BREATHE_AMPLITUDE,
     BREATHE_FREQUENCY_HZ,
     WANDER_SPEED_CM_S,
@@ -42,6 +48,9 @@ import {
     GLANCE_HOP_DURATION_S,
     GLANCE_HOLD_DURATION_S,
     FACE_TURN_RATE_PER_S,
+    IDLE_YAW_LIMIT_DEG,
+    IDLE_MAX_YAW_SPEED_DEG_S,
+    CHASE_MAX_YAW_SPEED_DEG_S,
     BODY_MOVE_TILT_DEG,
     BODY_SECONDARY_SWAY_DEG,
     EYE_OFFSET_X_CM,
@@ -155,6 +164,8 @@ export class CreatureBehavior extends BaseScriptComponent {
     private hesitationTimer = 0;
     private hesitationAngleOffsetRad = 0;
     private hesitationActiveT = 0;
+    private chaseCueElapsed = 0;
+    private presentationScale = HABITAT_VISUAL_SCALE;
 
     // Squash & stretch envelope: 1 = just triggered, decays to 0.
     private squashEnvelope = 0;
@@ -178,6 +189,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.hesitationTimer = this.randomRange(CHASE_HESITATION_INTERVAL_MIN_S, CHASE_HESITATION_INTERVAL_MAX_S);
         this.hesitationActiveT = 0;
         this.hesitationAngleOffsetRad = 0;
+        this.chaseCueElapsed = 0;
 
         // Seed polar chase state from the CURRENT position so entering chase
         // never snaps — the angular/radial seek then eases from here.
@@ -192,6 +204,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         }
         this.chaseAngularVel = 0;
         this.chaseRadialVel = 0;
+        console.log(`[WednesdayEvidence] chase cue look-pause root=${this.sceneObject.name}`);
     }
 
     /** Assigns a distinct camera-relative home without changing creature scale or internals. */
@@ -216,6 +229,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.velocity = vec3.zero();
         this.chaseAngularVel = 0;
         this.chaseRadialVel = 0;
+        this.chaseCueElapsed = 0;
         this.hesitationActiveT = 0;
         this.hesitationAngleOffsetRad = 0;
         console.log(`[CreatureBehavior] interaction hold root=${this.sceneObject.name}`);
@@ -364,7 +378,8 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.blinkElapsed = 0;
         this.blinkTimer = this.randomRange(BLINK_INTERVAL_MIN_S, BLINK_INTERVAL_MAX_S);
         if (this.visualRootObject) {
-            this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(VISUAL_BASELINE_SCALE));
+            this.presentationScale = HABITAT_VISUAL_SCALE;
+            this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale));
         }
 
         this.recomputeHabitatOrigin();
@@ -430,6 +445,7 @@ export class CreatureBehavior extends BaseScriptComponent {
             this.updateInteractionHold(dt);
         }
 
+        this.updatePresentationScale(dt);
         this.applyBodyScale(dt);
         this.updateFaceAndSecondaryMotion(dt);
     }
@@ -450,6 +466,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         }
 
         this.updateWander(dt);
+        this.updateCameraFrontBias(dt, true);
     }
 
     private updateWander(dt: number): void {
@@ -491,7 +508,6 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (result.velocity.length > 0.5) {
             const dir = result.velocity.normalize();
             this.checkSquashStretch(dir);
-            this.updateFacing(dir, dt);
         }
     }
 
@@ -571,6 +587,20 @@ export class CreatureBehavior extends BaseScriptComponent {
     // camera at a bounded, predictable rate regardless of the starting gap.
     private updateChasing(dt: number): void {
         if (!this.cameraObject) return;
+
+        this.chaseCueElapsed += dt;
+        const cueDuration = CHASE_LOOK_PAUSE_S + CHASE_ANTICIPATION_S;
+        if (this.chaseCueElapsed < cueDuration) {
+            this.velocity = vec3.zero();
+            this.updateCameraFrontBias(dt, false);
+            if (this.bodyObject) {
+                const anticipationT = clamp01((this.chaseCueElapsed - CHASE_LOOK_PAUSE_S) / CHASE_ANTICIPATION_S);
+                const dip = anticipationT > 0 ? -CHASE_ANTICIPATION_DIP_CM * Math.sin(anticipationT * Math.PI) : 0;
+                this.bodyObject.getTransform().setLocalPosition(new vec3(0, dip, 0));
+            }
+            return;
+        }
+        if (this.bodyObject) this.bodyObject.getTransform().setLocalPosition(vec3.zero());
 
         this.hesitationTimer -= dt;
         if (this.hesitationTimer <= 0 && this.hesitationActiveT <= 0) {
@@ -652,7 +682,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         // Front stays oriented toward the camera throughout the chase.
         const toCam = camPos.sub(newPos);
         if (toCam.length > 0.5) {
-            this.updateFacing(toCam.normalize(), dt);
+            this.updateFacingLimited(toCam.normalize(), dt, CHASE_MAX_YAW_SPEED_DEG_S);
         }
 
         const moveDelta = newPos.sub(beforePos);
@@ -667,6 +697,48 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (!this.bodyObject) return;
         const alpha = clamp01(dt * FACE_TURN_RATE_PER_S);
         this.facingDir = vec3.slerp(this.facingDir, desiredDir, alpha).normalize();
+    }
+
+    private updateCameraFrontBias(dt: number, clampIdleBias: boolean): void {
+        if (!this.cameraObject) return;
+        const camPos = this.cameraObject.getTransform().getWorldPosition();
+        const pos = this.sceneObject.getTransform().getWorldPosition();
+        let toCamera = camPos.sub(pos);
+        toCamera.y = 0;
+        if (toCamera.length < 0.5) return;
+        toCamera = toCamera.normalize();
+        if (clampIdleBias) {
+            const directYaw = Math.atan2(toCamera.x, -toCamera.z);
+            const frontYaw = this.habitatForwardYaw + Math.PI;
+            const maxBias = IDLE_YAW_LIMIT_DEG * Math.PI / 180;
+            const bias = this.wrapAngle(directYaw - frontYaw);
+            const limitedYaw = frontYaw + Math.max(-maxBias, Math.min(maxBias, bias));
+            toCamera = new vec3(Math.sin(limitedYaw), 0, -Math.cos(limitedYaw));
+        }
+        this.updateFacingLimited(toCamera, dt, clampIdleBias ? IDLE_MAX_YAW_SPEED_DEG_S : CHASE_MAX_YAW_SPEED_DEG_S);
+    }
+
+    private updateFacingLimited(desiredDir: vec3, dt: number, maxDegreesPerSecond: number): void {
+        const currentYaw = Math.atan2(this.facingDir.x, -this.facingDir.z);
+        const desiredYaw = Math.atan2(desiredDir.x, -desiredDir.z);
+        const delta = this.wrapAngle(desiredYaw - currentYaw);
+        const maxStep = maxDegreesPerSecond * Math.PI / 180 * dt;
+        const nextYaw = currentYaw + Math.max(-maxStep, Math.min(maxStep, delta));
+        this.facingDir = new vec3(Math.sin(nextYaw), 0, -Math.cos(nextYaw));
+    }
+
+    private updatePresentationScale(dt: number): void {
+        if (!this.visualRootObject) return;
+        const urgent = this.state === CreaturePresentationState.CHASING || this.state === CreaturePresentationState.INTERACTING;
+        const target = urgent ? CHASE_VISUAL_SCALE : HABITAT_VISUAL_SCALE;
+        this.presentationScale += (target - this.presentationScale) * clamp01(dt * PRESENTATION_SCALE_EASE_PER_S);
+        this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale));
+    }
+
+    private wrapAngle(angle: number): number {
+        while (angle > Math.PI) angle -= Math.PI * 2;
+        while (angle < -Math.PI) angle += Math.PI * 2;
+        return angle;
     }
 
     private updateFaceAndSecondaryMotion(dt: number): void {

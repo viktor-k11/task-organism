@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-Day 1 Emotional Prototype / Character Vitality is redesigned and verified in Lens Studio Preview after Gate 1 visual feedback. No task logic has been started. The character now reads as a small living pear/bean creature rather than a decorated sphere.
+Day 1 Emotional Prototype / Character Vitality is frozen as the **technical character checkpoint**. It proves the presentation seams and verified behavior, but it is not final art. No task logic has been started.
 
 Environment: Lens Studio 5.23.1, SPECS 27 target, Interactive stereo Preview, SIK/UIKit installed, `lens-studio` MCP connected and authenticated. Blender is intentionally unavailable and not required.
 
@@ -70,11 +70,21 @@ Preserve existing untracked inspection artifacts:
 
 1. `task-organism-plan-v3-final.md` is missing from the repository.
 2. `task-organism-playbook-v3.md` is missing from the repository.
-3. None for Day 1 acceptance.
+
+## Scheduled polish-phase art debt
+
+- Replace the technical procedural body with a production-quality soft bean/mochi silhouette while preserving `VisualRoot` scale and the `CreatureBehavior` API.
+- Improve material response and color separation across bright/dark environments without changing the unlit, opaque, lightweight constraint.
+- Refine eye embedding, eyelid forms, pupil/catchlight consistency, and three-quarter readability.
+- Refine flipper-to-body transitions and secondary-motion weighting.
+- Refine contact-shadow shape/softness and release-particle art.
+- Re-evaluate apparent size versus camera FOV: the verified 35.5 cm creature at roughly 1.2 m occupies about 44% of the current 36.6° vertical Preview frame, so the prior one-third framing request conflicts with the frozen 35–45 cm and 1.1–1.3 m constraints.
+
+These are explicit art-polish tasks, not blockers for the technical character checkpoint or authorization to redesign during the data-layer phase.
 
 ## Exact next step
 
-Stop at the frozen Day 1 boundary. Begin task logic only after explicit user direction and after the missing frozen v3 plan/playbook are restored or otherwise supplied.
+Begin the data layer from the model and invariants in `CLAUDE.md`. Do not invent scope that depends on the two missing frozen v3 documents.
 
 ## Do Not Repeat
 

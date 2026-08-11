@@ -6,6 +6,7 @@ export interface CreatureEye {
     white: RenderMeshVisual;
     pupil: SceneObject;
     pupilVisual: RenderMeshVisual;
+    eyelid: SceneObject;
     baseScale: vec3;
 }
 
@@ -31,42 +32,55 @@ export class CreatureEyes {
         builder.topology = MeshTopology.Triangles;
         builder.indexType = MeshIndexType.UInt16;
 
-        // Small 5-point sphere profile, few segments -> a cheap, simple round pupil.
+        // Smooth oval white, embedded shallowly into the body's front surface.
         const radius = EYE_RADIUS_CM * sizeScale;
         const profile: [number, number][] = [
-            [0, -radius], [radius * 0.75, -radius * 0.5], [radius, 0],
-            [radius * 0.75, radius * 0.5], [0, radius],
+            [0,-radius],[radius*0.5,-radius*0.85],[radius*0.82,-radius*0.5],[radius*0.98,-radius*0.15],
+            [radius,0],[radius*0.95,radius*0.35],[radius*0.72,radius*0.68],[radius*0.38,radius*0.9],[0,radius],
         ];
-        buildLathe(builder, profile, 10, [1, 0.94, 0.84, 1]);
+        buildLathe(builder, profile, 40, [0.97, 0.90, 0.80, 1]);
 
         rmv.mesh = builder.getMesh();
         if (whiteMaterial) {
             const white = whiteMaterial.clone();
-            white.mainPass.baseColor = new vec4(1, 0.94, 0.84, 1);
+            white.mainPass.baseColor = new vec4(0.97, 0.90, 0.80, 1);
             rmv.mainMaterial = white;
         }
         builder.updateMesh();
 
         const pupil = global.scene.createSceneObject("Pupil");
         pupil.setParent(eyeObject);
-        pupil.getTransform().setLocalPosition(new vec3(0.18 * sizeScale, 0.05, -radius * 0.78));
-        pupil.getTransform().setLocalScale(new vec3(0.48, 0.62, 0.32));
-        const pupilVisual = CreatureEyes.buildSphere(pupil, radius * 0.72, pupilMaterial, EYE_COLOR);
-        const baseScale = new vec3(1, 1.08, 0.72);
+        pupil.getTransform().setLocalPosition(new vec3(0.18 * sizeScale, -0.08, -radius * 0.98));
+        pupil.getTransform().setLocalScale(new vec3(0.68, 0.82, 0.25));
+        const pupilVisual = CreatureEyes.buildSphere(pupil, radius * 0.54, pupilMaterial, EYE_COLOR);
+
+        const catchlight = global.scene.createSceneObject("Catchlight"); catchlight.setParent(pupil);
+        catchlight.getTransform().setLocalPosition(new vec3(-radius*0.22,radius*0.28,-radius*0.58));
+        catchlight.getTransform().setLocalScale(new vec3(0.46,0.46,0.20));
+        CreatureEyes.buildSphere(catchlight, radius*0.19, whiteMaterial, [1,0.96,0.9,1]);
+
+        const eyelid = global.scene.createSceneObject("SoftEyelid"); eyelid.setParent(eyeObject);
+        eyelid.getTransform().setLocalPosition(new vec3(0, radius*0.94, -radius*0.7));
+        eyelid.getTransform().setLocalScale(new vec3(1.04,0.16,0.26));
+        CreatureEyes.buildSphere(eyelid, radius*1.02, whiteMaterial, [0.84,0.62,0.49,1]);
+
+        const baseScale = new vec3(1.0, 1.12, 0.46);
         eyeObject.getTransform().setLocalScale(baseScale);
-        return { root: eyeObject, white: rmv, pupil, pupilVisual, baseScale };
+        return { root: eyeObject, white: rmv, pupil, pupilVisual, eyelid, baseScale };
     }
 
     static updateBlink(eye: CreatureEye, blinkT: number): void {
-        const closed = blinkT > 0 ? Math.max(0.08, Math.abs(blinkT / BLINK_DURATION_S - 0.5) * 2) : 1;
-        eye.root.getTransform().setLocalScale(new vec3(eye.baseScale.x, eye.baseScale.y * closed, eye.baseScale.z));
+        const closure = blinkT > 0 ? 1 - Math.abs(blinkT / BLINK_DURATION_S - 0.5) * 2 : 0;
+        eye.root.getTransform().setLocalScale(eye.baseScale);
+        const lidY = EYE_RADIUS_CM * (0.94 - closure * 0.98);
+        eye.eyelid.getTransform().setLocalPosition(new vec3(0, lidY, -EYE_RADIUS_CM * 0.7));
     }
 
     private static buildSphere(object: SceneObject, radius: number, material: Material | null, color: [number, number, number, number]): RenderMeshVisual {
         const rmv = object.createComponent("Component.RenderMeshVisual") as RenderMeshVisual;
         const builder = new MeshBuilder([{ name: "position", components: 3 }, { name: "normal", components: 3, normalized: true }, { name: "color", components: 4 }]);
         builder.topology = MeshTopology.Triangles; builder.indexType = MeshIndexType.UInt16;
-        buildLathe(builder, [[0,-radius],[radius*0.78,-radius*0.5],[radius,0],[radius*0.78,radius*0.5],[0,radius]], 12, color);
+        buildLathe(builder, [[0,-radius],[radius*0.38,-radius*0.92],[radius*0.7,-radius*0.7],[radius*0.92,-radius*0.38],[radius,0],[radius*0.92,radius*0.38],[radius*0.7,radius*0.7],[radius*0.38,radius*0.92],[0,radius]], 36, color);
         rmv.mesh = builder.getMesh(); if (material) rmv.mainMaterial = material; builder.updateMesh();
         return rmv;
     }

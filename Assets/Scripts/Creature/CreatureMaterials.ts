@@ -14,8 +14,24 @@
  */
 export function cloneMaterialOnto(rmv: RenderMeshVisual): Material {
     const mat = rmv.mainMaterial.clone();
+    forceOpaque(mat);
     rmv.clearMaterials();
     rmv.addMaterial(mat);
+    return mat;
+}
+
+/** Hardens a cloned presentation material against accidental transparency. */
+export function forceOpaque(mat: Material): Material {
+    const base = mat.mainPass.baseColor as vec4;
+    mat.mainPass.baseColor = new vec4(base.x, base.y, base.z, 1);
+    // The stock unlit graph exposes its scalar opacity fallback under this
+    // generated port name even when the opacity texture define is disabled.
+    // Pin both fallbacks so graph evaluation cannot inherit translucent data.
+    mat.mainPass.Port_Default_N204 = 1;
+    mat.mainPass.Port_Default_N369 = new vec4(1, 1, 1, 1);
+    mat.mainPass.blendMode = BlendMode.Disabled;
+    mat.mainPass.depthTest = true;
+    mat.mainPass.depthWrite = true;
     return mat;
 }
 

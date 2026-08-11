@@ -8,6 +8,7 @@ import {
     WOBBLE_FREQUENCY_HZ,
     WOBBLE_PHASE_STEP,
 } from "../Config/CreatureConfig";
+import { forceOpaque } from "./CreatureMaterials";
 
 interface BaseVertex {
     pos: vec3;
@@ -48,7 +49,10 @@ export class BlobMeshBuilder {
 
         this.rmv.mesh = this.builder.getMesh();
         if (material) {
-            this.rmv.mainMaterial = material;
+            const opaqueMaterial = material.clone();
+            opaqueMaterial.mainPass.baseColor = new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], 1);
+            forceOpaque(opaqueMaterial);
+            this.rmv.mainMaterial = opaqueMaterial;
         }
         this.builder.updateMesh();
     }

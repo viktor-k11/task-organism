@@ -49,6 +49,7 @@ import {
     BLINK_INTERVAL_MIN_S,
     BLINK_INTERVAL_MAX_S,
     BLINK_DURATION_S,
+    VISUAL_BASELINE_SCALE,
 } from "../Config/CreatureConfig";
 
 const bodyBaseMaterialAsset = requireAsset("../../Materials/BlobBody.mat") as Material;
@@ -99,6 +100,8 @@ export class CreatureBehavior extends BaseScriptComponent {
     private isReleased = false;
 
     private bodyObject: SceneObject | null = null;
+    private visualRootObject: SceneObject | null = null;
+    private shadowObject: SceneObject | null = null;
     private eyeLeftObject: SceneObject | null = null;
     private eyeRightObject: SceneObject | null = null;
     private particleAnchorObject: SceneObject | null = null;
@@ -272,11 +275,14 @@ export class CreatureBehavior extends BaseScriptComponent {
             return;
         }
 
-        this.bodyObject = findChildByName(this.sceneObject, "Body");
+        this.visualRootObject = findChildByName(this.sceneObject, "VisualRoot");
+        this.bodyObject = this.visualRootObject ? findChildByName(this.visualRootObject, "Body") : null;
         this.eyeLeftObject = this.bodyObject ? findChildByName(this.bodyObject, "EyeLeft") : null;
         this.eyeRightObject = this.bodyObject ? findChildByName(this.bodyObject, "EyeRight") : null;
-        this.particleAnchorObject = findChildByName(this.sceneObject, "ParticleAnchor");
-        this.audioComponent = this.sceneObject.getComponent("Component.AudioComponent") as AudioComponent;
+        this.particleAnchorObject = this.visualRootObject ? findChildByName(this.visualRootObject, "ParticleAnchor") : null;
+        this.audioComponent = this.visualRootObject
+            ? this.visualRootObject.getComponent("Component.AudioComponent") as AudioComponent
+            : null;
 
         if (!this.bodyObject || !this.eyeLeftObject || !this.eyeRightObject || !this.particleAnchorObject) {
             console.error("[CreatureBehavior] Body/EyeLeft/EyeRight/ParticleAnchor not found. Check the authored scene hierarchy.");
@@ -289,7 +295,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.eyeLeft = CreatureEyes.build(this.eyeLeftObject, bodyBaseMaterialAsset, eyeBaseMaterialAsset, 1.0);
         this.eyeRight = CreatureEyes.build(this.eyeRightObject, bodyBaseMaterialAsset, eyeBaseMaterialAsset, 0.88);
         this.appendages = new CreatureAppendages(this.bodyObject, bodyBaseMaterialAsset);
-        buildCreatureShadow(this.sceneObject, eyeBaseMaterialAsset);
+        this.shadowObject = buildCreatureShadow(this.visualRootObject!, eyeBaseMaterialAsset);
 
         this.resetToIdle();
     }
@@ -323,6 +329,9 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.releaseEffect = null;
         this.blinkElapsed = 0;
         this.blinkTimer = this.randomRange(BLINK_INTERVAL_MIN_S, BLINK_INTERVAL_MAX_S);
+        if (this.visualRootObject) {
+            this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(VISUAL_BASELINE_SCALE));
+        }
 
         this.recomputeHabitatOrigin();
         this.wanderTarget = this.pickWanderTarget();
@@ -647,6 +656,10 @@ export class CreatureBehavior extends BaseScriptComponent {
         const scaleXZ = 1 + SQUASH_STRETCH_AMOUNT * 0.5 * wave;
 
         this.bodyObject.getTransform().setLocalScale(new vec3(breathe * scaleXZ, breathe * scaleY, breathe * scaleXZ));
+        if (this.shadowObject) {
+            const shadowScale = 0.92 + 0.08 * scaleXZ;
+            this.shadowObject.getTransform().setLocalScale(new vec3(shadowScale, 0.06, 0.64 * shadowScale));
+        }
     }
 
     private randomRange(min: number, max: number): number {

@@ -17,3 +17,11 @@
 4. **Observe:** First isolated capture read as a creature but the upper body was broad, flippers read like ears, and pupils were too faceted.
 5. **Fix:** Tightened and offset the crown, lowered/rounded the flippers, and increased pupil profile resolution.
 6. **Verify:** Front and three-quarter isolated captures show the asymmetrical living silhouette; the real user-view chase capture shows the face, flippers, body lean, and grounded placement at habitat scale. TypeScript and runtime logs passed. Release still produced one effect-start per Preview lifecycle despite two calls from the idempotency harness.
+
+## 2026-08-11 — Technical character freeze
+
+1. **Inspect:** Audited the authored and runtime hierarchy. `MovementRoot` owns the behavior controller only; all replaceable presentation nodes are below `VisualRoot`.
+2. **Isolate:** Reparented `ParticleAnchor` and moved the optional release audio component to `VisualRoot`; updated controller discovery without changing chase, state, or release semantics.
+3. **Opacity:** Audited `BlobBody.mat` and confirmed alpha 1, opacity texture disabled, blend mode Disabled, depth test/write enabled, and back-face culling. Added runtime opaque-pass hardening to every cloned body material, including release-brighten clones.
+4. **Verify:** Recompiled TypeScript, refreshed Preview logs, inspected the live hierarchy/material result, and captured Preview evidence before freezing the technical checkpoint.
+5. **Debt:** Recorded remaining silhouette, face, flipper, material, shadow, effect, and camera-framing work as scheduled polish-phase art debt in `HANDOFF.md`.

@@ -120,26 +120,43 @@ export const FACE_TURN_RATE_PER_S = 6;
 export const MAX_STEP_DT_S = 1 / 15;
 
 // ── Lathe geometry (egg/teardrop silhouette, ~16cm tall x ~14cm wide) ──────
-export const LATHE_SEGMENTS = 18;
-/** [radius_cm, height_cm, x_offset_cm] — offset rings create a tilted bean silhouette. */
-export const BLOB_PROFILE: [number, number, number?][] = [
-    [0.0, -8.5, -0.4],
-    [4.5, -8.0, -0.3],
-    [7.4, -5.6, -0.1],
-    [7.8, -2.0, 0.2],
-    [6.4, 1.4, 0.6],
-    [4.4, 4.5, 1.15],
-    [2.35, 7.0, 1.55],
-    [0.0, 8.4, 1.85],
+export const LATHE_SEGMENTS = 80;
+export const VISUAL_BASELINE_SCALE = 0.88;
+/** [radius_cm, height_cm, x_offset_cm, z_offset_cm] — smooth asymmetric bean, 39cm tall. */
+export const BLOB_PROFILE: [number, number, number?, number?][] = [
+    [0.0, -19.0, -0.8, 0.0],
+    [9.5, -19.0, -0.7, 0.0],
+    [12.0, -18.4, -0.6, -0.05],
+    [14.0, -17.2, -0.5, -0.1],
+    [15.2, -15.5, -0.35, -0.25],
+    [16.0, -13.5, -0.2, -0.4],
+    [16.5, -11.3, 0.0, -0.6],
+    [16.8, -9.0, 0.2, -0.8],
+    [16.75, -6.5, 0.45, -1.05],
+    [16.5, -4.0, 0.7, -1.3],
+    [16.1, -1.5, 0.95, -1.55],
+    [15.6, 1.0, 1.2, -1.8],
+    [15.05, 3.5, 1.4, -2.05],
+    [14.4, 6.0, 1.6, -2.3],
+    [13.65, 8.3, 1.75, -2.5],
+    [12.8, 10.5, 1.9, -2.7],
+    [11.8, 12.5, 1.95, -2.85],
+    [10.7, 14.2, 2.0, -3.0],
+    [9.5, 15.7, 1.95, -3.05],
+    [8.1, 17.0, 1.8, -3.1],
+    [6.2, 18.2, 1.6, -3.1],
+    [4.2, 19.1, 1.3, -3.0],
+    [2.1, 19.75, 1.0, -2.9],
+    [0.0, 20.0, 0.8, -2.8],
 ];
 /** Warm cream/peach, unlit — matches the "cat-like, never monstrous" tone. */
-export const BLOB_COLOR: [number, number, number, number] = [0.96, 0.82, 0.68, 1.0];
+export const BLOB_COLOR: [number, number, number, number] = [0.84, 0.62, 0.49, 1.0];
 
 // ── Eyes (simple dark unlit pupils, fixed on Body's local -Z front) ────────
-export const EYE_RADIUS_CM = 1.25;
-export const EYE_OFFSET_X_CM = 2.15;
-export const EYE_OFFSET_Y_CM = 2.35;
-export const EYE_OFFSET_Z_CM = -5.9;
+export const EYE_RADIUS_CM = 2.25;
+export const EYE_OFFSET_X_CM = 4.2;
+export const EYE_OFFSET_Y_CM = 0.3;
+export const EYE_OFFSET_Z_CM = -17.6;
 export const EYE_COLOR: [number, number, number, number] = [0.12, 0.1, 0.09, 1.0];
 export const BLINK_INTERVAL_MIN_S = 2.8;
 export const BLINK_INTERVAL_MAX_S = 5.5;

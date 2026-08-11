@@ -15,6 +15,12 @@ Functional Wednesday vertical slice complete.
 - Gate 3: technically integrated but not human-validated.
 - Do not claim comprehension evidence from the failed 18.7-second recording or proceed as though the presentation gate has passed.
 
+## Recording Constraint — Additive Display
+
+The SPECS Preview composites rendered Lens content additively over the passthrough background rather than occluding it (see `prompts.md`, "Additive display investigation"). A fully opaque object can still read as washed-out/see-through against a bright background (sky, lit windows) purely because of this compositing model — no material or mesh change fixes it. `BLOB_COLOR` was retuned to a saturated amber-gold to read as well as possible across both dark and moderately bright backdrops, but no color choice fully escapes wash-out against a very bright one.
+
+**All demo recording must be done against a dark background.** Avoid framing that puts bright sky, lit windows, or other bright surfaces directly behind a creature.
+
 ## Latest Verified Preview Sequence
 
 One uninterrupted Preview lifecycle provided this technical evidence:

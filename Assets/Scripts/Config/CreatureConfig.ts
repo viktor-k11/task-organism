@@ -655,6 +655,25 @@ export const MOUTH_CURVE_CHASE = 0.55;
 
 // ── Release (one-shot, idempotent — see CreatureBehavior.release()) ────────
 export const RELEASE_DURATION_S = 1.5;
+
+/**
+ * Which release sound plays when a creature is let go. Three variants were
+ * generated (Tools note: /build-sfx, regenerable via
+ * tempAssetGen/gen_sfx_release.js); all three are ~1.10s and ship in
+ * Assets/GeneratedSFX/.
+ *
+ *   "breath" — almost pure air, a falling filtered exhale over a warm low bed
+ *   "hum"    — a contented low hum that settles a step and flattens out
+ *   "bloom"  — a single soft wooden note allowed to ring away
+ *
+ * THIS IS NOT A RECOMMENDATION. The value below is only whichever variant was
+ * loaded for the timing capture; pick by ear and change this one constant.
+ * All three are deliberately descending/settling rather than ascending —
+ * per CLAUDE.md, completion is release and gratitude, not a level cleared,
+ * and a rising figure is what makes a sound read as a reward chime.
+ */
+export type ReleaseSfxVariant = "breath" | "hum" | "bloom";
+export const RELEASE_SFX_VARIANT: ReleaseSfxVariant = "breath";
 export const RELEASE_PARTICLE_COUNT = 30;
 export const RELEASE_PARTICLE_SPEED_CM_S = 8;
 export const RELEASE_PARTICLE_DRIFT_CM = 4;

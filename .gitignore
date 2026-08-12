@@ -28,3 +28,6 @@ Workspaces/**
 
 # Added by Lens Studio (LEAF plugin)
 leaf_plugin_settings.json
+
+# Asset generator scratch (one-shot regenerator scripts for /build-sfx)
+tempAssetGen/

@@ -104,6 +104,8 @@ import {
     MOUTH_CURVE_CHASE,
     GROWTH_SCALE_MAX,
     GROWTH_EASE_PER_S,
+    RELEASE_SFX_VARIANT,
+    ReleaseSfxVariant,
 } from "../Config/CreatureConfig";
 
 /**
@@ -115,6 +117,17 @@ import {
  * have no vertex colors, and a shader that reads them would render those
  * meshes black on an additive display.
  */
+/**
+ * All three release variants are loaded so switching RELEASE_SFX_VARIANT is a
+ * one-constant change with no code edit. ~190KB each; if that ever matters,
+ * drop the two unused entries.
+ */
+const releaseSfxTracks: Record<ReleaseSfxVariant, AudioTrackAsset> = {
+    breath: requireAsset("../../GeneratedSFX/ReleaseBreath.wav") as AudioTrackAsset,
+    hum: requireAsset("../../GeneratedSFX/ReleaseHum.wav") as AudioTrackAsset,
+    bloom: requireAsset("../../GeneratedSFX/ReleaseBloom.wav") as AudioTrackAsset,
+};
+
 const bodyBaseMaterialAsset = requireAsset("../../Materials/PetBody.mat") as Material;
 const eyeBaseMaterialAsset = requireAsset("../../Materials/BlobEye.mat") as Material;
 /** Ready-made Sketchfab dog/cat GLBs (Assets/3d assets/, see LICENSES.md),
@@ -541,7 +554,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.bodyObject = this.visualRootObject ? findChildByName(this.visualRootObject, "Body") : null;
         this.particleAnchorObject = this.visualRootObject ? findChildByName(this.visualRootObject, "ParticleAnchor") : null;
         this.audioComponent = this.visualRootObject
-            ? this.visualRootObject.getComponent("Component.AudioComponent") as AudioComponent
+            ? this.resolveReleaseAudio(this.visualRootObject)
             : null;
         // EyeLeft/EyeRight are authored placeholders from the earlier
         // procedural/mesh-generated visuals — still looked up (so a future
@@ -1189,6 +1202,28 @@ export class CreatureBehavior extends BaseScriptComponent {
             const shadowScale = 0.92 + 0.08 * finalXZ;
             this.shadowObject.getTransform().setLocalScale(new vec3(shadowScale, 0.06, 0.64 * shadowScale));
         }
+    }
+
+    /**
+     * Finds (or creates) this creature's AudioComponent and loads the release
+     * track selected by RELEASE_SFX_VARIANT.
+     *
+     * Created rather than required: the AudioComponent was an optional
+     * authored component, so a creature whose VisualRoot lacks one would have
+     * been silently silent. Playback mode is set here, once, rather than on
+     * every release — LowLatency trades a little memory for an immediate
+     * start, which is what a one-shot cue tied to a visual beat needs.
+     */
+    private resolveReleaseAudio(visualRoot: SceneObject): AudioComponent | null {
+        let audio = visualRoot.getComponent("Component.AudioComponent") as AudioComponent;
+        if (!audio) audio = visualRoot.createComponent("Component.AudioComponent") as AudioComponent;
+        if (!audio) return null;
+        const track = releaseSfxTracks[RELEASE_SFX_VARIANT];
+        if (track) {
+            audio.audioTrack = track;
+            audio.playbackMode = Audio.PlaybackMode.LowLatency;
+        }
+        return audio;
     }
 
     /** Warm-shifts the per-instance body material toward the state's tint

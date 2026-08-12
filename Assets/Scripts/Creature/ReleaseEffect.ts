@@ -16,11 +16,14 @@ interface ReleaseParticle {
 /**
  * ReleaseEffect — one-shot "release" presentation event: brighten body +
  * eyes, spawn ~30 lightweight unlit particles from ParticleAnchor that
- * drift up and fade over RELEASE_DURATION_S, play a placeholder chime.
+ * drift up and fade over RELEASE_DURATION_S, and play the one-shot release
+ * cue (RELEASE_SFX_VARIANT).
  *
- * Idempotency is CreatureBehavior's job (the isReleased guard) — this class
- * assumes play() is called at most once per instance and does not guard
- * against repeat calls itself.
+ * Idempotency is primarily CreatureBehavior's job (the isReleased guard).
+ * The AUDIO path additionally latches locally via hasPlayedAudio, because a
+ * retriggered sound is the one repeat artifact a listener notices instantly;
+ * the particle/brighten work is still assumed to run at most once per
+ * instance and is not separately guarded.
  *
  * Skips VFX Graph entirely (evaluated and found overkill for a 30-particle
  * one-shot) in favor of manual instantiate/animate/destroy via one shared
@@ -34,6 +37,8 @@ export class ReleaseEffect {
     private particleBaseColor: vec4 = new vec4(1, 1, 1, 1);
     private updateEvent: UpdateEvent | null = null;
     private cleanupEvent: DelayedCallbackEvent | null = null;
+    /** Latches on the first cue so a repeat play() cannot retrigger the sound. */
+    private hasPlayedAudio = false;
 
     play(
         owner: BaseScriptComponent,
@@ -44,6 +49,28 @@ export class ReleaseEffect {
         onComplete: () => void,
     ): void {
         console.log("[ReleaseEffect] play");
+
+        // Cue FIRST, before any visual setup. Measured: with this block at the
+        // end of play() (after the brighten, the mesh build and 30 particle
+        // spawns) the sound started 510ms after the effect began — half the
+        // length of the cue itself, and clearly late against the visual.
+        // Triggering before that work lands the attack on the same frame the
+        // release becomes visible.
+        //
+        // The track and LowLatency mode are set up once in
+        // CreatureBehavior.resolveReleaseAudio; this only triggers.
+        //
+        // Guarded twice on purpose. CreatureBehavior.release() already
+        // early-returns on isReleased, so play() should never be reached
+        // twice — but a second audio.play(1) would restart the cue from the
+        // top mid-tail, which is the one failure a listener notices
+        // immediately. hasPlayedAudio makes a repeat call inaudible even if a
+        // future caller loses the outer guard. play(1) = one loop, not looping.
+        if (audio && audio.audioTrack && !this.hasPlayedAudio) {
+            this.hasPlayedAudio = true;
+            audio.play(1);
+            console.log("[ReleaseEffect] cue played");
+        }
 
         // Brighten body + eyes (clone-before-mutate, never mutate the shared base material).
         const brightBody = brightenMaterial(bodyRmv, RELEASE_BRIGHTEN_LERP);
@@ -57,16 +84,6 @@ export class ReleaseEffect {
 
         for (let i = 0; i < RELEASE_PARTICLE_COUNT; i++) {
             this.spawnParticle(particleAnchor, particleMesh, this.particleMaterial);
-        }
-
-        // Placeholder hook: the AudioComponent is wired and this call site is
-        // real, but no track is assigned today (real sound design comes
-        // later this week — see CreatureConfig / plan). audioTrack defaults
-        // to null, so this is a deliberate silent no-op until a track is
-        // assigned, not a missing feature.
-        if (audio && audio.audioTrack) {
-            audio.playbackMode = Audio.PlaybackMode.LowLatency;
-            audio.play(1);
         }
 
         this.updateEvent = owner.createEvent("UpdateEvent");

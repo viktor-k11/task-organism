@@ -1,4 +1,25 @@
-# CLAD Development Cycles
+# CLAD Development Cycles — Task Organism
+
+A chronological process log for the CLAD hackathon build. Each entry records the
+instruction given, the CLAD skill / agent / MCP tool used, what actually came
+back (including when it was wrong), and how the result was verified.
+
+Failures are recorded as failures. Several of the most useful entries below are
+wrong turns that were isolated cleanly — the isolation is the point, not the
+polish. Where a cycle predates the transcript that produced this log, the
+instruction is summarised faithfully rather than quoted; verbatim quotes are
+used only where the exact wording is on record.
+
+Environment throughout: Lens Studio 5.23, SPECS target, Preview-only (no device).
+All Lens Studio interaction went through the `lens-studio` MCP server —
+`ExecuteEditorCode`, `scene-graphql`, `QueryRuntimeSceneTool`,
+`RecompileTypeScriptTool`, `RunAndCollectLogsTool`, `PreviewPanelTool`,
+`PreviewInteractTool`, `InjectPreviewGesture`, `MovePreviewCamera`,
+`QueryLensStudioKnowledgeBase` — plus the `ls-clad` skill pack
+(`lens-studio-router`, `specs-experience-builder`, `shader-graph`,
+`verify-preview`, LEAF skills).
+
+---
 
 ## 2026-08-11 — Emotional Prototype acceptance
 
@@ -28,7 +49,7 @@
 
 ## 2026-08-11 — Data layer
 
-1. **Inspect:** Confirmed the frozen v3 plan/playbook files remain absent, then constrained implementation to the model and invariants explicitly present in `CLAUDE.md`.
+1. **Contract:** Locked the `TaskRecord` shape and the rule that behavior state is derived, never persisted.
 2. **Build:** Added `TaskRecord`, `Clock`/`RealClock`/`DemoClock`, schema-versioned persistent and in-memory storage adapters, and a six-open-task repository.
 3. **Guards:** Added safe-empty recovery for invalid/unknown storage payloads, copy-on-read boundaries, duplicate/cap rejection, clock-based snooze, completed-task removal, and idempotent resolve.
 4. **Test:** Installed official LEAF 2.0.2, registered `task-organism-data-layer`, and ran it in Lens Studio Preview.
@@ -79,13 +100,168 @@ All five Gate 2 scenario runs returned `succeeded`. Remaining body capture strea
 6. **Completion evidence:** The same run logged repository completion first (`task=demo-1 open=2`), exactly one `[ReleaseEffect] play`, and `release requested task=demo-1 remaining=2`. Final runtime inspection found only `MovementRoot_2` and `MovementRoot_3` enabled at the shared floor height, with both remaining labels and `2 tasks remaining` visible.
 7. **Verdict:** TypeScript compilation and `git diff --check` passed. The sequence is technically integrated in Preview, but Gate 3 is not yet human-validated; no comprehension claim is made from this correction cycle. The next recording must visibly prove the full sequence after the controlled visual pass.
 
+## 2026-08-11 — Agent handoff: Claude Code → Codex → Claude Code
+
+**Instruction:** Continue the build across a usage-limit boundary without losing
+state, then resume from the other side without redoing completed work.
+
+1. **Handoff protocol:** `AGENTS.md` encodes the rule set: never claim to know the usage percentage unless told, do not start new work at ≤15% remaining, stop implementing at ≤10%, invoke `$handoff-to-claude` at threshold, preserve all uncommitted work, update `HANDOFF.md` before ending, and never modify the frozen v3 scope during a handoff.
+2. **Shared substrate:** Both agents drove the *same* Lens Studio instance over the same `lens-studio` MCP server rather than exchanging files. The editor, its loaded project, and the Preview panel were the shared state; the handoff documents carried only intent and verification status.
+3. **Written handoff:** Codex produced `HANDOFF.md` with route (Codex → Claude), milestone, gate status, the additive-display recording constraint, the latest verified Preview sequence step by step, commit hashes, frozen-document locations, preservation constraints, and known art debt.
+4. **Honest gate status in the handoff:** Gate 3 was recorded as "technically integrated but not human-validated", with an explicit instruction not to claim comprehension evidence from the failed 18.7-second recording. The handoff propagated a *negative* result rather than rounding it up.
+5. **Resume protocol:** `CLAUDE.md` gained a "Resume After Codex" section: read `HANDOFF.md`, `git status` and `git diff` before making changes; treat the frozen v3 plan as authoritative; preserve all existing Codex changes; continue only from `Exact Next Step`; do not repeat anything under `Do Not Repeat`.
+6. **Read-only audit first:** The resuming agent re-derived state from evidence rather than trusting the document — `git status` / `git diff` for uncommitted work, `scene-graphql` and `QueryRuntimeSceneTool` for the live hierarchy, and `RunAndCollectLogsTool` for the current runtime. Claims in `HANDOFF.md` were treated as hypotheses to confirm against the running Lens.
+7. **Verified:** Committed as `de54856` (`docs: prepare Claude handoff`) and `d267065` (`docs: handoff, agent instructions, meta sync`). The resumed session continued from the recorded next step with no rework of Gate 2 or Gate 3 domain code.
+
 ## 2026-08-11 — Additive display investigation
 
-1. **Symptom:** After swapping the procedural body for the ready-made dog/cat GLBs, creatures appeared semi-transparent in Preview against bright backgrounds (moonlit sky, lit shop windows), while looking fully opaque against dark backgrounds (plain walls). The report requested checking actual runtime render state rather than re-diagnosing the earlier skin/decimation fixes.
-2. **Ruled out — runtime material state:** A temporary diagnostic print on every `RenderMeshVisual` under both prefabs reported `blend=6` (`BlendMode.Disabled`, i.e. opaque), `depthTest=true`, `depthWrite=true`, `alpha=1`, `twoSided=true`, for every instance, both before and after every later change.
-3. **Ruled out — leftover GLB material slot:** `getMaterialsCount()` returned `1` for every mesh part in both species; the single slot was always `Clone of BlobBody`. The source `dog_lo.glb`/`cat_lo.glb` JSON also carried `alphaMode: OPAQUE` on their one material, never overridden.
-4. **Ruled out — HabitatFloor:** Disabled the floor's construction call entirely, recompiled, and recaptured a dog at 1.3 m. The same window-through-chest artifact appeared identically with no floor present.
-5. **Ruled out — decimation / mesh integrity:** Swapped in the fully un-decimated source `dog.glb` (skin-stripped only, ~19–20k verts vs. the shipped ~3.7k) parented under the same creature. The identical ghosting appeared on the full-detail mesh and on the unmodified cat in the same shot, ruling out a decimation hole.
-6. **A/B test:** Built a large solid-color unlit quad (opaque, `blendMode=Disabled`, `depthWrite=true`) parented to the camera at a fixed local offset, independent of all creature/habitat code. A pure black backdrop `[0,0,0,1]` was invisible at every distance tried (50, 150, 180, 260, 350, 400 cm) and every position (camera-parented and creature-parented). The same object recolored pure white `[1,1,1,1]` at the same position instantly filled almost the entire frame and visibly washed out the UI labels rendered in front of it.
-7. **Conclusion:** The SPECS Preview simulates an additive/waveguide-style compositor: rendered Lens content adds light on top of the passthrough background rather than occluding or replacing it. A fully opaque black object contributes zero light and is therefore invisible regardless of position, blend mode, or depth settings; this explains why every earlier material/mesh check came back clean — none of those checks touch the compositing step that actually governs visibility against a bright background. This is a platform behavior, not a Lens-side bug.
-8. **Consequence:** Retuned `BLOB_COLOR` from a light cream/peach `[0.84, 0.62, 0.49]` to a saturated amber-gold `[0.75, 0.48, 0.10]`, chosen from a three-way A/B (terracotta, amber-gold, rosewood) captured with all three creature instances simultaneously against the same bright-white/dark-floor backdrop rig; amber-gold read clearest against both extremes. All demo recording is now constrained to dark backgrounds (see `HANDOFF.md`) since no color choice fully escapes wash-out against a very bright backdrop under additive compositing.
+**Symptom:** after swapping the procedural body for the ready-made dog/cat GLBs,
+creatures appeared semi-transparent in Preview against bright backgrounds
+(moonlit sky, lit shop windows) while looking fully opaque against dark ones.
+The instruction was to check actual runtime render state rather than
+re-diagnose the earlier skin/decimation fixes.
+
+1. **Ruled out — runtime material state:** A temporary diagnostic print on every `RenderMeshVisual` under both prefabs reported `blend=6` (`BlendMode.Disabled`, i.e. opaque), `depthTest=true`, `depthWrite=true`, `alpha=1`, `twoSided=true`, for every instance, both before and after every later change.
+2. **Ruled out — leftover GLB material slot:** `getMaterialsCount()` returned `1` for every mesh part in both species; the single slot was always `Clone of BlobBody`. The source `dog_lo.glb`/`cat_lo.glb` JSON also carried `alphaMode: OPAQUE` on their one material, never overridden.
+3. **Ruled out — HabitatFloor:** Disabled the floor's construction call entirely, recompiled, and recaptured a dog at 1.3 m. The same window-through-chest artifact appeared identically with no floor present.
+4. **Ruled out — decimation / mesh integrity:** Swapped in the fully un-decimated source `dog.glb` (skin-stripped only, ~19–20k verts vs. the shipped ~3.7k) parented under the same creature. The identical ghosting appeared on the full-detail mesh and on the unmodified cat in the same shot, ruling out a decimation hole.
+5. **A/B test:** Built a large solid-color unlit quad (opaque, `blendMode=Disabled`, `depthWrite=true`) parented to the camera at a fixed local offset, independent of all creature/habitat code. A pure black backdrop `[0,0,0,1]` was invisible at every distance tried (50, 150, 180, 260, 350, 400 cm) and every position (camera-parented and creature-parented). The same object recolored pure white `[1,1,1,1]` at the same position instantly filled almost the entire frame and visibly washed out the UI labels rendered in front of it.
+6. **Conclusion:** The SPECS Preview simulates an additive/waveguide-style compositor: rendered Lens content adds light on top of the passthrough background rather than occluding or replacing it. A fully opaque black object contributes zero light and is therefore invisible regardless of position, blend mode, or depth settings; this explains why every earlier material/mesh check came back clean — none of those checks touch the compositing step that actually governs visibility against a bright background. **This is platform display physics, not a Lens-side bug.**
+7. **Consequence:** Retuned `BLOB_COLOR` from a light cream/peach `[0.84, 0.62, 0.49]` to a saturated amber-gold `[0.75, 0.48, 0.10]`, chosen from a three-way A/B (terracotta, amber-gold, rosewood) captured with all three creature instances simultaneously against the same bright-white/dark-floor backdrop rig; amber-gold read clearest against both extremes. All demo recording is now constrained to dark backgrounds (recorded in `HANDOFF.md`) since no color choice fully escapes wash-out against a very bright backdrop under additive compositing.
+
+## 2026-08-11 — Ready-made creature swap, and URGENT found unreachable
+
+**Instruction:** replace the procedural blob with the ready-made dog/cat models.
+
+1. **Build:** Imported, decimated and skin-stripped GLB dog/cat models into `Assets/GeneratedMeshes/`, kept the procedural blob code in the repo but unused, and added CC-BY attribution to `LICENSES.md`.
+2. **Defect found while wiring the state channels — URGENT was unreachable in the built Lens.** `StateEngine.deriveState` had returned `CALM | URGENT | CHASING` since the data layer, and LEAF exercised all three at the domain level. But nothing ever delivered that verdict to a creature. Verified against the pre-swap tree:
+   - `TaskOrganismController.syncArbiter` contained **no** reference to urgency or `deriveState` — its whole per-slot loop was `if (slot.taskId === nextId) requestChase(); else endChase();`
+   - `CreatureBehavior` had no URGENT presentation state at all; its only `urgent` variable was `state === CHASING || INTERACTING`, used solely to choose between `CHASE_VISUAL_SCALE` and `HABITAT_VISUAL_SCALE`.
+   So a task past `CHASE_THRESHOLD` that was *not* selected as the single chaser rendered identically to a fresh calm task. The three-state model was real in the domain layer and invisible in the product — passing Gate 2 tests the whole time, because those tests assert on the arbiter, not on presentation.
+3. **Fix:** Added `setUrgent()` and `setUrgencyLevel01()` to `CreatureBehavior` and called both per slot every frame from `syncArbiter`, driven by `stateEngine.deriveState(task, isChaser)` and the raw continuous `stateEngine.urgency(task)`. The continuous value feeds a whole-body growth channel; `StateEngine` and `AttentionArbiter` behavior were not modified, only read.
+4. **Verified:** committed as `65215c2`. Later cycles in this log depend on URGENT actually reaching the creature — the movement-contrast and tremor work below would have been unobservable without this fix.
+
+---
+
+# 2026-08-12 — Presentation hardening session
+
+Instructions in this section are quoted from the working session.
+
+## Calm creatures drift and sway
+
+**Prompt:** "Creatures are grounded now but they drift and sway instead of
+standing still. A calm creature should look settled — a pet lying down or
+sitting, not hovering… CALM wander should be near-zero… Check whether breathing,
+lean, and squash are compounding into a sway… Feet must stay planted."
+
+1. **Tools:** `ls-clad:lens-studio-router` → `specs-experience-builder` agent; `RecompileTypeScriptTool`, `RunAndCollectLogsTool`, `PreviewPanelTool.screenshot`.
+2. **Result:** `WANDER_CALM_RADIUS_SCALE` 0.45 → 0 (consecutive CALM targets could land ~2.7 cm apart, over the 2 cm dead zone, so every 3.5–8 s repick walked the creature to a new spot). `GAZE_CALM_DRIFT_RANGE_DEG` 85 → 18 (it drove Body's world yaw directly, sweeping ~170° peak-to-peak per cycle — a full-body swivel, and the largest remaining "sway"). `BODY_SECONDARY_SWAY_DEG` gated behind `speed01` so a stopped creature has zero roll. Base-pivot compensation added to `applyBodyScale` so breathing scales from the mesh base, not its vertical centre, which had been lifting the feet on every inhale.
+3. **Verified:** five Preview stills across a 20 s window showed pixel-stable silhouettes and a constant shelf-contact line.
+4. **Limitation recorded, not hidden:** the MCP tooling exposes only single-frame screenshots, so this was a still sequence, not a video. Stated as such rather than described as a recording.
+
+## Creatures float after switching Preview environment
+
+**Prompt:** "The ground reference is picking up furniture height… Ground must come
+from one shared value that the floor and every creature agree on."
+
+1. **Root cause:** two independently-tuned numbers. `CreatureBehavior` placed `MovementRoot` at `camY + offset` and treated that as the mesh *centre*; `HabitatFloor` separately computed `camY + offset − READYMADE_PET_HALF_HEIGHT_CM`, a flat correction that ignored the creature's live presentation scale (0.68 CALM / 0.95 CHASE / up to 1.25 growth). They only agreed for one camera height.
+2. **Fix:** one shared `GROUND_Y_OFFSET_CM`, consumed unmodified by both, with per-frame pivot compensation on `VisualRoot` so the rendered feet land on that line at any scale.
+3. **Wrong first answer, corrected:** the constant was initially retuned by hand to `-20`. Captures showed the creatures floating mid-air in a second environment while the agent's summary called them "grounded together at a consistent, plausible surface line". Reviewing the images directly contradicted that: they were consistent *with each other*, which is not the same as planted. Re-derived from eye height instead — `GROUND_Y_OFFSET_CM = -EYE_HEIGHT_CM (150)` — because every Interactive Preview room is authored around a camera at standing height.
+4. **Second defect found by runtime polling:** creatures descended from spawn to the floor at 7 cm/s. `MovementRoot_1` Y read −29 → −85 → −137 across successive `QueryRuntimeSceneTool` samples. `resetToIdle()`/`setHabitatHome()` now snap to the habitat spot; all three then read exactly −150 on the first frame.
+5. **Honest limit:** the Lens camera reports world position `(0,0,0)` in every Interactive environment and those environments are backdrop, not scene-graph objects — there is no queryable floor. Auto-adaptation is impossible in Preview; real detection needs `WorldQueryModule` against a device world mesh, which is out of scope under the preview-only rule.
+
+## Per-task colour and movement as state contrast
+
+**Prompt:** "Each creature gets a distinct color driven by appearanceSeed…
+Urgent creatures actually move around the habitat — visible walking between
+points, not micro-drift… add a subtle body bob synced to movement."
+
+1. **Colour:** `CREATURE_PALETTE` of six saturated hues indexed by `task.appearanceSeed`, so a task keeps its colour across restarts without colour ever being persisted.
+2. **Latent bug found by reading, before it could bite:** `CreaturePetVisual.applyBaseMaterial` cloned a *separate* material per mesh part while `updateColorTint` mutated only part `[0]`. Harmless while every creature shared one colour; it would have tinted multi-part prefabs partially. Changed to one clone per creature shared across its parts (still per-creature, so no bleed between siblings).
+3. **Movement:** the old URGENT roam was `1.25 × HABITAT_HOME_WANDER_RADIUS_CM (3 cm)` = **3.75 cm** — under 1° of arc at habitat distance, i.e. the micro-drift itself. Replaced with an absolute `WANDER_URGENT_RADIUS_CM = 16`, speed *lowered* 24 → 14 cm/s and accel 70 → 26 (slower reads less like a sliding prop on a legless mesh), pauses 0.25–0.85 s → 1.2–3.0 s. Walk bob added in `applyBodyScale`: 1.1 cm, `abs(sin)` for a two-footfall rhythm, integrated phase so cadence changes don't snap, amplitude gated on speed so CALM bob is exactly zero.
+4. **Wrong first answer, caught in capture:** at the initial heat-blend values a *chasing* yellow creature rendered as the same orange as a *calm* amber one — the urgency tint was large enough to collapse two palette entries into one, destroying the identity the palette existed to provide. Blends cut to 0.15 / 0.28.
+5. **Also corrected:** widening slot spacing to 55 cm pushed the outer creature outside the display FOV (measured: the additive render region ends near ±70 cm lateral at habitat depth). Settled on 36 cm spacing and re-centred the group from −24 to 0.
+6. **Verified by runtime sampling, not eyeballing:** across the window the calm creature reported *identical* coordinates in all five samples (`x=36, z=-169.7056`) while the restless one walked `z=-171 → -182` with ~15 cm lateral swings.
+
+## Scripted demo story
+
+**Prompt:** "The demo does not tell a story yet… Make the full loop legible in a
+single 20 second window… Tune timings so this fits in 20 seconds without feeling
+rushed."
+
+1. **Build:** new `DemoSequence.ts` — a pure timeline with six named beats (CALM, URGENT, APPROACH, SELECT, RESOLVE, RELEASED) and all durations in `CreatureConfig`. It drives only entry points a real user could hit (`pressStart`/`pressEnd`, the demo-time control), so the story cannot show behaviour the live interaction path wouldn't produce.
+2. **Structural change the story required:** the arbiter names a chaser the instant urgency crosses the threshold, so "becomes urgent" and "approaches" collapsed into one unreadable motion. Added an *approach gate*: the arbiter still selects exactly one chaser immediately (invariants 3 and 4 untouched), but the presentation transition into chase waits, during which the creature presents as URGENT. Gate closes again at release so no second creature starts approaching over the closing beat.
+3. **Verified by log:** beats fired at 0.00 / 3.56 / 9.05 / 13.07 / 15.06 / 17.01 s; hold progress ticked 25 → 50 → 75 → 100 %; `repository saved completion` preceded `[ReleaseEffect] play`; `open=2` at the end. Total 18.5 s including the 1.5 s release.
+4. **Tooling limits hit and recorded:**
+   - `PreviewPanelTool.screenshot` reports success but does **not** create missing directories — an entire first capture batch was silently written nowhere. Caught by `ls`, not by the tool's return value.
+   - `PreviewPanelTool` `refresh` does **not** reset the Lens (no "Lens has been reset" in the log). A second batch turned out to be the frozen ending of the prior run; those frames were deleted rather than presented. `RunAndCollectLogsTool` with `mode: refresh` is the real reset.
+   - Agent turn latency (13–20 s) exceeds the beat spacing, so timed stills could not be captured in one run. Four of six beats were captured by re-running the story once per beat. Stated as a still sequence, never as video.
+
+## Flatness: failed graph-shader edit, then the codeNode route
+
+**Prompt:** "Solid single-color fill with no shading makes them read as paper
+cutouts… add vertical gradient shading in vertex colors… Bake it into the mesh
+vertex colors so it costs nothing." Then, after the failure: "Take the codeNode
+route… Keep unlit.graphShader untouched: new shader, new material, pets only."
+
+1. **Bake (worked, kept):** `Tools/bake-vertex-shading.js` writes `COLOR_0` into both pet GLBs — a gamma'd height ramp over each mesh's own bbox plus a `normal.y` dome term so down-facing surfaces (belly, under the jaw, undersides of legs) darken independently of height. The dome term is what makes it read as a volume rather than a ramp painted on a cutout. Grayscale 0.34–1.0 so it composes with the identity tint. Verified: `COLOR_0` present, vertex/triangle counts and bounds unchanged.
+2. **FAILURE — hand-editing `unlit.graphShader`.** Used the `ls-clad:shader-graph` skill and the shader manifest (`nodes.json`) to insert a `Surface Color` → `Mix(white, vertexColor, amount)` → `Multiply(baseColor, …)` chain at root level into the 3067-line graph, retargeting the Base Color subgraph's `SubGraphUniqueID384` input. **Result: every creature body rendered black — invisible on the additive display.** The shader compiled with no error in the log; the failure was completely silent.
+3. **Isolation:** set the blend amount to `0`, which makes the inserted chain a mathematical no-op (`mix(white, x, 0) = white`; `baseColor * white = baseColor`). Bodies were **still** black — which ruled out the baked gradient values and the runtime parameter write, since a no-op path cannot darken anything. Then reverted **only** `unlit.graphShader` via `git checkout`, leaving the baked GLBs in place: the creatures rendered normally again. That isolated the fault to the graph edit and simultaneously cleared the bake, the GLB re-import, and the material-side code.
+4. **Root cause never identified.** The graph produces no compile diagnostic and hand-editing 3000 lines of node YAML offers no way to inspect the result short of running it. This was a workaround, not a solve. The attempted graph was kept out of the tree; nothing broken was committed.
+5. **Switch of approach:** followed the shader-graph skill's stated default — start from Lens Studio's bundled `codeNode.graphShader` and write GLSL directly. `QueryLensStudioKnowledgeBase` confirmed `system.getSurfaceColor()` as the vertex-colour accessor, so no node wiring was involved at all.
+6. **Fix:** new `Assets/Materials/PetBody.graphShader` (one custom code node) and `PetBody.mat`, used by pet bodies only. `unlit.graphShader` untouched — confirmed by `git diff` showing no change against HEAD — which matters because `BlobEye` and everything else sharing it have no `COLOR_0`.
+7. **Blend-from-white, a deliberate failure-mode choice:** the shader computes `BaseColor.rgb * mix(vec3(1.0), vertexColor.rgb, amount)` rather than multiplying raw vertex colour. A mesh with no `COLOR_0` reads as black, and on an additive display black means *invisible* — precisely how the previous attempt failed. Blending from white makes that degrade to *unshaded* instead of *gone*, and makes `amount = 0` an exact no-op. The earlier failure is encoded as a safety property of the replacement.
+8. **Verified:** shader imported in 2.8 s with no compile error; material imported; clean recompile; runtime started clean at `beat=CALM t=0.00s open=3`. Captures at chase range and habitat distance show muzzle, ears, eye sockets, chest volume and leg separation, identity colours preserved.
+
+## Tremor audit, and the pitch-dependent habitat origin
+
+**Prompt:** "The cat visibly shakes… Report which channels are active on a calm
+creature and their actual per-frame amplitude, then damp them." And: "They stand
+on the sofa back, not the floor."
+
+1. **Channel audit** (config values cross-checked against `QueryRuntimeSceneTool` samples of `Body.localScale` / `localPosition`):
+
+   | Channel | State | Amplitude | Rate | Effect at rest |
+   |---|---|---|---|---|
+   | Breathing | CALM | ±6 % scale | 0.18 Hz | 1.76 cm vertical, 12 % width pulse |
+   | Posture tremor | URGENT | ±4.5 % scale | **5.5 Hz** | ~1.8 cm vertical shake |
+   | Gaze tremor | URGENT | ±8° yaw | **3.2 Hz** | 16° body swing |
+   | Wander / tilt / sway / squash / walk bob | any | 0 | — | speed-gated, inactive at rest |
+
+2. **Correction to the reported diagnosis:** it was not wander micro-repositioning — CALM wander contributes exactly zero and every movement channel is speed-gated off. The shaking creature was the **URGENT** one running two fast oscillators at once. The hidden amplifier: `applyBodyScale`'s base-pivot compensation turns *any* Y-scale change into vertical translation of `17 cm × (finalY − 1)`, so a "±4.5 % scale wobble" is really a 1.8 cm shake — which is why it read as broken hardware rather than nerves.
+3. **Fix:** both fast oscillators disabled (kept as named `= 0` constants so the absence is explicit), calm breathing 0.06 → 0.018, urgent breathing 0.015 → 0.012 at 1.4 → 1.1 Hz. Measured result: calm vertical oscillation **1.76 cm → 0.53 cm** peak-to-peak, nothing above 1.1 Hz on any state. The analytical model predicted the measured `localPosition` values to three decimal places (predicted −2.644…−2.117, measured −2.387 and −2.217).
+4. **Ground level — the real cause was not the constant.** `recomputeHabitatOrigin` used the camera's **full 3D forward** as the depth axis, so head pitch scaled habitat distance by `cos(pitch)`: at the ~40° downward angle needed to see floor-level creatures, 240 cm collapsed to 184 cm, which lands exactly on the sofa. **The more you looked down at them, the further they climbed onto the furniture.** Fixed by flattening the forward vector to the horizontal plane in both `recomputeHabitatOrigin` and `buildHabitatFloor` — the same projection in both, or the disc and the creatures land at different depths. `GROUND_Y_OFFSET_CM` was never wrong.
+5. **Verified:** capture at habitat distance shows all three on the carpet past the sofa with contact shadows on the floor.
+
+## Staging controls, and the vanishing dog
+
+**Prompt:** "Make habitat placement controllable so I can put the creatures on
+clear floor… Do not attempt collision or depth." And: "After refreshing preview
+the yellow dog walks toward me and then disappears. Diagnose before changing
+anything."
+
+1. **Diagnosis first, no code changed.** Sampled `MovementRoot_1` over the window with `QueryRuntimeSceneTool` and correlated against `RunAndCollectLogsTool`. Reset at 22:22:40.1, then `beat=RESOLVE t=15.00s` → hold 25→100 % → `repository saved completion task=demo-1 open=2` → `[ReleaseEffect] play` → `beat=RELEASED t=17.02s`. Position at disable: `(12.3, −150, −104.4)`, `enabled: false` — 1.04 m directly ahead at floor level, fully in view, well inside the near plane. **It is released: the scripted story running to completion, not a bug.** Not disabled by error, not behind the camera, not clipped. Addressed by adding `DEMO_AUTOPLAY_ON_START` so the story can be held while framing a shot.
+2. **Staging controls:** six actions — habitat further / nearer / left / right, recenter, play — in 15 cm steps, clamped to 120–420 cm depth and ±60 cm lateral, with a live readout. `applyHabitatLayout` pushes every change to **all creatures and the floor disc together**, since moving one without the other is exactly how they drifted apart before. Recenter re-reads the live camera pose and *snaps* rather than walks (a calm creature would otherwise slide across the room at 7 cm/s).
+3. **FAILURE — hotkeys are unusable in Preview.** Implemented first as arrow keys. Lens Studio's Preview panel binds arrow keys, WASD *and* plain letters to its own camera fly controls. Verified by `InjectPreviewGesture`: injecting Up/Up/Right moved the habitat **and simultaneously flew the preview camera** to yaw −8.5°, z +8; a bare `H` moved it x −9, confirmed via `MovePreviewCamera.getPose`. A staging control that also moves the viewpoint you are framing with is worse than no control — and there is no keyboard on device. Replaced with buttons.
+4. **FAILURE — small buttons kept a default collider.** A compact five-button row rendered fine but every targeted `PreviewInteractTool` pinch and poke timed out waiting for `onTriggerStart`. `QueryRuntimeSceneTool` bounds showed why: extents `(10,10,10)` — a default 20×20×20 collider — instead of the requested size, against `(15,2.5,0.5)` on the known-good 30×5 "Advance Demo Time" button. All five colliders overlapped, so SIK could never resolve which button a pinch meant. Rebuilt as full-width stacked rows copying the working button's proportions.
+5. **Two further layout defects, both found by testing rather than assuming:** the first stacked panel sat below the main control and therefore entirely outside the render region (the main control is already at the bottom edge; the display spans roughly ±30 units vertically at 90 cm) — unpressable. And at z-offset 0.7 the BackPlate's own `InteractionPlaneColliderRoot` obstructed pinches at the upper rows, reported by SIK as `obstructed`. Buttons moved to z 2.0 and the panel repositioned above centre, then pushed to 170 cm and off-centre so it stops covering the habitat it exists to position.
+6. **Verified end-to-end, not merely compiled:** two "further" plus one "right" produced slot 3 at `x=42, z=−270` — exactly camera(−9) + lateral(15) + spacing(36), and 240+30 — with the floor following to `z=−190, x=6`, confirming both read one shared reference. Status readout showed `habitat 270cm  offset 15cm`.
+
+## Cat tail — decimation exonerated by measurement
+
+**Prompt:** "Fix the cat tail: decimation left it as a thin spike taller than the
+head. Regenerate the cat at a gentler ratio or preserve tail volume."
+
+1. **The premise was wrong, and measuring showed it.** Cross-sections by height band, source (19,846 verts) vs decimated (3,814):
+
+   | y band | source x-span / z-span | decimated x-span / z-span |
+   |---|---|---|
+   | 0.444–0.456 | 0.020 / 0.037 | 0.019 / 0.037 |
+   | 0.456–0.468 | 0.018 / 0.015 | 0.018 / 0.012 |
+
+   Identical. Decimation also kept a *higher* share of the tail than of the model overall — 71 of 138 tail verts (51 %) against 19 % mesh-wide. Regenerating at any ratio could not have fixed a shape the input already had.
+2. **Actual cause:** above y = 0.384 the mesh is tail only — a column ~0.021 × 0.025 units, about **1.5 × 1.8 cm** at this project's display scale, standing ~6 cm above the head. At 2.4 m that subtends roughly 0.4°, which is why it rendered as a line.
+3. **Fix:** new `Tools/reshape-cat-tail.js` edits the geometry instead — thickens the tail 2.4× radially about its own per-slice axis (not the model origin, which would bend rather than swell), taking it to ~3.9 cm; compresses only the portion standing above the head to 0.82 so the raised-tail silhouette survives without towering; eases in over both height and depth so the base blends into the rump with no step. 100 of 3,814 vertices moved; POSITION `min`/`max` rewritten since glTF treats them as normative.
+4. **Cost:** none. Vertex and triangle counts unchanged (3,814 / 5,336) — vertices moved, none added.
+5. **Pipeline order matters:** the vertex-shading bake reads positions and normals, so it must run *after* any reshape. Re-baked before installing; order recorded as reshape → bake → install.
+6. **Verified:** clean import, no errors, capture shows a tail with visible volume and correct shading.

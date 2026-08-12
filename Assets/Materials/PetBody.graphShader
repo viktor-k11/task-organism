@@ -1,0 +1,224 @@
+SchemaVersion: 1
+Nodes:
+  ChildNodes:
+    Node0:
+      DependencyIndex: 0
+      LevelID: 1
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 0
+          ItemList: "rgba : rgb"
+        Default:
+          Variable: [1.0, 1.0, 1.0, 1.0]
+        Group:
+          String: ""
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: baseColor
+        SortIndex:
+          Variable: 0
+        Tooltip:
+          String: The creature's identity color, assigned per task from CREATURE_PALETTE.
+        UniqueID:
+          String: Base Color
+      PositionX: -380
+      PositionY: 40
+      TemplateID: nodes_inputs_parameters_color
+      Title1: Color Parameter
+      Title2: Base Color
+    Node1:
+      DependencyIndex: 1
+      LevelID: 2
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 5
+          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
+        Default:
+          Variable: [1.0, 1.0, 1.0, 1.0]
+        EnableMax:
+          Variable: true
+        EnableMin:
+          Variable: true
+        Group:
+          String: ""
+        Max:
+          Variable: 1.0
+        Min:
+          Variable: 0.0
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: vertexShadingAmount
+        SortIndex:
+          Variable: 1
+        Step:
+          Variable: 0.009999999776482582
+        Title:
+          String: Vertex Shading
+        Tooltip:
+          String: How strongly the mesh's baked vertex colors darken the body. 0 ignores them, 1 applies them fully.
+      PositionX: -380
+      PositionY: 180
+      TemplateID: nodes_inputs_parameters_float
+      Title1: Float Parameter
+      Title2: Vertex Shading
+    Node2:
+      DependencyIndex: 2
+      LevelID: 0
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        BaseColor:
+          Connection0:
+            NodeLevelID: 1
+            PortID: Output
+          Variable: [1.0, 1.0, 1.0, 1.0]
+        Code:
+          ClassType1: TEXT
+          String: |-
+            // Unlit body shader for the ready-made pet meshes.
+            //
+            // The meshes carry a baked COLOR_0 gradient (darker feet/underside,
+            // lighter back and head) produced by Tools/bake-vertex-shading.js.
+            // Multiplying it into the identity color is what makes the creatures
+            // read as volumes instead of flat cutouts, and it costs nothing:
+            // no lighting, no extra texture fetch, just an interpolated vertex
+            // attribute the mesh already carries.
+            input_vec4 BaseColor;
+            input_float ShadingAmount;
+            output_vec4 Result;
+
+            void main()
+            {
+            	vec4 vertexColor = system.getSurfaceColor();
+            	float amount = clamp(ShadingAmount, 0.0, 1.0);
+            	// Meshes with no COLOR_0 read as black here, which would make the
+            	// body vanish on an additive display. Blending from white rather
+            	// than multiplying raw keeps amount = 0 an exact no-op, so the
+            	// failure mode is "unshaded" instead of "invisible".
+            	vec3 shade = mix(vec3(1.0), vertexColor.rgb, amount);
+            	Result = vec4(BaseColor.rgb * shade, BaseColor.a);
+            }
+        CustomCodeNodeAsset:
+          ClassType1: REFUID
+          String: ""
+        Description:
+          ClassType1: TEXT
+          String: ""
+        Examples:
+          ItemIndex: 0
+          ItemList: "Custom : Input/Output/Global Types : Extra Functions : Procedural Execution : Lighting Loop : System Built-In Values/Functions"
+        ID:
+          Variable: 0
+        Locked:
+          Variable: false
+        ShadingAmount:
+          Connection0:
+            NodeLevelID: 2
+            PortID: Output
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        Stage:
+          ItemIndex: 1
+          ItemList: "Vertex : Pixel"
+        Title:
+          String: Vertex Shaded Body
+        UseExternalFile:
+          Variable: false
+        ngs_Height:
+          Variable: 400
+        ngs_Version:
+          String: 0.1.0
+        Result:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+      PositionX: -59
+      PositionY: 91
+      TemplateID: node_util_custom
+      TemplateVersionMinor: 2
+      Title1: Vertex Shaded Body
+    Node3:
+      CommentSizeX: 0
+      CommentSizeY: 0
+      DependencyIndex: 3
+      LevelID: 4
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Depth:
+          Variable: 1.0
+        DepthMode:
+          ItemIndex: 0
+          ItemList: "Non-Linear - Normalized [0 to 1] : Linear - Normalized [-1 to 1] : View Space - Non-Normalized [-near to -far]"
+        DontFreezeSpec:
+          Variable: false
+        FinalColor:
+          ClassType1: COLOR
+          Connection0:
+            NodeLevelID: 0
+            PortID: Result
+          Variable: [1.0, 1.0, 1.0, 1.0]
+        FinalColor1:
+          ClassType1: COLOR
+          Variable: [1.0, 1.0, 1.0, 1.0]
+        FinalColor2:
+          ClassType1: COLOR
+          Variable: [1.0, 1.0, 1.0, 1.0]
+        FinalColor3:
+          ClassType1: COLOR
+          Variable: [1.0, 1.0, 1.0, 1.0]
+        GSplatPointSize:
+          Variable: 0.0
+        GSplatRotation:
+          Variable: [0.0, 0.0, 0.0, 1.0]
+        GSplatScale:
+          Variable: [0.0, 0.0, 0.0]
+        Motion Vector Pass:
+          ItemIndex: 0
+          ItemList: "Write Velocity and Depth : Discard Velocity but Write Depth : Discard Velocity and Depth"
+        Negative:
+          Variable: false
+        PrevWorldPosition:
+          Variable: [0.0, 0.0, 0.0]
+        RayDirection:
+          Variable: [0.0, 1.0, 0.0]
+        RayOrigin:
+          Variable: [0.0, 0.0, 0.0]
+        ShowPrevPos:
+          Variable: false
+        Targets:
+          ItemIndex: 0
+          ItemList: "1 : 2 : 3 : 4"
+        Type:
+          ItemIndex: 0
+          ItemList: "3D : Post Effect : Hair : Gaussian Splatting"
+        WorldNormal:
+          Variable: [0.0, 1.0, 0.0]
+        WorldPosition:
+          Variable: [0.0, 0.0, 0.0]
+        WorldTangent:
+          Variable: [0.0, 0.0, 1.0]
+        WriteDepth:
+          Variable: false
+      PositionX: 220
+      PositionY: 90
+      TemplateID: nodes_main_graph
+      Title1: Shader
+      Title2: 3D
+  IsSubGraph0: true
+  IsSubGraph1: true
+  IsSubGraph2: true
+  IsSubGraph3: true
+  LevelID: 0
+  NodeType: 3
+  PositionX: 0
+  PositionY: 0
+  TemplateID: nodes_main_subgraph
+  Title1: ""
+SystemID: dev.snap.shaders

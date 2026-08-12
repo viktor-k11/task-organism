@@ -54,8 +54,10 @@ import {
     GAZE_URGENT_TREMOR_DEG,
     GAZE_URGENT_TREMOR_HZ,
     TINT_EASE_PER_S,
-    TINT_URGENT_COLOR,
-    TINT_CHASE_COLOR,
+    TINT_HEAT_COLOR,
+    TINT_URGENT_HEAT_BLEND,
+    TINT_CHASE_HEAT_BLEND,
+    CREATURE_PALETTE,
     WANDER_CALM_SPEED_CM_S,
     WANDER_CALM_MAX_ACCEL_CM_S2,
     WANDER_CALM_REPICK_PAUSE_MIN_S,
@@ -65,9 +67,12 @@ import {
     WANDER_URGENT_MAX_ACCEL_CM_S2,
     WANDER_URGENT_REPICK_PAUSE_MIN_S,
     WANDER_URGENT_REPICK_PAUSE_MAX_S,
-    WANDER_URGENT_RADIUS_SCALE,
+    WANDER_URGENT_RADIUS_CM,
     WANDER_ARRIVAL_RADIUS_CM,
     WANDER_DEAD_ZONE_RADIUS_CM,
+    WALK_BOB_AMPLITUDE_CM,
+    WALK_BOB_HZ_PER_CM_S,
+    WALK_BOB_FULL_SPEED_CM_S,
     SQUASH_STRETCH_AMOUNT,
     SQUASH_STRETCH_DURATION_S,
     SQUASH_STRETCH_DIRECTION_DOT_THRESHOLD,
@@ -101,7 +106,16 @@ import {
     GROWTH_EASE_PER_S,
 } from "../Config/CreatureConfig";
 
-const bodyBaseMaterialAsset = requireAsset("../../Materials/BlobBody.mat") as Material;
+/**
+ * Pet bodies use their own shader (PetBody.graphShader), not the shared
+ * unlit one. It is the same flat unlit output plus one extra step: the mesh's
+ * baked COLOR_0 gradient multiplied into baseColor, which is what stops the
+ * creatures reading as paper cutouts. Kept as a separate shader/material
+ * deliberately — BlobBody/BlobEye and everything else on unlit.graphShader
+ * have no vertex colors, and a shader that reads them would render those
+ * meshes black on an additive display.
+ */
+const bodyBaseMaterialAsset = requireAsset("../../Materials/PetBody.mat") as Material;
 const eyeBaseMaterialAsset = requireAsset("../../Materials/BlobEye.mat") as Material;
 /** Ready-made Sketchfab dog/cat GLBs (Assets/3d assets/, see LICENSES.md),
  *  simplified for SPECS — see CreaturePetVisual.ts and CreatureConfig's
@@ -132,7 +146,17 @@ enum CreaturePresentationState {
  */
 interface CreatureVisual {
     readonly renderMeshVisual: RenderMeshVisual | null;
-    applyBaseMaterial(baseMaterial: Material): void;
+    /**
+     * Distance (cm) from Body's local origin DOWN to the mesh's ground-
+     * contact point (feet/base), at rest scale. Lets applyBodyScale() scale
+     * breathing/posture/squash from that base instead of Body's local
+     * origin (the mesh's vertical CENTER) — see applyBodyScale's pivot
+     * comment. Without this, any Y-scale channel drags the feet up/down
+     * with it (a vertical bob), since scaling around the center moves both
+     * the top AND the bottom away from rest.
+     */
+    readonly baseOffsetCm: number;
+    applyBaseMaterial(baseMaterial: Material, color?: vec4): void;
 }
 
 /**
@@ -210,14 +234,33 @@ export class CreatureBehavior extends BaseScriptComponent {
     private habitatForwardYaw = 0;
     private homeLateralOffsetCm = 0;
     private homeDepthCm = 0;
+    /** Ground/floor Y, camera-relative (cm) — see setHabitatHome's doc and
+     *  GROUND_Y_OFFSET_CM in CreatureConfig. NOT the mesh's vertical center;
+     *  wanderTargetY below is now the literal floor line MovementRoot sits
+     *  on, and updatePresentationScale compensates VisualRoot's own local
+     *  position so the rendered feet land exactly there (see that method). */
     private homeVerticalOffsetCm = HABITAT_VERTICAL_OFFSET_CM;
     private homeWanderRadiusCm = HABITAT_HOME_WANDER_RADIUS_CM;
     private homeAnchorConfigured = false;
+    /** MovementRoot's world Y (ground/floor level, camera-relative) — shared
+     *  with HabitatFloor via the same GROUND_Y_OFFSET_CM constant, so both
+     *  always agree (see recomputeHabitatOrigin). */
     private wanderTargetY = 0;
     private wanderTarget: vec3 | null = null;
     private wanderPauseTimer = 0;
     private isWaitingAtWanderTarget = false;
     private prevMoveDir: vec3 | null = null;
+
+    /**
+     * Body's intended local Y position BEFORE the base-pivot compensation
+     * applyBodyScale() layers on top (see that method). Normally 0; the
+     * chase anticipation dip is the one other channel that wants Body to
+     * move on Y, so it writes here instead of calling setLocalPosition
+     * directly — applyBodyScale is the single place that actually sets
+     * Body's local position each frame, so the dip and the breathing/
+     * squash/posture compensation can never clobber each other.
+     */
+    private bodyRestLocalY = 0;
 
     /** CALM vs URGENT presentation, driven externally via setUrgent() — see
      *  StateEngine.deriveState. Only read by IDLE wander; CHASING/INTERACTING/
@@ -229,6 +272,16 @@ export class CreatureBehavior extends BaseScriptComponent {
     private postureHeightScale = 1;
     private postureWidthScale = 1;
     private currentTint: vec4 = new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], BLOB_COLOR[3]);
+    /** This creature's identity color, chosen from CREATURE_PALETTE by its
+     *  task's appearanceSeed (see setAppearanceSeed). Every tint target is
+     *  computed relative to THIS, not to a global base, so urgency shifts the
+     *  creature's own color rather than overwriting it. Defaults to BLOB_COLOR
+     *  so a creature that is never assigned a task still renders sanely. */
+    private baseBodyColor: vec4 = new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], BLOB_COLOR[3]);
+    /** Integrated walk-bob phase (radians). Accumulated rather than derived
+     *  from timeS so that cadence changing with speed never snaps the bounce
+     *  mid-stride — see applyBodyScale. */
+    private walkBobPhase = 0;
 
     // Expressive face — every channel eased toward the SAME emotionalProfile()
     // target each frame (see updateExpression), so eyelids/eye scale/spacing/
@@ -301,7 +354,33 @@ export class CreatureBehavior extends BaseScriptComponent {
         console.log(`[WednesdayEvidence] chase cue look-pause root=${this.sceneObject.name}`);
     }
 
-    /** Assigns a distinct camera-relative home without changing creature scale or internals. */
+    /**
+     * Picks this creature's identity color from CREATURE_PALETTE using its
+     * task's appearanceSeed. Deterministic and stateless: the same seed always
+     * yields the same color, so a task looks identical across lens restarts
+     * (appearanceSeed is part of the persisted TaskRecord) without any color
+     * ever being written to storage itself.
+     *
+     * Applies immediately rather than waiting for updateColorTint's per-frame
+     * ease, so the creature is never visible in the wrong color for a frame.
+     */
+    setAppearanceSeed(seed: number): void {
+        const index = ((Math.floor(seed) % CREATURE_PALETTE.length) + CREATURE_PALETTE.length) % CREATURE_PALETTE.length;
+        const c = CREATURE_PALETTE[index];
+        this.baseBodyColor = new vec4(c[0], c[1], c[2], c[3]);
+        this.currentTint = new vec4(c[0], c[1], c[2], c[3]);
+        if (this.body) this.body.applyBaseMaterial(bodyBaseMaterialAsset, this.currentTint);
+    }
+
+    /**
+     * Assigns a distinct camera-relative home without changing creature
+     * scale or internals. verticalOffsetCm is the GROUND/FLOOR Y (camera-
+     * relative, cm) this creature's feet rest on — every caller currently
+     * passes the same shared GROUND_Y_OFFSET_CM constant (see
+     * TaskOrganismController.bindCreatureSlots) so every slot's floor line
+     * agrees with HabitatFloor's, but the parameter stays per-creature in
+     * case a future caller wants one creature on a raised surface.
+     */
     setHabitatHome(lateralOffsetCm: number, depthCm: number, verticalOffsetCm: number, wanderRadiusCm: number): void {
         if (this.isReleased || this.state === CreaturePresentationState.RELEASING) return;
         this.homeLateralOffsetCm = lateralOffsetCm;
@@ -313,6 +392,12 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (this.state === CreaturePresentationState.IDLE) {
             this.wanderTarget = this.pickWanderTarget();
             this.isWaitingAtWanderTarget = false;
+            // Same rationale as resetToIdle's snap: this runs during spawn
+            // binding (bindCreatureSlots), after resetToIdle has already placed
+            // the creature at its pre-home position, so without this it would
+            // walk from there to its assigned slot in view of the user.
+            this.sceneObject.getTransform().setWorldPosition(this.wanderTarget);
+            this.velocity = vec3.zero();
         }
     }
 
@@ -434,6 +519,13 @@ export class CreatureBehavior extends BaseScriptComponent {
             // immediately instead of waiting for the current leg to finish.
             this.wanderTarget = this.pickWanderTarget();
             this.isWaitingAtWanderTarget = false;
+            // Snap rather than walk. This is a staging action: the operator is
+            // framing a shot, and a CALM creature would otherwise cross the
+            // room to the new anchor at WANDER_CALM_SPEED_CM_S (7 cm/s) — tens
+            // of seconds for a large recenter, with the creature visibly
+            // sliding the whole way.
+            this.sceneObject.getTransform().setWorldPosition(this.wanderTarget);
+            this.velocity = vec3.zero();
         }
     }
 
@@ -496,9 +588,13 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.chaseRadialVel = 0;
         this.squashEnvelope = 0;
         this.prevMoveDir = null;
+        this.bodyRestLocalY = 0;
         this.postureHeightScale = 1;
         this.postureWidthScale = 1;
-        this.currentTint = new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], BLOB_COLOR[3]);
+        // Back to this creature's identity color, NOT the global BLOB_COLOR —
+        // a reset must not erase the appearanceSeed-assigned color.
+        this.currentTint = new vec4(this.baseBodyColor.x, this.baseBodyColor.y, this.baseBodyColor.z, this.baseBodyColor.w);
+        this.walkBobPhase = 0;
         this.eyeLidClosure = EYELID_CALM_CLOSURE;
         this.eyeScaleMultiplier = EYE_SCALE_CALM;
         this.eyeSpacingCm = EYE_SPACING_CALM_CM;
@@ -514,10 +610,23 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (this.visualRootObject) {
             this.presentationScale = HABITAT_VISUAL_SCALE;
             this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale * this.growthScale));
+            // Matches updatePresentationScale's ground-pivot compensation — set
+            // once here too so the very first rendered frame (before onUpdate's
+            // first tick) already has feet on the ground line, not the mesh
+            // center.
+            const baseOffsetCm = this.body ? this.body.baseOffsetCm : 0;
+            this.visualRootObject.getTransform().setLocalPosition(new vec3(0, baseOffsetCm * this.presentationScale * this.growthScale, 0));
         }
 
         this.recomputeHabitatOrigin();
         this.wanderTarget = this.pickWanderTarget();
+        // Start ON the habitat spot rather than gliding to it. Without this the
+        // creature keeps whatever world position it had at reset (effectively the
+        // camera/world origin) and seeks the target at WANDER_CALM_SPEED_CM_S —
+        // which, now that the ground line is a real floor ~150cm below eye level
+        // rather than a 20cm offset, is a multi-second visible descent from
+        // mid-air on every Lens reset. A settled pet is already where it lives.
+        this.sceneObject.getTransform().setWorldPosition(this.wanderTarget);
 
         if (this.bodyObject) {
             this.bodyObject.getTransform().setLocalPosition(vec3.zero());
@@ -531,7 +640,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         // creature's tint onto every sibling using it. release()'s brighten
         // clone is discarded here, not reused, since it also never touches
         // the shared asset (clone-before-mutate).
-        if (this.body) this.body.applyBaseMaterial(bodyBaseMaterialAsset);
+        if (this.body) this.body.applyBaseMaterial(bodyBaseMaterialAsset, this.currentTint);
         if (this.eyeLeft) this.eyeLeft.pupilVisual.mainMaterial = eyeBaseMaterialAsset;
         if (this.eyeRight) this.eyeRight.pupilVisual.mainMaterial = eyeBaseMaterialAsset;
     }
@@ -542,6 +651,15 @@ export class CreatureBehavior extends BaseScriptComponent {
      * anchored once at spawn/reset) and the debug-only recenterHabitat()
      * (a manual re-anchor for preview/recording) — the habitat is otherwise
      * world-anchored, not continuously recentered on the camera every frame.
+     *
+     * wanderTargetY is the literal ground/floor Y (camera-relative) —
+     * HabitatFloor's disc reads the exact same GROUND_Y_OFFSET_CM constant
+     * for its own Y, so MovementRoot and the floor plane can never drift
+     * apart. (Previously this was the mesh's vertical CENTER, matched
+     * against a separately-derived, independently-tuned HabitatFloor
+     * formula — the two numbers only coincidentally lined up for one
+     * specific Preview environment. See CreatureConfig's GROUND_Y_OFFSET_CM
+     * doc comment for the full root-cause note.)
      */
     private recomputeHabitatOrigin(): void {
         if (!this.cameraObject) return;
@@ -555,10 +673,19 @@ export class CreatureBehavior extends BaseScriptComponent {
         // space behind them.
         const camFwd = camTransform.forward.uniformScale(-1);
         this.habitatForwardYaw = Math.atan2(camFwd.x, -camFwd.z);
+        // Flatten the camera's forward onto the horizontal plane before using
+        // it as the depth axis. Using the raw 3D forward made the habitat
+        // depend on head PITCH: looking down 40 degrees placed the homes at
+        // homeDepthCm * cos(40) = 77% of the intended distance (240cm became
+        // 184cm) and dragged habitatCenter's Y down with it, which then had to
+        // be overridden by the ground line anyway. The habitat is a spot on
+        // the floor in front of the user; where they happen to be looking when
+        // it is anchored must not move it.
+        const flatFwd = new vec3(Math.sin(this.habitatForwardYaw), 0, -Math.cos(this.habitatForwardYaw));
         if (this.homeAnchorConfigured) {
             const right = new vec3(Math.cos(this.habitatForwardYaw), 0, Math.sin(this.habitatForwardYaw));
             this.habitatCenter = camPos
-                .add(camFwd.uniformScale(this.homeDepthCm))
+                .add(flatFwd.uniformScale(this.homeDepthCm))
                 .add(right.uniformScale(this.homeLateralOffsetCm));
         } else {
             this.habitatCenter = camPos;
@@ -716,10 +843,15 @@ export class CreatureBehavior extends BaseScriptComponent {
     }
 
     private pickWanderTarget(): vec3 {
-        const radiusScale = this.isUrgent ? WANDER_URGENT_RADIUS_SCALE : WANDER_CALM_RADIUS_SCALE;
         if (this.homeAnchorConfigured) {
             const angle = Math.random() * Math.PI * 2;
-            const radius = Math.sqrt(Math.random()) * this.homeWanderRadiusCm * radiusScale;
+            // URGENT roams an ABSOLUTE radius around home (a real walk);
+            // CALM scales the tiny 3cm home-jitter radius, which at scale 0
+            // means "the home anchor itself" — i.e. arrive once and stay.
+            const maxRadius = this.isUrgent
+                ? WANDER_URGENT_RADIUS_CM
+                : this.homeWanderRadiusCm * WANDER_CALM_RADIUS_SCALE;
+            const radius = Math.sqrt(Math.random()) * maxRadius;
             return new vec3(
                 this.habitatCenter.x + Math.cos(angle) * radius,
                 this.wanderTargetY,
@@ -729,7 +861,12 @@ export class CreatureBehavior extends BaseScriptComponent {
         const halfArcRad = (HABITAT_ARC_HALF_ANGLE_DEG * Math.PI) / 180;
         const angleOffset = (Math.random() * 2 - 1) * halfArcRad;
         const angle = this.habitatForwardYaw + angleOffset;
-        const dist = this.randomRange(HABITAT_RADIUS_MIN_CM, HABITAT_RADIUS_MAX_CM) * radiusScale;
+        // No home anchor configured: fall back to the open habitat ring. CALM
+        // still collapses to the ring's inner edge via WANDER_CALM_RADIUS_SCALE;
+        // URGENT uses the full ring, which is already far wider than the
+        // home-anchored roam radius, so it needs no extra scaling.
+        const dist = this.randomRange(HABITAT_RADIUS_MIN_CM, HABITAT_RADIUS_MAX_CM)
+            * (this.isUrgent ? 1 : WANDER_CALM_RADIUS_SCALE);
 
         // Reconstruct a direction vector from a yaw angle the same way faceDirection's
         // formula reads one back: yaw = atan2(dir.x, -dir.z) => dir = (sin(yaw), 0, -cos(yaw)).
@@ -770,14 +907,15 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (this.chaseCueElapsed < cueDuration) {
             this.velocity = vec3.zero();
             this.updateCameraFrontBias(dt);
-            if (this.bodyObject) {
-                const anticipationT = clamp01((this.chaseCueElapsed - CHASE_LOOK_PAUSE_S) / CHASE_ANTICIPATION_S);
-                const dip = anticipationT > 0 ? -CHASE_ANTICIPATION_DIP_CM * Math.sin(anticipationT * Math.PI) : 0;
-                this.bodyObject.getTransform().setLocalPosition(new vec3(0, dip, 0));
-            }
+            const anticipationT = clamp01((this.chaseCueElapsed - CHASE_LOOK_PAUSE_S) / CHASE_ANTICIPATION_S);
+            // Written to bodyRestLocalY, not setLocalPosition — applyBodyScale()
+            // is the single place that sets Body's local Y each frame (rest +
+            // base-pivot compensation), so this dip and that compensation never
+            // clobber each other (see bodyRestLocalY's field comment).
+            this.bodyRestLocalY = anticipationT > 0 ? -CHASE_ANTICIPATION_DIP_CM * Math.sin(anticipationT * Math.PI) : 0;
             return;
         }
-        if (this.bodyObject) this.bodyObject.getTransform().setLocalPosition(vec3.zero());
+        this.bodyRestLocalY = 0;
 
         this.hesitationTimer -= dt;
         if (this.hesitationTimer <= 0 && this.hesitationActiveT <= 0) {
@@ -904,6 +1042,22 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.presentationScale += (target - this.presentationScale) * clamp01(dt * PRESENTATION_SCALE_EASE_PER_S);
         this.growthScale += (this.targetGrowthScale - this.growthScale) * clamp01(dt * GROWTH_EASE_PER_S);
         this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale * this.growthScale));
+
+        // Ground-pivot compensation: VisualRoot's local origin sits at the
+        // mesh's vertical CENTER (same "Body's own local scale never moves
+        // the feet" convention baseOffsetCm documents for applyBodyScale),
+        // so scaling VisualRoot itself — CALM<->CHASE presentation scale,
+        // whole-body growth — drags the feet up/down with it exactly like
+        // Body's own breathing scale did before that compensation existed.
+        // MovementRoot's world Y is GROUND_Y_OFFSET_CM directly now (see
+        // recomputeHabitatOrigin) — the single shared floor reference
+        // HabitatFloor also reads — so lifting VisualRoot's local origin by
+        // baseOffsetCm * (current total scale) keeps the rendered feet
+        // pinned exactly on that floor line regardless of which
+        // presentation scale is currently active.
+        const baseOffsetCm = this.body ? this.body.baseOffsetCm : 0;
+        const totalScale = this.presentationScale * this.growthScale;
+        this.visualRootObject.getTransform().setLocalPosition(new vec3(0, baseOffsetCm * totalScale, 0));
     }
 
     private wrapAngle(angle: number): number {
@@ -924,7 +1078,13 @@ export class CreatureBehavior extends BaseScriptComponent {
 
         const speed01 = clamp01(this.velocity.length / MAX_SPEED_CM_S);
         const yaw = Math.atan2(this.facingDir.x, -this.facingDir.z);
-        const roll = ((BODY_MOVE_TILT_DEG * speed01) + BODY_SECONDARY_SWAY_DEG * Math.sin(this.timeS * 3.1)) * Math.PI / 180;
+        // BODY_SECONDARY_SWAY_DEG used to apply unconditionally — a constant
+        // +/-2.5deg roll oscillation even at velocity 0, which read as a
+        // stationary creature rocking side to side. It's a walk-cycle wobble
+        // (same family as BODY_MOVE_TILT_DEG just above it), so gate it by
+        // speed01 too: full strength while actually moving (URGENT wander,
+        // chase), zero once CALM settles and stops.
+        const roll = ((BODY_MOVE_TILT_DEG * speed01) + BODY_SECONDARY_SWAY_DEG * speed01 * Math.sin(this.timeS * 3.1)) * Math.PI / 180;
         const pitch = Math.sin(this.timeS * 2.2) * speed01 * 0.035 + (this.leanPitchDeg * Math.PI) / 180;
         this.bodyObject.getTransform().setLocalRotation(quat.fromEulerAngles(pitch, yaw, -roll));
 
@@ -990,6 +1150,41 @@ export class CreatureBehavior extends BaseScriptComponent {
         const finalXZ = breathe * scaleXZ * this.postureWidthScale * tremor;
 
         this.bodyObject.getTransform().setLocalScale(new vec3(finalXZ, finalY, finalXZ));
+
+        // Base-pivot compensation: Body's local origin sits at the mesh's
+        // vertical CENTER (see CreatureVisual.baseOffsetCm), so scaling
+        // Body's own transform — which is the only way to animate breathing/
+        // posture/squash without new geometry — stretches vertices AWAY from
+        // that center on both sides. Left uncompensated, any Y-scale change
+        // (breathing's slow pulse chief among them) drags the feet up/down
+        // with it: a vertical bob that lifts the model off the floor or
+        // sinks it through on every inhale/exhale. Shifting Body's local Y by
+        // baseOffsetCm * (finalY - 1) moves the scale pivot's effective
+        // anchor down to the base instead: only the TOP grows/shrinks, the
+        // feet stay pinned at rest height. bodyRestLocalY carries any other
+        // intentional Y offset (currently only the chase anticipation dip)
+        // so the two channels compose instead of overwriting each other.
+        // Walk bob: the pet meshes have no leg rig, so translation alone reads
+        // as sliding. A small vertical bounce whose cadence is locked to travel
+        // speed supplies the missing footfall cue. abs(sin) gives two bounces
+        // per phase cycle — a footfall rhythm rather than a float. Phase is
+        // integrated (not derived from timeS) so cadence changes as the
+        // creature accelerates without the bounce snapping mid-stride.
+        //
+        // Gated hard on current speed: a settled CALM creature has zero
+        // velocity, so bob is exactly 0 and its feet stay flat on the ground
+        // line — this does not reintroduce the always-on vertical bob that was
+        // removed from breathing.
+        const speedCmS = this.velocity.length;
+        const bobStrength = clamp01(speedCmS / WALK_BOB_FULL_SPEED_CM_S);
+        this.walkBobPhase += speedCmS * WALK_BOB_HZ_PER_CM_S * Math.PI * 2 * dt;
+        const walkBobCm = bobStrength > 0
+            ? WALK_BOB_AMPLITUDE_CM * bobStrength * Math.abs(Math.sin(this.walkBobPhase))
+            : 0;
+
+        const baseOffsetCm = this.body ? this.body.baseOffsetCm : 0;
+        this.bodyObject.getTransform().setLocalPosition(new vec3(0, this.bodyRestLocalY + baseOffsetCm * (finalY - 1) + walkBobCm, 0));
+
         if (this.shadowObject) {
             const shadowScale = 0.92 + 0.08 * finalXZ;
             this.shadowObject.getTransform().setLocalScale(new vec3(shadowScale, 0.06, 0.64 * shadowScale));
@@ -997,12 +1192,16 @@ export class CreatureBehavior extends BaseScriptComponent {
     }
 
     /** Warm-shifts the per-instance body material toward the state's tint
-     *  target (see CreatureConfig TINT_* — CALM stays at neutral BLOB_COLOR). */
+     *  target. The target is always this creature's OWN baseBodyColor blended
+     *  a fraction toward TINT_HEAT_COLOR (CALM = the identity color itself,
+     *  unblended), so rising urgency reads as the same creature heating up
+     *  rather than every creature converging on one shared orange. */
     private updateColorTint(dt: number): void {
         if (!this.body || !this.body.renderMeshVisual) return;
         const profile = this.emotionalProfile();
-        const targetArr = profile === "CALM" ? BLOB_COLOR : profile === "URGENT" ? TINT_URGENT_COLOR : TINT_CHASE_COLOR;
-        const target = new vec4(targetArr[0], targetArr[1], targetArr[2], targetArr[3]);
+        const blend = profile === "CALM" ? 0 : profile === "URGENT" ? TINT_URGENT_HEAT_BLEND : TINT_CHASE_HEAT_BLEND;
+        const heat = new vec4(TINT_HEAT_COLOR[0], TINT_HEAT_COLOR[1], TINT_HEAT_COLOR[2], TINT_HEAT_COLOR[3]);
+        const target = vec4.lerp(this.baseBodyColor, heat, blend);
         const alpha = clamp01(dt * TINT_EASE_PER_S);
         this.currentTint = vec4.lerp(this.currentTint, target, alpha);
         this.body.renderMeshVisual.mainMaterial.mainPass.baseColor = this.currentTint;

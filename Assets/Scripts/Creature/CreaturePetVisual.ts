@@ -5,6 +5,7 @@ import {
     READYMADE_PET_YAW_CORRECTION_DEG,
     DOG_DISPLAY_SCALE,
     CAT_DISPLAY_SCALE,
+    VERTEX_SHADING_AMOUNT,
 } from "../Config/CreatureConfig";
 
 export type PetSpecies = "dog" | "cat";
@@ -53,6 +54,10 @@ export type PetSpecies = "dog" | "cat";
  */
 export class CreaturePetVisual {
     readonly root: SceneObject;
+    /** See CreatureVisual.baseOffsetCm (CreatureBehavior.ts) — the prefab root
+     *  is placed at local Y = -READYMADE_PET_HALF_HEIGHT_CM (below), which is
+     *  exactly the mesh's feet-to-center distance at rest scale. */
+    readonly baseOffsetCm: number = READYMADE_PET_HALF_HEIGHT_CM;
     private readonly renderMeshVisuals: RenderMeshVisual[];
 
     constructor(bodyObject: SceneObject, prefab: ObjectPrefab, species: PetSpecies, baseMaterial: Material) {
@@ -70,25 +75,41 @@ export class CreaturePetVisual {
         this.applyBaseMaterial(baseMaterial);
     }
 
-    /** Fresh per-instance clone-before-mutate for every mesh part found —
-     *  called at construction and again from CreatureBehavior.resetToIdle(). */
-    applyBaseMaterial(baseMaterial: Material): void {
+    /** ONE fresh clone-before-mutate per creature, shared across every mesh
+     *  part of that creature — called at construction and again from
+     *  CreatureBehavior.resetToIdle().
+     *
+     *  The clone is per-creature (never the shared base asset), so tinting one
+     *  creature still cannot bleed onto its siblings. But it is deliberately
+     *  ONE clone for all of this creature's parts: updateColorTint mutates a
+     *  single material every frame, so giving each part its own clone (as this
+     *  did previously) meant a multi-part prefab only ever tinted the part the
+     *  renderMeshVisual getter happened to return, leaving the rest stuck at
+     *  the base color. That was harmless while every creature shared one
+     *  color; it breaks visibly now that color is per-creature identity. */
+    applyBaseMaterial(baseMaterial: Material, color?: vec4): void {
+        const fresh = baseMaterial.clone();
+        fresh.mainPass.baseColor = color ?? new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], 1);
+        forceOpaque(fresh);
+        // These source GLBs' winding/normals aren't verified against this
+        // project's back-face-culling convention (see PetCreatureBody's
+        // identical fix) — render both sides rather than risk the same
+        // "see-through" artifact on an unfamiliar mesh.
+        fresh.mainPass.twoSided = true;
+        // Enables PetBody.graphShader's multiply of the mesh's baked COLOR_0
+        // gradient into baseColor — the shading that makes the body read as a
+        // volume. Free at runtime: the gradient is baked into the GLB
+        // (Tools/bake-vertex-shading.js), so this is one interpolated vertex
+        // attribute and a multiply, no lighting and no extra fetch.
+        fresh.mainPass.vertexShadingAmount = VERTEX_SHADING_AMOUNT;
         for (const rmv of this.renderMeshVisuals) {
-            const fresh = baseMaterial.clone();
-            fresh.mainPass.baseColor = new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], 1);
-            forceOpaque(fresh);
-            // These source GLBs' winding/normals aren't verified against this
-            // project's back-face-culling convention (see PetCreatureBody's
-            // identical fix) — render both sides rather than risk the same
-            // "see-through" artifact on an unfamiliar mesh.
-            fresh.mainPass.twoSided = true;
             rmv.mainMaterial = fresh;
         }
     }
 
-    /** Only the first material is used for per-frame tinting (see
-     *  CreatureBehavior.updateColorTint) — every part shares an identical
-     *  clone from applyBaseMaterial, so any one of them reflects the whole. */
+    /** Used for per-frame tinting (see CreatureBehavior.updateColorTint).
+     *  Every part of this creature now genuinely shares the single clone
+     *  applyBaseMaterial assigned, so mutating this one tints the whole body. */
     get renderMeshVisual(): RenderMeshVisual | null {
         return this.renderMeshVisuals[0] ?? null;
     }

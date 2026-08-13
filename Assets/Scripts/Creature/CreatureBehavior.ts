@@ -135,6 +135,20 @@ const eyeBaseMaterialAsset = requireAsset("../../Materials/BlobEye.mat") as Mate
  *  READYMADE_PET_* doc comment. */
 const dogPrefab = requireAsset("../../GeneratedMeshes/dog_lo.glb") as ObjectPrefab;
 const catPrefab = requireAsset("../../GeneratedMeshes/cat_lo.glb") as ObjectPrefab;
+const owlPrefab = requireAsset("../../GeneratedMeshes/owl_lo.glb") as ObjectPrefab;
+const elephantPrefab = requireAsset("../../GeneratedMeshes/elephant_lo.glb") as ObjectPrefab;
+const rabbitPrefab = requireAsset("../../GeneratedMeshes/rabbit_lo.glb") as ObjectPrefab;
+const penguinPrefab = requireAsset("../../GeneratedMeshes/penguin_lo.glb") as ObjectPrefab;
+/** Species -> prefab. Table rather than a conditional for the same reason as
+ *  PET_DISPLAY_SCALE: adding a species should be adding a row. */
+const petPrefabs: Record<PetSpecies, ObjectPrefab> = {
+    dog: dogPrefab,
+    cat: catPrefab,
+    owl: owlPrefab,
+    elephant: elephantPrefab,
+    rabbit: rabbitPrefab,
+    penguin: penguinPrefab,
+};
 
 /**
  * Local, presentation-only state — deliberately NOT named `BehaviorState`;
@@ -223,6 +237,10 @@ export class CreatureBehavior extends BaseScriptComponent {
      *  setAppearanceSeed can tear the old prefab down. */
     private petVisual: CreaturePetVisual | null = null;
     private currentSpecies: PetSpecies | null = null;
+    /** Set by setAppearanceSeed, which may run before or after onStart — see
+     *  the ordering note there. Defaults to 0 so an unseeded creature still
+     *  builds a valid species. */
+    private appearanceSeed = 0;
     private eyeLeft: CreatureEye | null = null;
     private eyeRight: CreatureEye | null = null;
     private earsAndTail: CreatureEarsAndTail | null = null;
@@ -389,8 +407,18 @@ export class CreatureBehavior extends BaseScriptComponent {
      * ease, so the creature is never visible in the wrong color for a frame.
      */
     setAppearanceSeed(seed: number): void {
-        // Species first: it rebuilds this.body, and the colour below has to land
-        // on the material of whichever body ends up in the scene.
+        // Remember the seed unconditionally. Script order is by scene hierarchy,
+        // and the controller sits ABOVE the creatures, so its onStart (which
+        // calls this) runs BEFORE CreatureBehavior.onStart has built any visual.
+        // Species is therefore usually resolved later, by onStart reading this
+        // field — not here. Colour did not expose the ordering because
+        // resetToIdle re-applies the stored tint after the build; species had no
+        // such second chance, and every creature silently came out as the
+        // seed-0 species.
+        this.appearanceSeed = seed;
+
+        // Still handle the already-built case: a seed can change after
+        // construction (task rebind), and then the body must be swapped now.
         const species = speciesForSeed(seed);
         if (this.bodyObject && species !== this.currentSpecies) {
             if (this.petVisual) this.petVisual.destroy();
@@ -408,7 +436,7 @@ export class CreatureBehavior extends BaseScriptComponent {
      *  so setAppearanceSeed can tell whether a rebuild is actually needed. */
     private buildSpeciesVisual(species: PetSpecies): void {
         if (!this.bodyObject) return;
-        const prefab = species === "cat" ? catPrefab : dogPrefab;
+        const prefab = petPrefabs[species];
         this.petVisual = new CreaturePetVisual(this.bodyObject, prefab, species, bodyBaseMaterialAsset);
         this.body = this.petVisual;
         this.currentSpecies = species;
@@ -606,7 +634,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         // the controller binds slots in its own onStart — so build the seed-0
         // species here and let setAppearanceSeed swap the body if the real seed
         // selects a different one.
-        this.buildSpeciesVisual(speciesForSeed(0));
+        this.buildSpeciesVisual(speciesForSeed(this.appearanceSeed));
         this.shadowObject = buildCreatureShadow(this.visualRootObject!, eyeBaseMaterialAsset);
 
         this.resetToIdle();

@@ -511,7 +511,7 @@ export const DEMO_BEAT_RESOLVE_SETTLE_S = 0.5;
  * the chaser approaches and is resolved away ~17s later whether or not you
  * were ready — see the staging key map in TaskOrganismController.)
  */
-export const DEMO_AUTOPLAY_ON_START = false;
+export const DEMO_AUTOPLAY_ON_START = true;
 /** Per-keypress nudge for the runtime habitat placement controls. */
 export const HABITAT_DEPTH_STEP_CM = 15;
 export const HABITAT_LATERAL_STEP_CM = 15;
@@ -627,6 +627,32 @@ export const DOG_DISPLAY_SCALE = (READYMADE_PET_TARGET_HEIGHT_CM / 205.2) * 100;
  */
 export const CAT_BODY_TO_BBOX_RATIO = 0.8945;
 export const CAT_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / CAT_BODY_TO_BBOX_RATIO;
+/**
+ * Owl — generated (SPECS text-to-3D), same pipeline and same body-height rule
+ * as the cat. Its ear tufts are only 2.9% of the bounding box (0.9708 body
+ * against 1.0000 bbox), far less overhead than the cat's upright ears, because
+ * the prompt asked for short blunt tufts rather than the thin spikes the
+ * thin-feature rule forbids. Bbox consequently renders 35.0cm.
+ */
+export const OWL_BODY_TO_BBOX_RATIO = 0.9708;
+export const OWL_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / OWL_BODY_TO_BBOX_RATIO;
+/**
+ * Baby elephant, rabbit, baby penguin — generated, same pipeline, same rule.
+ * Each ratio is MEASURED by Tools/seat-pet-glb.js (centreline dome top over
+ * bbox height), never guessed: the fraction a species spends on ears varies
+ * enormously, and using the wrong one is exactly what makes one animal read
+ * undersized next to another.
+ *
+ *   elephant  1.0000 — ears sit beside the head, nothing above it
+ *   rabbit    0.8961 — upright ears, closest to the cat
+ *   penguin   1.0000 — no ears at all; bbox IS the body
+ */
+export const ELEPHANT_BODY_TO_BBOX_RATIO = 1.0;
+export const ELEPHANT_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / 0.8499;
+export const RABBIT_BODY_TO_BBOX_RATIO = 0.8961;
+export const RABBIT_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / RABBIT_BODY_TO_BBOX_RATIO;
+export const PENGUIN_BODY_TO_BBOX_RATIO = 1.0;
+export const PENGUIN_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / PENGUIN_BODY_TO_BBOX_RATIO;
 
 /** Whole-body growth: an ignored task's creature scales from 1.0 up to this
  *  cap as urgency climbs from 0 toward CHASE_THRESHOLD, then holds — a

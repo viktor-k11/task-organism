@@ -5,10 +5,14 @@ import {
     READYMADE_PET_YAW_CORRECTION_DEG,
     DOG_DISPLAY_SCALE,
     CAT_DISPLAY_SCALE,
+    OWL_DISPLAY_SCALE,
+    ELEPHANT_DISPLAY_SCALE,
+    RABBIT_DISPLAY_SCALE,
+    PENGUIN_DISPLAY_SCALE,
     VERTEX_SHADING_AMOUNT,
 } from "../Config/CreatureConfig";
 
-export type PetSpecies = "dog" | "cat";
+export type PetSpecies = "dog" | "cat" | "owl" | "elephant" | "rabbit" | "penguin";
 
 /** Species roster indexed by appearanceSeed (see CreatureBehavior.setAppearanceSeed).
  *  Deterministic and stateless in exactly the way the colour palette is: the
@@ -19,7 +23,25 @@ export type PetSpecies = "dog" | "cat";
  *  what decides which animals a small demo actually shows, so accepted species
  *  are appended rather than inserted — inserting would re-shuffle every
  *  existing task's animal. */
-export const PET_SPECIES_BY_SEED: PetSpecies[] = ["dog", "cat"];
+/** "elephant" is deliberately ABSENT: the asset exists and is fully wired
+ *  (PET_DISPLAY_SCALE, petPrefabs), but the generation failed acceptance — its
+ *  ears flare wider than its body, the trunk came out a stub, and at habitat
+ *  distance it reads as a flat slab rather than an animal. Re-adding it after a
+ *  regeneration is exactly one word here. */
+export const PET_SPECIES_BY_SEED: PetSpecies[] = ["dog", "cat", "owl", "rabbit", "penguin"];
+
+/** Per-species localScale for the instantiated prefab root. A table rather than
+ *  a ternary chain: every species is measured separately (each generation has
+ *  its own body-to-bbox ratio, see seat-pet-glb.js), so adding a species should
+ *  be adding a row, not editing a conditional. */
+export const PET_DISPLAY_SCALE: Record<PetSpecies, number> = {
+    dog: DOG_DISPLAY_SCALE,
+    cat: CAT_DISPLAY_SCALE,
+    owl: OWL_DISPLAY_SCALE,
+    elephant: ELEPHANT_DISPLAY_SCALE,
+    rabbit: RABBIT_DISPLAY_SCALE,
+    penguin: PENGUIN_DISPLAY_SCALE,
+};
 
 export function speciesForSeed(seed: number): PetSpecies {
     const n = PET_SPECIES_BY_SEED.length;
@@ -79,7 +101,7 @@ export class CreaturePetVisual {
     constructor(bodyObject: SceneObject, prefab: ObjectPrefab, species: PetSpecies, baseMaterial: Material) {
         this.root = prefab.instantiate(bodyObject);
 
-        const displayScale = species === "dog" ? DOG_DISPLAY_SCALE : CAT_DISPLAY_SCALE;
+        const displayScale = PET_DISPLAY_SCALE[species];
         this.root.getTransform().setLocalPosition(new vec3(0, -READYMADE_PET_HALF_HEIGHT_CM, 0));
         this.root.getTransform().setLocalRotation(quat.fromEulerAngles(0, (READYMADE_PET_YAW_CORRECTION_DEG * Math.PI) / 180, 0));
         this.root.getTransform().setLocalScale(new vec3(displayScale, displayScale, displayScale));

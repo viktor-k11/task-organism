@@ -28,7 +28,7 @@ import { CreatureBehavior } from "../Creature/CreatureBehavior";
 import { findChildByName } from "../Creature/CreatureMovement";
 import { DEMO_TASK_FIXTURES, DemoInput } from "../Input/DemoInput";
 import { KeyboardInput } from "../Input/KeyboardInput";
-import { SequentialTaskIdentitySource, TaskCreationService } from "../Input/TaskCreationService";
+import { OrderedTaskIdentitySource, TaskCreationService } from "../Input/TaskCreationService";
 import { AttentionArbiter } from "../State/AttentionArbiter";
 import { StateEngine } from "../State/StateEngine";
 import { TaskResolutionService } from "../State/TaskResolutionService";
@@ -42,7 +42,10 @@ import { buildHabitatFloor, positionHabitatFloor } from "./HabitatFloor";
 // single "Advance Demo Time" press now produces one of each behavior state
 // (CALM/URGENT/CHASING) instead of only CALM/CHASING — bump forces a reseed
 // so a v3 demo save (different creation times) can't produce stale ages.
-const DEMO_STORAGE_KEY = "task-organism.wednesday-demo.v4.presentation";
+// v5: appearanceSeed semantics changed (OrderedTaskIdentitySource), and seeds
+// are persisted — a v4 save would restore the old hash seeds and silently undo
+// the species/colour spread. Bumping the key retires those saves instead.
+const DEMO_STORAGE_KEY = "task-organism.wednesday-demo.v5.presentation";
 /**
  * Creation ages as fractions of URGENCY_AGE_WINDOW_MS, oldest first. After
  * advancing to DEMO_ADVANCE_TARGET_MS (1.8W) each task's age is
@@ -254,7 +257,7 @@ export class TaskOrganismController extends BaseScriptComponent {
         }
         if (tasks.length > 0) this.clock.setNowMs(this.latestCreationTime(tasks));
 
-        const creator = new TaskCreationService(this.repository, this.clock, new SequentialTaskIdentitySource("demo", tasks.length));
+        const creator = new TaskCreationService(this.repository, this.clock, new OrderedTaskIdentitySource("demo", tasks.length));
         const demo = new DemoInput(creator);
         this.keyboard = new KeyboardInput(creator);
         if (tasks.length === 0) tasks = this.seedStaggeredDemoTasks(demo);

@@ -265,3 +265,179 @@ head. Regenerate the cat at a gentler ratio or preserve tail volume."
 4. **Cost:** none. Vertex and triangle counts unchanged (3,814 / 5,336) — vertices moved, none added.
 5. **Pipeline order matters:** the vertex-shading bake reads positions and normals, so it must run *after* any reshape. Re-baked before installing; order recorded as reshape → bake → install.
 6. **Verified:** clean import, no errors, capture shows a tail with visible volume and correct shading.
+
+## Five generated species — retiring the licence question entirely
+
+**Prompt:** "Generate five creature species with the CLAD 3D asset generation
+skill… Quality is the priority, not speed — generate one at a time, evaluate it
+against the acceptance test, and iterate before moving to the next. A rejected
+generation with a recorded reason is a better outcome than five mediocre ones."
+
+Backend: **SPECS text-to-3D**, not FAST3D. The skill makes FAST3D a *user-granted
+speed exception*; here the user granted the opposite, so the minutes-long jobs
+were accepted deliberately. Blender is absent on this machine, so the voxel
+backend and the Blender preview step were unavailable and in-engine capture was
+used for every acceptance test instead.
+
+A generated asset carries no third-party rights at all. That does not merely
+document the licence question — it **retires** it, which is why this run
+replaced a working asset rather than annotating it.
+
+### Cat — attempt 1 REJECTED, the eyes were never geometry
+
+Job `8048e239`, `standard`/`high`/`high`. Succeeded, 11,645 verts — 3× over the
+2,000–4,000 budget on its own. But the disqualifying fault was the face: ears
+and muzzle were genuinely sculpted, while the eyes were **shallow surface
+dimples only**. The real eyes lived in the two textures this project's unlit
+pipeline discards, so the creature had no readable front at all.
+
+This is the second time the same failure mode killed a cat — the Quaternius
+asset was rejected for exactly this. The lesson is that "the model has a face"
+and "the face is geometry" are different claims, and only the second one
+survives an unlit pipeline. Confirmed by capture, not assumed: an isolated
+front-on render showed a blank face box.
+
+The first render also read as featureless because the model imported facing
+`+Z`; the face was found on the `back` capture. Facing was measured rather than
+guessed thereafter.
+
+### Cat — attempt 2 ACCEPTED
+
+Job `388daa4b`, `balanced`/`high`/`high`. 4,812 verts / 3,896 tris, single
+material. The prompt change that fixed it was making eye protrusion the explicit
+subject rather than one clause among many: "two separate solid spheres that
+BULGE OUT and STICK OUT prominently from the front of the face like buttons sewn
+onto a plush toy… so raised that they are clearly visible as bumps when the head
+is viewed from the side", style "chunky carved wooden toy with deep high-relief
+sculpted features", plus a negative prompt against flat, painted and shallow
+faces. Note that `balanced` output quality produced a *better* result than
+attempt 1's `standard` — the win came from the prompt, not the quality tier.
+
+**Two pipeline bugs surfaced here, both of which would have hit all four
+remaining species:**
+
+1. **Grounding — the generated mesh was centre-origin.** `CreaturePetVisual`
+   seats every prefab at `localPosition.y = -READYMADE_PET_HALF_HEIGHT_CM`, which
+   only grounds a creature whose own origin is at its feet. The reference dog
+   satisfies that *by accident* (min-Y 0.007), so the assumption had never been
+   tested. The cat ran −0.5…+0.5 and sank ~13 cm through the floor.
+2. **Facing — cat and dog geometry faced opposite local axes.** Measured, not
+   eyeballed: the cat's head Z-range ran −0.216…+0.427, so the muzzle pointed
+   `+Z`, and the global 180° yaw correction then turned it away from the user.
+
+Both are fixed in one new reusable step, `Tools/seat-pet-glb.js`, which re-seats
+min-Y to 0 and bakes a 180° yaw into the vertices. Baking beats a per-species
+yaw constant: facing is a property of the asset, fixed once, and the alternative
+grows a hand-tuned table that every future species has to be added to. Pipeline
+order is now **prepare-pet-glb → seat-pet-glb → bake-vertex-shading → install**.
+
+**Display scale is derived from BODY height, not bounding-box height.** The
+sitting cat's upright ears are 10.6 % of its bbox (1.0000 units bbox, 0.8945
+body, measured from the centreline dome top). Scaling by the box spends that
+10.6 % on ears, and the animal then reads visibly smaller than the dog beside
+it. `CAT_DISPLAY_SCALE = 34 / 0.8945 = 38.012`, so the body reads 34 cm and the
+bbox renders 38.0 cm.
+
+**A measurement trap worth recording:** the cat first appeared ~1.75× the dog's
+height. Chasing that analytically was wasted effort — comparing `worldScale.y`
+against `localScale` showed the dog sampled at 0.637 and the cat at 0.996, i.e.
+they were caught at opposite phases of the squash animation. Single-frame size
+comparisons between two animating creatures are not evidence; the fix was to
+sample repeatedly. The dog also renders smaller than its nominal 34 cm because
+it is skinned and its bind pose is not its POSITION bbox.
+
+**Also delivered here:** the temporary force-cat evaluation override was replaced
+with real seed-driven species selection (`PET_SPECIES_BY_SEED` / `speciesForSeed`
+in `CreaturePetVisual.ts`), deterministic from the persisted `appearanceSeed`
+exactly as the colour palette already was, so species is never written to
+storage. Species is resolved in `setAppearanceSeed`, which rebuilds the body when
+the seed selects a different animal than the one built at construction — the
+seed arrives after the visual is built, because the controller binds slots in its
+own `onStart`.
+
+### Owl, elephant, rabbit, penguin — one batch, one rejection
+
+The per-species approval gate was dropped at the user's request after the cat:
+"Generate the remaining three back to back… If one fails badly, note it and move
+on rather than iterating for perfection." All three were created concurrently
+(the API allows several in flight), which cost one round trip instead of three.
+
+**Prompt cap discovered:** `prompt` is capped at **1500 characters** (HTTP 422,
+`String should have at most 1500 characters`). The cat and owl fit under it by
+luck; the three longer species prompts did not. Trimmed by shortening the shared
+boilerplate tail and compressing the eye clause — deliberately keeping the
+eye-protrusion phrasing that fixed the cat, since that was the working part.
+
+| Species | Job | Verts / tris | bbox | BODY | ratio | scale | Verdict |
+|---|---|---|---|---|---|---|---|
+| Owl | `06562111` | 4,530 / 3,904 | 1.0000 | 0.9708 | 97.1 % | 35.024 | **accepted** |
+| Elephant | `f7718f4f` | — / 3,830 | 0.8499 | 0.8499 | 100 % | 40.003 | **REJECTED** |
+| Rabbit | `60248ac7` | — / 3,950 | 1.0000 | 0.8961 | 89.6 % | 37.941 | accepted |
+| Penguin | `67fb12cc` | — / 3,976 | 1.0000 | 1.0000 | 100 % | 34.000 | accepted |
+
+**Owl** — the strongest face of the whole run. Beak and ear tufts were the named
+risks and both held: the tufts are short and blunt, contributing only 2.9 % of
+bounding-box height, so they read in silhouette without tripping the
+thin-feature rule.
+
+**Elephant — REJECTED, and worth recording as a failure.** The prompt fought the
+right battle and lost a different one. The trunk instruction worked in the sense
+that nothing thin or rope-like was generated — but it over-corrected into a
+stub, while the ears flared wider than the body (width 0.9918 against height
+0.8499). At habitat distance it reads as a flat green slab, not an animal, and
+its eyes are the shallowest of the five. The lesson is that *thickness*
+constraints and *proportion* constraints are separate: repeating "thick, never
+thin" five times bought thickness at the cost of length, and nothing in the
+prompt defended the body against the ears. The asset and all its wiring are kept
+in the tree; only its entry in `PET_SPECIES_BY_SEED` is withheld, so a
+regeneration costs one word.
+
+**Rabbit** — accepted on silhouette. The ears were the named risk and they are
+genuinely thick, upright and blunt-tipped. Its face is shallower than the owl's,
+which is a refinement item, not a blocker.
+
+**Penguin** — accepted. Stocky upright posture held, flippers are solid lumps,
+beak is short and blunt, eyes read.
+
+### Two bugs found by looking at the result rather than trusting the code
+
+**1. Every creature came out as the same species, while colours spread
+correctly.** Both are chosen from `appearanceSeed` by the same modulus, so a
+failure in one and not the other localised the bug immediately: script order is
+by scene hierarchy, the controller sits above the creatures, and its `onStart`
+calls `setAppearanceSeed` **before** `CreatureBehavior.onStart` has built any
+visual. Species was resolved against a null body and skipped; every creature
+then built the seed-0 species. Colour hid the ordering because `resetToIdle`
+re-applies the stored tint *after* the build — it had a second chance that
+species did not. Fixed by storing the seed and resolving species at build time.
+
+**2. Six real tasks produced five dogs and one owl.** `SequentialTaskIdentitySource`
+hashes the task text (FNV), which is right for production — stable, unguessable
+— but distributes badly through a modulus of 5 or 6. Added
+`OrderedTaskIdentitySource`, used by the demo fixture only, which hands out
+seeds 0,1,2,… so species *and* colour both become perfect permutations. Same
+latitude CLAUDE.md already grants fixtures for `deadlineAtMs`; production
+seeding is untouched. `DEMO_STORAGE_KEY` bumped to v5, because seeds are
+persisted and a v4 save would have restored the old ones and silently undone it.
+
+### The dog size discrepancy that wasn't
+
+Flagged in the previous cycle as a suspected defect: the dog appeared to render
+~22 cm against the generated species' 34 cm. **Measurement disproved it.**
+
+Single-frame comparisons between two creatures were never valid evidence, for
+three compounding reasons discovered here: `HABITAT_VISUAL_SCALE` 0.68,
+`POSTURE_CALM_HEIGHT_SCALE` 0.86 against `POSTURE_URGENT_HEIGHT_SCALE` 1.18 (a
+1.37x spread that depends on *behaviour state*), and breathing phase. Creatures
+in different states are simply different sizes on purpose.
+
+Measured properly by temporarily setting every posture, breathing and growth
+scale to 1.0 and confirming `worldScale == localScale` before capturing: the dog
+came out **377 px against the owl's 410 px**. Independently, analytically: the
+dog's joints carry world scale 0.4095 (`DOG_DISPLAY_SCALE` 16.569 x 2.4717 x
+0.01), and 83.01 units x 0.4095 = **33.99 cm**. The constant was correct all
+along; no change made. Config restored from backup and verified by `git diff`.
+
+Recording this as a closed cycle because the honest outcome of a measurement is
+sometimes that the thing you suspected is fine — and a suspicion retired with
+evidence is worth as much as a bug fixed.

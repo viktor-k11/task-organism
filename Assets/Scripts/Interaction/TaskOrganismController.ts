@@ -14,6 +14,11 @@ import {
     HABITAT_DEPTH_MIN_CM,
     HABITAT_DEPTH_MAX_CM,
     HABITAT_LATERAL_LIMIT_CM,
+    DEMO_TASK_COUNT,
+    HABITAT_TWO_ROW_THRESHOLD,
+    HABITAT_BACK_ROW_COUNT,
+    HABITAT_CAPACITY_SPACING_CM,
+    HABITAT_ROW_DEPTH_STEP_CM,
 } from "../Config/CreatureConfig";
 import { DemoClock } from "../Data/Clock";
 import { PersistentTaskStorage } from "../Data/TaskStorage";
@@ -39,19 +44,23 @@ import { buildHabitatFloor, positionHabitatFloor } from "./HabitatFloor";
 // so a v3 demo save (different creation times) can't produce stale ages.
 const DEMO_STORAGE_KEY = "task-organism.wednesday-demo.v4.presentation";
 /**
- * Fractions of URGENCY_AGE_WINDOW_MS (the CHASE_THRESHOLD crossing point).
- * Chosen so that at seed-end (clock = DEMO_TASK2_CREATED_AT_MS) every task's
- * age is still below the threshold (all calm, matching the initial demo
- * status text), and after advancing to DEMO_ADVANCE_TARGET_MS the three
- * tasks land in three different behavior states with comfortable margins:
- * task0 age 1.8W (highest urgency -> chaser), task1 age 1.4W (eligible but
- * lower urgency -> URGENT, not selected), task2 age 0.9W (-> still CALM).
+ * Creation ages as fractions of URGENCY_AGE_WINDOW_MS, oldest first. After
+ * advancing to DEMO_ADVANCE_TARGET_MS (1.8W) each task's age is
+ * 1.8W - createdAt, so these fractions produce a deliberate spread across the
+ * CHASE_THRESHOLD (1.0):
+ *   idx 0: age 1.80W -> URGENT, highest urgency -> the single chaser
+ *   idx 1: age 1.40W -> URGENT (restless, stays in habitat)
+ *   idx 2: age 1.10W -> URGENT (restless)
+ *   idx 3: age 0.90W -> CALM
+ *   idx 4: age 0.70W -> CALM
+ *   idx 5: age 0.50W -> CALM
+ * At capacity that is 1 chasing + 2 restless + 3 calm — the calm/restless
+ * contrast stays legible instead of everything going urgent at once.
  */
-const DEMO_TASK1_CREATED_AT_MS = URGENCY_AGE_WINDOW_MS * 0.4;
-const DEMO_TASK2_CREATED_AT_MS = URGENCY_AGE_WINDOW_MS * 0.9;
-const DEMO_TASK_CREATION_TIMES_MS = [0, DEMO_TASK1_CREATED_AT_MS, DEMO_TASK2_CREATED_AT_MS];
+const DEMO_TASK_AGE_FRACTIONS = [0, 0.4, 0.7, 0.9, 1.1, 1.3];
 const DEMO_ADVANCE_TARGET_MS = URGENCY_AGE_WINDOW_MS * 1.8;
-const SLOT_NAMES = ["MovementRoot_1", "MovementRoot_2", "MovementRoot_3"];
+const MAX_CREATURE_SLOTS = 6;
+const SLOT_NAMES = Array.from({ length: MAX_CREATURE_SLOTS }, (_, i) => `MovementRoot_${i + 1}`);
 
 interface CreatureSlot {
     taskId: string;
@@ -95,6 +104,55 @@ export class TaskOrganismController extends BaseScriptComponent {
     private habitatLateralCm = HABITAT_HOME_GROUP_LATERAL_CM;
     private cameraObject: SceneObject | null = null;
     private floorObject: SceneObject | null = null;
+    private cloneContainer: SceneObject | null = null;
+
+    // Rolling frame-time window for the capacity FPS measurement.
+    private fpsAccumS = 0;
+    private fpsFrames = 0;
+
+    /**
+     * Where slot `index` of `count` sits, as an offset from the habitat centre.
+     *
+     * <= HABITAT_TWO_ROW_THRESHOLD creatures keep the original single row at
+     * HABITAT_HOME_LATERAL_SPACING_CM, so the verified 3-creature demo is
+     * bit-for-bit unchanged. Above it, the habitat splits into two rows: a
+     * back row of HABITAT_BACK_ROW_COUNT and a front row of the remainder,
+     * each centred on its own row and the back row offset by half a spacing so
+     * it interleaves into the front row's gaps rather than hiding behind it.
+     *
+     * Why two rows at all: the additive render region ends near +/-70cm
+     * lateral at habitat depth, and a creature needs
+     * |lateral| + urgent roam (16) + half body width (~7) inside that. Six in
+     * one row does not fit without either overlapping bodies or pushing the
+     * habitat far enough away to cost face readability.
+     */
+    private slotLayout(index: number, count: number): { lateralCm: number; depthCm: number } {
+        if (count <= HABITAT_TWO_ROW_THRESHOLD) {
+            return {
+                lateralCm: (index - (count - 1) / 2) * HABITAT_HOME_LATERAL_SPACING_CM,
+                depthCm: index === 1 ? HABITAT_HOME_SIDE_DEPTH_OFFSET_CM : 0,
+            };
+        }
+        const backCount = Math.min(HABITAT_BACK_ROW_COUNT, count - 1);
+        const frontCount = count - backCount;
+        const spacing = HABITAT_CAPACITY_SPACING_CM;
+        if (index < frontCount) {
+            return { lateralCm: (index - (frontCount - 1) / 2) * spacing, depthCm: 0 };
+        }
+        // Back row is centred over the SAME span as the front row, divided by
+        // its own count. A fixed half-spacing offset (the obvious way to
+        // interleave) breaks centring whenever the back count is even — it put
+        // 6 creatures at back 0/+30 instead of -22.5/+22.5, leaning the whole
+        // group right. This lands the back row squarely in the front row's
+        // gaps for 4, 5 and 6 while staying symmetric about the habitat axis.
+        const j = index - frontCount;
+        const frontSpan = (frontCount - 1) * spacing;
+        const backSpacing = backCount > 0 ? frontSpan / backCount : 0;
+        return {
+            lateralCm: (j - (backCount - 1) / 2) * backSpacing,
+            depthCm: HABITAT_ROW_DEPTH_STEP_CM,
+        };
+    }
 
     onAwake(): void {
         this.createEvent("OnStartEvent").bind(() => this.onStart());
@@ -143,9 +201,10 @@ export class TaskOrganismController extends BaseScriptComponent {
      */
     private applyHabitatLayout(): void {
         for (let i = 0; i < this.slots.length; i++) {
+            const layout = this.slotLayout(i, this.slots.length);
             this.slots[i].creature.setHabitatHome(
-                this.habitatLateralCm + (i - 1) * HABITAT_HOME_LATERAL_SPACING_CM,
-                this.habitatDepthCm + (i === 1 ? HABITAT_HOME_SIDE_DEPTH_OFFSET_CM : 0),
+                this.habitatLateralCm + layout.lateralCm,
+                this.habitatDepthCm + layout.depthCm,
                 GROUND_Y_OFFSET_CM,
                 HABITAT_HOME_WANDER_RADIUS_CM,
             );
@@ -252,6 +311,20 @@ export class TaskOrganismController extends BaseScriptComponent {
         if (this.sequence) this.sequence.update(dt);
         this.interaction.update(dt);
         this.syncArbiter();
+
+        // Capacity instrumentation: rolling FPS plus a live assertion that
+        // invariant 4 (at most ONE chaser) still holds with a full habitat.
+        this.fpsAccumS += dt;
+        this.fpsFrames++;
+        if (this.fpsAccumS >= 3) {
+            let chasing = 0;
+            for (const slot of this.slots) if (slot.creature.isChasing()) chasing++;
+            const fps = this.fpsFrames / this.fpsAccumS;
+            console.log(`[Capacity] creatures=${this.slots.length} fps=${fps.toFixed(1)} chasing=${chasing}`
+                + (chasing > 1 ? "  *** INVARIANT 4 VIOLATED ***" : ""));
+            this.fpsAccumS = 0;
+            this.fpsFrames = 0;
+        }
     }
 
     // ── Scripted demo story ────────────────────────────────────────────────
@@ -300,20 +373,54 @@ export class TaskOrganismController extends BaseScriptComponent {
 
     private seedStaggeredDemoTasks(demo: DemoInput): TaskRecord[] {
         const created: TaskRecord[] = [];
-        for (let i = 0; i < DEMO_TASK_FIXTURES.length; i++) {
-            this.clock.setNowMs(DEMO_TASK_CREATION_TIMES_MS[i]);
+        const count = Math.min(DEMO_TASK_COUNT, DEMO_TASK_FIXTURES.length, MAX_CREATURE_SLOTS);
+        for (let i = 0; i < count; i++) {
+            this.clock.setNowMs(URGENCY_AGE_WINDOW_MS * DEMO_TASK_AGE_FRACTIONS[i]);
             const task = demo.submit(DEMO_TASK_FIXTURES[i]);
             if (task) created.push(task);
         }
         return created;
     }
 
+    /**
+     * Returns `needed` creature roots, cloning the last authored one when the
+     * scene has fewer. The scene authors only 3 slots; capacity is 6. Cloning
+     * at runtime via copyWholeHierarchy keeps the authored scene file
+     * untouched (no .scene diff, nothing to merge) and guarantees the clones
+     * carry an identical VisualRoot/Body/ParticleAnchor hierarchy and
+     * CreatureBehavior component, so no slot can drift from the verified one.
+     */
+    private resolveCreatureRoots(needed: number): SceneObject[] {
+        const roots: SceneObject[] = [];
+        for (const name of SLOT_NAMES) {
+            const found = this.findSceneObject(name);
+            if (found) roots.push(found);
+        }
+        const template = roots[roots.length - 1];
+        // copyWholeHierarchy is a SceneObject method and parents the copy under
+        // the receiver, so clones go under one identity-transform container at
+        // the origin. Creatures are positioned with setWorldPosition, so the
+        // container must not carry any transform of its own.
+        if (roots.length < needed && template && !this.cloneContainer) {
+            this.cloneContainer = global.scene.createSceneObject("CreatureSlotClones");
+        }
+        while (roots.length < needed && template && this.cloneContainer) {
+            const clone = this.cloneContainer.copyWholeHierarchy(template);
+            clone.name = `MovementRoot_${roots.length + 1}`;
+            roots.push(clone);
+            console.log(`[WednesdayDemo] cloned creature slot ${clone.name} (scene authored ${SLOT_NAMES.length - (needed - roots.length + 1) + 1})`);
+        }
+        return roots;
+    }
+
     private bindCreatureSlots(tasks: TaskRecord[]): void {
-        const roots = SLOT_NAMES.map((name) => this.findSceneObject(name)).filter((root) => root !== null) as SceneObject[];
-        if (roots.length !== SLOT_NAMES.length) {
-            console.error(`[WednesdayDemo] expected ${SLOT_NAMES.length} creature roots, found ${roots.length}`);
+        const roots = this.resolveCreatureRoots(tasks.length);
+        if (roots.length < tasks.length) {
+            console.error(`[WednesdayDemo] need ${tasks.length} creature roots, have ${roots.length}`);
             return;
         }
+        // Any slot beyond the task count stays off.
+        for (let i = tasks.length; i < roots.length; i++) roots[i].enabled = false;
 
         for (let i = 0; i < roots.length; i++) {
             const root = roots[i];
@@ -341,15 +448,16 @@ export class TaskOrganismController extends BaseScriptComponent {
             // Identity color from the task's own persisted seed, so the same
             // task is always the same creature (see CreatureBehavior.setAppearanceSeed).
             creature.setAppearanceSeed(task.appearanceSeed);
+            const layout = this.slotLayout(i, tasks.length);
             creature.setHabitatHome(
-                HABITAT_HOME_GROUP_LATERAL_CM + (i - 1) * HABITAT_HOME_LATERAL_SPACING_CM,
-                HABITAT_HOME_DEPTH_CM + (i === 1 ? HABITAT_HOME_SIDE_DEPTH_OFFSET_CM : 0),
+                this.habitatLateralCm + layout.lateralCm,
+                this.habitatDepthCm + layout.depthCm,
                 GROUND_Y_OFFSET_CM,
                 HABITAT_HOME_WANDER_RADIUS_CM,
             );
             this.attachInteraction(body, task.id);
             this.slots.push({ taskId: task.id, root, creature, view });
-            console.log(`[WednesdayEvidence] habitat task=${task.id} slot=${i + 1} lateral=${HABITAT_HOME_GROUP_LATERAL_CM + (i - 1) * HABITAT_HOME_LATERAL_SPACING_CM}`);
+            console.log(`[WednesdayEvidence] habitat task=${task.id} slot=${i + 1}/${tasks.length} lateral=${layout.lateralCm} depth=+${layout.depthCm}`);
         }
     }
 

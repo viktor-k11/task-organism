@@ -1,4 +1,4 @@
-import { CreaturePetVisual, PetSpecies } from "./CreaturePetVisual";
+import { CreaturePetVisual, PetSpecies, speciesForSeed } from "./CreaturePetVisual";
 import { CreatureEyes, CreatureEye } from "./CreatureEyes";
 import { CreatureEarsAndTail } from "./CreatureEarsAndTail";
 import { CreatureMouth } from "./CreatureMouth";
@@ -219,6 +219,10 @@ export class CreatureBehavior extends BaseScriptComponent {
     private audioComponent: AudioComponent | null = null;
 
     private body: CreatureVisual | null = null;
+    /** Same object as `body`, kept at its concrete type so the species swap in
+     *  setAppearanceSeed can tear the old prefab down. */
+    private petVisual: CreaturePetVisual | null = null;
+    private currentSpecies: PetSpecies | null = null;
     private eyeLeft: CreatureEye | null = null;
     private eyeRight: CreatureEye | null = null;
     private earsAndTail: CreatureEarsAndTail | null = null;
@@ -338,6 +342,13 @@ export class CreatureBehavior extends BaseScriptComponent {
 
     // ── Public API — the seam AttentionArbiter (future) and the debug trigger call ──
 
+    /** Read-only: is this creature currently OUT of the habitat, approaching?
+     *  Used by the capacity check to assert invariant 4 (at most one chaser)
+     *  from live presentation state rather than from arbiter bookkeeping. */
+    isChasing(): boolean {
+        return this.state === CreaturePresentationState.CHASING;
+    }
+
     requestChase(): void {
         if (this.isReleased) return;
         if (this.state === CreaturePresentationState.CHASING) return;
@@ -378,11 +389,29 @@ export class CreatureBehavior extends BaseScriptComponent {
      * ease, so the creature is never visible in the wrong color for a frame.
      */
     setAppearanceSeed(seed: number): void {
+        // Species first: it rebuilds this.body, and the colour below has to land
+        // on the material of whichever body ends up in the scene.
+        const species = speciesForSeed(seed);
+        if (this.bodyObject && species !== this.currentSpecies) {
+            if (this.petVisual) this.petVisual.destroy();
+            this.buildSpeciesVisual(species);
+        }
+
         const index = ((Math.floor(seed) % CREATURE_PALETTE.length) + CREATURE_PALETTE.length) % CREATURE_PALETTE.length;
         const c = CREATURE_PALETTE[index];
         this.baseBodyColor = new vec4(c[0], c[1], c[2], c[3]);
         this.currentTint = new vec4(c[0], c[1], c[2], c[3]);
         if (this.body) this.body.applyBaseMaterial(bodyBaseMaterialAsset, this.currentTint);
+    }
+
+    /** Instantiates the prefab for one species and records which one is live,
+     *  so setAppearanceSeed can tell whether a rebuild is actually needed. */
+    private buildSpeciesVisual(species: PetSpecies): void {
+        if (!this.bodyObject) return;
+        const prefab = species === "cat" ? catPrefab : dogPrefab;
+        this.petVisual = new CreaturePetVisual(this.bodyObject, prefab, species, bodyBaseMaterialAsset);
+        this.body = this.petVisual;
+        this.currentSpecies = species;
     }
 
     /**
@@ -572,9 +601,12 @@ export class CreatureBehavior extends BaseScriptComponent {
             return;
         }
 
-        const species: PetSpecies = this.petSpecies === "cat" ? "cat" : "dog";
-        const prefab = species === "cat" ? catPrefab : dogPrefab;
-        this.body = new CreaturePetVisual(this.bodyObject, prefab, species, bodyBaseMaterialAsset);
+        // Species is chosen from the task's appearanceSeed, exactly like colour
+        // (see setAppearanceSeed). The seed usually arrives AFTER this build —
+        // the controller binds slots in its own onStart — so build the seed-0
+        // species here and let setAppearanceSeed swap the body if the real seed
+        // selects a different one.
+        this.buildSpeciesVisual(speciesForSeed(0));
         this.shadowObject = buildCreatureShadow(this.visualRootObject!, eyeBaseMaterialAsset);
 
         this.resetToIdle();

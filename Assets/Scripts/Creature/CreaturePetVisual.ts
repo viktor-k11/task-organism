@@ -10,6 +10,22 @@ import {
 
 export type PetSpecies = "dog" | "cat";
 
+/** Species roster indexed by appearanceSeed (see CreatureBehavior.setAppearanceSeed).
+ *  Deterministic and stateless in exactly the way the colour palette is: the
+ *  same persisted seed always yields the same animal, so a task keeps its
+ *  identity across lens restarts without species ever being written to storage.
+ *
+ *  Grows by one entry per species that passes the acceptance test. Order is
+ *  what decides which animals a small demo actually shows, so accepted species
+ *  are appended rather than inserted — inserting would re-shuffle every
+ *  existing task's animal. */
+export const PET_SPECIES_BY_SEED: PetSpecies[] = ["dog", "cat"];
+
+export function speciesForSeed(seed: number): PetSpecies {
+    const n = PET_SPECIES_BY_SEED.length;
+    return PET_SPECIES_BY_SEED[((Math.floor(seed) % n) + n) % n];
+}
+
 /**
  * CreaturePetVisual — wraps one of the ready-made Sketchfab dog/cat GLBs
  * (Assets/3d assets/, see LICENSES.md) as the creature's visual body, an
@@ -73,6 +89,12 @@ export class CreaturePetVisual {
             console.error(`[CreaturePetVisual] no RenderMeshVisual found in instantiated ${species} prefab.`);
         }
         this.applyBaseMaterial(baseMaterial);
+    }
+
+    /** Removes the instantiated prefab from the scene. Used when a creature's
+     *  seed selects a different species than the one already built. */
+    destroy(): void {
+        this.root.destroy();
     }
 
     /** ONE fresh clone-before-mutate per creature, shared across every mesh

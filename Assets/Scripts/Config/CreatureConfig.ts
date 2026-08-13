@@ -49,6 +49,40 @@ export const HABITAT_HOME_LATERAL_SPACING_CM = 36;
 export const HABITAT_HOME_GROUP_LATERAL_CM = 0;
 export const HABITAT_HOME_SIDE_DEPTH_OFFSET_CM = 6;
 export const HABITAT_HOME_WANDER_RADIUS_CM = 3;
+
+// ── Capacity layout (up to 6 creatures, CLAUDE.md max) ────────────────────
+/**
+ * How many demo tasks to seed. The product supports 6 open tasks / 6 living
+ * creatures; testing at capacity is the point, so this is not pinned to 3.
+ */
+export const DEMO_TASK_COUNT = 6;
+/**
+ * Above this count the habitat switches from a single row to TWO ROWS with a
+ * depth stagger. Measured constraint: the additive render region ends near
+ * +/-70cm lateral at habitat depth. Budget per creature is
+ * |lateral| + WANDER_URGENT_RADIUS_CM (16) + half body width (~7) <= 70,
+ * so centres must stay within +/-47cm.
+ *
+ * A single row cannot hold 6: at 36cm spacing the outer centres land at
+ * +/-90, and even squeezed to fit (18.8cm spacing) the 14cm-wide bodies would
+ * overlap as soon as an URGENT creature roamed. Widening habitat distance
+ * instead would fit them, but shrinks every creature and costs face
+ * readability — which matters more now that the glance is the whole signal.
+ * Two rows keep the front row at full size and full readability.
+ */
+export const HABITAT_TWO_ROW_THRESHOLD = 4;
+/** Back-row creature count once two rows are in use. Front row takes the
+ *  remainder, which keeps both rows centred AND interleaved (front row gaps
+ *  sit behind back-row bodies) for 4, 5 and 6. */
+export const HABITAT_BACK_ROW_COUNT = 2;
+/** Lateral spacing within a row at capacity. Tighter than the 3-creature
+ *  spacing (36) so the widest case, 6 creatures = 4 front + 2 back, puts the
+ *  outer front centres at +/-45 — inside the +/-47 budget above. */
+export const HABITAT_CAPACITY_SPACING_CM = 30;
+/** How much further back the second row sits. At 240 + 45 = 285cm the back
+ *  row renders about 16% smaller than the front and is partly occluded by it
+ *  — the accepted cost of not crowding. */
+export const HABITAT_ROW_DEPTH_STEP_CM = 45;
 /**
  * THE single shared ground/floor reference (cm, camera-relative — added to
  * Camera Object's world Y). HabitatFloor's disc and every creature's
@@ -477,7 +511,7 @@ export const DEMO_BEAT_RESOLVE_SETTLE_S = 0.5;
  * the chaser approaches and is resolved away ~17s later whether or not you
  * were ready — see the staging key map in TaskOrganismController.)
  */
-export const DEMO_AUTOPLAY_ON_START = true;
+export const DEMO_AUTOPLAY_ON_START = false;
 /** Per-keypress nudge for the runtime habitat placement controls. */
 export const HABITAT_DEPTH_STEP_CM = 15;
 export const HABITAT_LATERAL_STEP_CM = 15;
@@ -574,7 +608,25 @@ export const READYMADE_PET_YAW_CORRECTION_DEG = 180;
  *  READYMADE_PET_TARGET_HEIGHT_CM. Computed from each source GLB's
  *  measured height at the default ×100 scale: dog 205.2cm, cat 84.6cm. */
 export const DOG_DISPLAY_SCALE = (READYMADE_PET_TARGET_HEIGHT_CM / 205.2) * 100;
-export const CAT_DISPLAY_SCALE = (READYMADE_PET_TARGET_HEIGHT_CM / 84.6) * 100;
+/**
+ * Cat — generated (SPECS text-to-3D), so it carries no third-party rights at
+ * all. Unlike the dog it is fully baked and re-seated by the pipeline
+ * (prepare-pet-glb.js -> seat-pet-glb.js), so the mesh is self-contained: node
+ * transform identity, feet at min-Y = 0, facing baked. Its natural height at
+ * the prefab root is therefore just its own measured extent, with no unit
+ * fudge factor — which is why this expression has no `* 100` while
+ * DOG_DISPLAY_SCALE does.
+ *
+ * The divisor is BODY height (0.8945 units), NOT bbox height (1.0000). A
+ * sitting cat's upright ears are 10.6% of its bounding box, and scaling by the
+ * box spends that 10.6% on ears — the animal itself then reads noticeably
+ * smaller than the dog standing next to it. Scaling by the body puts the top
+ * of the head at READYMADE_PET_TARGET_HEIGHT_CM and lets the ears sit above
+ * it, so the two species read as the same size. Bbox consequently renders
+ * 38.0cm tall.
+ */
+export const CAT_BODY_TO_BBOX_RATIO = 0.8945;
+export const CAT_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / CAT_BODY_TO_BBOX_RATIO;
 
 /** Whole-body growth: an ignored task's creature scales from 1.0 up to this
  *  cap as urgency climbs from 0 toward CHASE_THRESHOLD, then holds — a

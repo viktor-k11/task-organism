@@ -1,12 +1,6 @@
+import { ART } from "../Config/ArtDirection";
 import { brightenMaterial } from "./CreatureMaterials";
-import {
-    RELEASE_DURATION_S,
-    RELEASE_PARTICLE_COUNT,
-    RELEASE_PARTICLE_SPEED_CM_S,
-    RELEASE_PARTICLE_DRIFT_CM,
-    RELEASE_PARTICLE_SIZE_CM,
-    RELEASE_BRIGHTEN_LERP,
-} from "../Config/CreatureConfig";
+
 
 interface ReleaseParticle {
     object: SceneObject;
@@ -16,7 +10,7 @@ interface ReleaseParticle {
 /**
  * ReleaseEffect — one-shot "release" presentation event: brighten body +
  * eyes, spawn ~30 lightweight unlit particles from ParticleAnchor that
- * drift up and fade over RELEASE_DURATION_S, and play the one-shot release
+ * drift up and fade over ART.releaseDurationS, and play the one-shot release
  * cue (RELEASE_SFX_VARIANT).
  *
  * Idempotency is primarily CreatureBehavior's job (the isReleased guard).
@@ -73,16 +67,16 @@ export class ReleaseEffect {
         }
 
         // Brighten body + eyes (clone-before-mutate, never mutate the shared base material).
-        const brightBody = brightenMaterial(bodyRmv, RELEASE_BRIGHTEN_LERP);
-        eyeRmvs.forEach((rmv) => brightenMaterial(rmv, RELEASE_BRIGHTEN_LERP));
+        const brightBody = brightenMaterial(bodyRmv, ART.releaseBrightenLerp);
+        eyeRmvs.forEach((rmv) => brightenMaterial(rmv, ART.releaseBrightenLerp));
 
         // One shared, cheap particle mesh + one shared fading material (reused by all instances).
-        const particleMesh = this.buildParticleMesh(RELEASE_PARTICLE_SIZE_CM * 0.5);
+        const particleMesh = this.buildParticleMesh(ART.releaseParticleSizeCm * 0.5);
         this.particleBaseColor = brightBody.mainPass.baseColor as vec4;
         this.particleMaterial = brightBody.clone();
         this.particleMaterial.mainPass.baseColor = this.particleBaseColor;
 
-        for (let i = 0; i < RELEASE_PARTICLE_COUNT; i++) {
+        for (let i = 0; i < ART.releaseParticleCount; i++) {
             this.spawnParticle(particleAnchor, particleMesh, this.particleMaterial);
         }
 
@@ -94,7 +88,7 @@ export class ReleaseEffect {
             this.teardown();
             onComplete();
         });
-        this.cleanupEvent.reset(RELEASE_DURATION_S);
+        this.cleanupEvent.reset(ART.releaseDurationS);
     }
 
     private teardown(): void {
@@ -117,10 +111,10 @@ export class ReleaseEffect {
         rmv.mainMaterial = material;
 
         const angle = Math.random() * Math.PI * 2;
-        const driftRadius = Math.random() * RELEASE_PARTICLE_DRIFT_CM;
+        const driftRadius = Math.random() * ART.releaseParticleDriftCm;
         const velocity = new vec3(
             Math.cos(angle) * driftRadius,
-            RELEASE_PARTICLE_SPEED_CM_S * (0.6 + Math.random() * 0.8),
+            ART.releaseParticleSpeedCmS * (0.6 + Math.random() * 0.8),
             Math.sin(angle) * driftRadius,
         );
 
@@ -130,7 +124,7 @@ export class ReleaseEffect {
     private onUpdate(): void {
         const dt = getDeltaTime();
         this.elapsed += dt;
-        const t = Math.min(1, this.elapsed / RELEASE_DURATION_S);
+        const t = Math.min(1, this.elapsed / ART.releaseDurationS);
         const fadeAlpha = 1 - t;
 
         for (const p of this.particles) {

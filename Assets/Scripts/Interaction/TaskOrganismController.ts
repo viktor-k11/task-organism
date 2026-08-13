@@ -1,8 +1,6 @@
+import { ART } from "../Config/ArtDirection";
 import { Interactable } from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable";
 import {
-    HABITAT_HOME_DEPTH_CM,
-    GROUND_Y_OFFSET_CM,
-    HABITAT_HOME_LATERAL_SPACING_CM,
     HABITAT_HOME_GROUP_LATERAL_CM,
     HABITAT_HOME_SIDE_DEPTH_OFFSET_CM,
     HABITAT_HOME_WANDER_RADIUS_CM,
@@ -17,8 +15,6 @@ import {
     DEMO_TASK_COUNT,
     HABITAT_TWO_ROW_THRESHOLD,
     HABITAT_BACK_ROW_COUNT,
-    HABITAT_CAPACITY_SPACING_CM,
-    HABITAT_ROW_DEPTH_STEP_CM,
 } from "../Config/CreatureConfig";
 import { DemoClock } from "../Data/Clock";
 import { PersistentTaskStorage } from "../Data/TaskStorage";
@@ -64,6 +60,13 @@ const DEMO_TASK_AGE_FRACTIONS = [0, 0.4, 0.7, 0.9, 1.1, 1.3];
 const DEMO_ADVANCE_TARGET_MS = URGENCY_AGE_WINDOW_MS * 1.8;
 const MAX_CREATURE_SLOTS = 6;
 const SLOT_NAMES = Array.from({ length: MAX_CREATURE_SLOTS }, (_, i) => `MovementRoot_${i + 1}`);
+/**
+ * The designer-editable clone source. A disabled SceneObject in the scene, so
+ * whatever a designer changes on it (mesh, material, child parts, the
+ * CreatureBehavior inputs) is what every runtime-created slot 4-6 becomes.
+ * Kept disabled so it never renders as a seventh creature.
+ */
+const CREATURE_TEMPLATE_NAME = "CreatureTemplate";
 
 interface CreatureSlot {
     taskId: string;
@@ -103,7 +106,7 @@ export class TaskOrganismController extends BaseScriptComponent {
      */
     private approachGateOpen = false;
     // ── Staging state (runtime habitat placement, see the key map in onAwake) ──
-    private habitatDepthCm = HABITAT_HOME_DEPTH_CM;
+    private habitatDepthCm = ART.habitatDepthCm;
     private habitatLateralCm = HABITAT_HOME_GROUP_LATERAL_CM;
     private cameraObject: SceneObject | null = null;
     private floorObject: SceneObject | null = null;
@@ -117,7 +120,7 @@ export class TaskOrganismController extends BaseScriptComponent {
      * Where slot `index` of `count` sits, as an offset from the habitat centre.
      *
      * <= HABITAT_TWO_ROW_THRESHOLD creatures keep the original single row at
-     * HABITAT_HOME_LATERAL_SPACING_CM, so the verified 3-creature demo is
+     * ART.habitatSpacingCm, so the verified 3-creature demo is
      * bit-for-bit unchanged. Above it, the habitat splits into two rows: a
      * back row of HABITAT_BACK_ROW_COUNT and a front row of the remainder,
      * each centred on its own row and the back row offset by half a spacing so
@@ -132,13 +135,13 @@ export class TaskOrganismController extends BaseScriptComponent {
     private slotLayout(index: number, count: number): { lateralCm: number; depthCm: number } {
         if (count <= HABITAT_TWO_ROW_THRESHOLD) {
             return {
-                lateralCm: (index - (count - 1) / 2) * HABITAT_HOME_LATERAL_SPACING_CM,
+                lateralCm: (index - (count - 1) / 2) * ART.habitatSpacingCm,
                 depthCm: index === 1 ? HABITAT_HOME_SIDE_DEPTH_OFFSET_CM : 0,
             };
         }
         const backCount = Math.min(HABITAT_BACK_ROW_COUNT, count - 1);
         const frontCount = count - backCount;
-        const spacing = HABITAT_CAPACITY_SPACING_CM;
+        const spacing = ART.habitatCapacitySpacingCm;
         if (index < frontCount) {
             return { lateralCm: (index - (frontCount - 1) / 2) * spacing, depthCm: 0 };
         }
@@ -153,7 +156,7 @@ export class TaskOrganismController extends BaseScriptComponent {
         const backSpacing = backCount > 0 ? frontSpan / backCount : 0;
         return {
             lateralCm: (j - (backCount - 1) / 2) * backSpacing,
-            depthCm: HABITAT_ROW_DEPTH_STEP_CM,
+            depthCm: ART.habitatRowDepthStepCm,
         };
     }
 
@@ -208,7 +211,7 @@ export class TaskOrganismController extends BaseScriptComponent {
             this.slots[i].creature.setHabitatHome(
                 this.habitatLateralCm + layout.lateralCm,
                 this.habitatDepthCm + layout.depthCm,
-                GROUND_Y_OFFSET_CM,
+                ART.groundYOffsetCm,
                 HABITAT_HOME_WANDER_RADIUS_CM,
             );
             this.slots[i].creature.recenterHabitat();
@@ -399,7 +402,20 @@ export class TaskOrganismController extends BaseScriptComponent {
             const found = this.findSceneObject(name);
             if (found) roots.push(found);
         }
-        const template = roots[roots.length - 1];
+        // Clone from the AUTHORED template, not from whichever slot happens to
+        // be last. The template is a real, disabled scene object a designer can
+        // open and edit; the old behaviour cloned MovementRoot_3 purely because
+        // it was the last one, which made the clone source an accident of
+        // hierarchy order and invisible to anyone who did not read this method.
+        //
+        // It also removes a live trap: MovementRoot_1 carries the
+        // TaskOrganismController as well as CreatureBehavior, so cloning "the
+        // first slot" would have duplicated the composition root itself. The
+        // template carries CreatureBehavior only.
+        const template = this.findSceneObject(CREATURE_TEMPLATE_NAME) ?? roots[roots.length - 1];
+        if (!this.findSceneObject(CREATURE_TEMPLATE_NAME)) {
+            console.log(`[WednesdayDemo] no "${CREATURE_TEMPLATE_NAME}" in the scene — falling back to the last authored slot as the clone source.`);
+        }
         // copyWholeHierarchy is a SceneObject method and parents the copy under
         // the receiver, so clones go under one identity-transform container at
         // the origin. Creatures are positioned with setWorldPosition, so the
@@ -410,6 +426,11 @@ export class TaskOrganismController extends BaseScriptComponent {
         while (roots.length < needed && template && this.cloneContainer) {
             const clone = this.cloneContainer.copyWholeHierarchy(template);
             clone.name = `MovementRoot_${roots.length + 1}`;
+            // The template is authored DISABLED so it never renders as an extra
+            // creature, and a copy inherits that. Every clone is a real slot,
+            // so re-enable it explicitly rather than relying on the source's
+            // enabled state — which a designer is free to toggle.
+            clone.enabled = true;
             roots.push(clone);
             console.log(`[WednesdayDemo] cloned creature slot ${clone.name} (scene authored ${SLOT_NAMES.length - (needed - roots.length + 1) + 1})`);
         }
@@ -455,7 +476,7 @@ export class TaskOrganismController extends BaseScriptComponent {
             creature.setHabitatHome(
                 this.habitatLateralCm + layout.lateralCm,
                 this.habitatDepthCm + layout.depthCm,
-                GROUND_Y_OFFSET_CM,
+                ART.groundYOffsetCm,
                 HABITAT_HOME_WANDER_RADIUS_CM,
             );
             this.attachInteraction(body, task.id);

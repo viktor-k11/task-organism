@@ -1,3 +1,4 @@
+import { ART } from "../Config/ArtDirection";
 import { BackPlate } from "SpectaclesUIKit.lspkg/Scripts/BackPlate";
 import { Button } from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button";
 import { FlexLayout } from "SpectaclesUIKit.lspkg/Scripts/Components/Layout2D/Flex/FlexLayout";
@@ -6,7 +7,7 @@ import { FlexAlign, FlexDirection, FlexJustify } from "SpectaclesUIKit.lspkg/Scr
 import { Billboard } from "SpectaclesInteractionKit.lspkg/Components/Interaction/Billboard/Billboard";
 import { Interactable } from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable";
 import { habitatLabel, selectionText } from "./TaskTextFormatting";
-import { TASK_SELECTION_PANEL_Y_CM } from "../Config/CreatureConfig";
+
 
 const PANEL_WIDTH = 38;
 
@@ -41,7 +42,7 @@ export class TaskSelectionView {
 
         this.panel = global.scene.createSceneObject("TaskSelectionPanel");
         this.panel.setParent(this.root);
-        this.panel.getTransform().setLocalPosition(new vec3(0, TASK_SELECTION_PANEL_Y_CM, 6));
+        this.panel.getTransform().setLocalPosition(new vec3(0, ART.selectionPanelYCm, 6));
         const plate = this.panel.createComponent(BackPlate.getTypeName()) as BackPlate;
         plate.size = new vec2(PANEL_WIDTH, 18);
 

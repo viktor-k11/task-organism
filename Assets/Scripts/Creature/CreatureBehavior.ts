@@ -1,3 +1,4 @@
+import { ART } from "../Config/ArtDirection";
 import { CreaturePetVisual, PetSpecies, speciesForSeed } from "./CreaturePetVisual";
 import { CreatureEyes, CreatureEye } from "./CreatureEyes";
 import { CreatureEarsAndTail } from "./CreatureEarsAndTail";
@@ -11,14 +12,9 @@ import {
     HABITAT_ARC_HALF_ANGLE_DEG,
     HABITAT_VERTICAL_OFFSET_CM,
     HABITAT_HOME_WANDER_RADIUS_CM,
-    HABITAT_VISUAL_SCALE,
-    CHASE_VISUAL_SCALE,
     PRESENTATION_SCALE_EASE_PER_S,
-    CHASE_DISTANCE_MIN_CM,
-    CHASE_DISTANCE_MAX_CM,
     CHASE_SIDE_OFFSET_MIN_DEG,
     CHASE_SIDE_OFFSET_MAX_DEG,
-    CHASE_STOP_DISTANCE_CM,
     MAX_SPEED_CM_S,
     CHASE_MAX_ACCEL_CM_S2,
     CHASE_ARRIVAL_RADIUS_CM,
@@ -32,19 +28,10 @@ import {
     CHASE_LOOK_PAUSE_S,
     CHASE_ANTICIPATION_S,
     CHASE_ANTICIPATION_DIP_CM,
-    BREATHE_CALM_AMPLITUDE,
     BREATHE_CALM_FREQUENCY_HZ,
-    BREATHE_URGENT_AMPLITUDE,
     BREATHE_URGENT_FREQUENCY_HZ,
-    BREATHE_CHASE_AMPLITUDE,
     BREATHE_CHASE_FREQUENCY_HZ,
     POSTURE_EASE_PER_S,
-    POSTURE_CALM_HEIGHT_SCALE,
-    POSTURE_CALM_WIDTH_SCALE,
-    POSTURE_URGENT_HEIGHT_SCALE,
-    POSTURE_URGENT_WIDTH_SCALE,
-    POSTURE_CHASE_HEIGHT_SCALE,
-    POSTURE_CHASE_WIDTH_SCALE,
     POSTURE_URGENT_TREMOR_AMPLITUDE,
     POSTURE_URGENT_TREMOR_HZ,
     GAZE_CALM_YAW_SPEED_DEG_S,
@@ -57,7 +44,6 @@ import {
     TINT_HEAT_COLOR,
     TINT_URGENT_HEAT_BLEND,
     TINT_CHASE_HEAT_BLEND,
-    CREATURE_PALETTE,
     WANDER_CALM_SPEED_CM_S,
     WANDER_CALM_MAX_ACCEL_CM_S2,
     WANDER_CALM_REPICK_PAUSE_MIN_S,
@@ -270,7 +256,7 @@ export class CreatureBehavior extends BaseScriptComponent {
     private homeLateralOffsetCm = 0;
     private homeDepthCm = 0;
     /** Ground/floor Y, camera-relative (cm) — see setHabitatHome's doc and
-     *  GROUND_Y_OFFSET_CM in CreatureConfig. NOT the mesh's vertical center;
+     *  ART.groundYOffsetCm in CreatureConfig. NOT the mesh's vertical center;
      *  wanderTargetY below is now the literal floor line MovementRoot sits
      *  on, and updatePresentationScale compensates VisualRoot's own local
      *  position so the rendered feet land exactly there (see that method). */
@@ -278,7 +264,7 @@ export class CreatureBehavior extends BaseScriptComponent {
     private homeWanderRadiusCm = HABITAT_HOME_WANDER_RADIUS_CM;
     private homeAnchorConfigured = false;
     /** MovementRoot's world Y (ground/floor level, camera-relative) — shared
-     *  with HabitatFloor via the same GROUND_Y_OFFSET_CM constant, so both
+     *  with HabitatFloor via the same ART.groundYOffsetCm constant, so both
      *  always agree (see recomputeHabitatOrigin). */
     private wanderTargetY = 0;
     private wanderTarget: vec3 | null = null;
@@ -307,7 +293,7 @@ export class CreatureBehavior extends BaseScriptComponent {
     private postureHeightScale = 1;
     private postureWidthScale = 1;
     private currentTint: vec4 = new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], BLOB_COLOR[3]);
-    /** This creature's identity color, chosen from CREATURE_PALETTE by its
+    /** This creature's identity color, chosen from ART.palette by its
      *  task's appearanceSeed (see setAppearanceSeed). Every tint target is
      *  computed relative to THIS, not to a global base, so urgency shifts the
      *  creature's own color rather than overwriting it. Defaults to BLOB_COLOR
@@ -331,17 +317,17 @@ export class CreatureBehavior extends BaseScriptComponent {
     // Chase — polar steering (radius + angle around the camera), decoupled so
     // the radial distance can never dip toward the camera while the angle is
     // still catching up to a target on the far side (see updateChasing).
-    private chaseDistanceCm = CHASE_DISTANCE_MIN_CM;
+    private chaseDistanceCm = ART.chaseDistanceMinCm;
     private chaseSideDeg = CHASE_SIDE_OFFSET_MIN_DEG;
     private chaseAngleRad = 0;
-    private chaseRadiusCm = CHASE_DISTANCE_MIN_CM;
+    private chaseRadiusCm = ART.chaseDistanceMinCm;
     private chaseAngularVel = 0;
     private chaseRadialVel = 0;
     private hesitationTimer = 0;
     private hesitationAngleOffsetRad = 0;
     private hesitationActiveT = 0;
     private chaseCueElapsed = 0;
-    private presentationScale = HABITAT_VISUAL_SCALE;
+    private presentationScale = ART.habitatVisualScale;
 
     // Whole-body growth (1.0 -> GROWTH_SCALE_MAX as a task ages) — driven
     // externally via setUrgencyLevel01, eased and multiplied into
@@ -373,7 +359,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (this.state === CreaturePresentationState.RELEASING) return;
 
         this.state = CreaturePresentationState.CHASING;
-        this.chaseDistanceCm = this.randomRange(CHASE_DISTANCE_MIN_CM, CHASE_DISTANCE_MAX_CM);
+        this.chaseDistanceCm = this.randomRange(ART.chaseDistanceMinCm, ART.chaseDistanceMaxCm);
         this.chaseSideDeg = this.randomRange(CHASE_SIDE_OFFSET_MIN_DEG, CHASE_SIDE_OFFSET_MAX_DEG) * (Math.random() < 0.5 ? -1 : 1);
         this.hesitationTimer = this.randomRange(CHASE_HESITATION_INTERVAL_MIN_S, CHASE_HESITATION_INTERVAL_MAX_S);
         this.hesitationActiveT = 0;
@@ -388,7 +374,7 @@ export class CreatureBehavior extends BaseScriptComponent {
             const dx = curPos.x - camPos.x;
             const dz = curPos.z - camPos.z;
             const flatDist = Math.sqrt(dx * dx + dz * dz);
-            this.chaseRadiusCm = flatDist > 0.0001 ? flatDist : CHASE_DISTANCE_MIN_CM;
+            this.chaseRadiusCm = flatDist > 0.0001 ? flatDist : ART.chaseDistanceMinCm;
             this.chaseAngleRad = flatDist > 0.0001 ? Math.atan2(dx, -dz) : 0;
         }
         this.chaseAngularVel = 0;
@@ -397,7 +383,7 @@ export class CreatureBehavior extends BaseScriptComponent {
     }
 
     /**
-     * Picks this creature's identity color from CREATURE_PALETTE using its
+     * Picks this creature's identity color from ART.palette using its
      * task's appearanceSeed. Deterministic and stateless: the same seed always
      * yields the same color, so a task looks identical across lens restarts
      * (appearanceSeed is part of the persisted TaskRecord) without any color
@@ -425,8 +411,8 @@ export class CreatureBehavior extends BaseScriptComponent {
             this.buildSpeciesVisual(species);
         }
 
-        const index = ((Math.floor(seed) % CREATURE_PALETTE.length) + CREATURE_PALETTE.length) % CREATURE_PALETTE.length;
-        const c = CREATURE_PALETTE[index];
+        const index = ((Math.floor(seed) % ART.palette.length) + ART.palette.length) % ART.palette.length;
+        const c = ART.palette[index];
         this.baseBodyColor = new vec4(c[0], c[1], c[2], c[3]);
         this.currentTint = new vec4(c[0], c[1], c[2], c[3]);
         if (this.body) this.body.applyBaseMaterial(bodyBaseMaterialAsset, this.currentTint);
@@ -446,7 +432,7 @@ export class CreatureBehavior extends BaseScriptComponent {
      * Assigns a distinct camera-relative home without changing creature
      * scale or internals. verticalOffsetCm is the GROUND/FLOOR Y (camera-
      * relative, cm) this creature's feet rest on — every caller currently
-     * passes the same shared GROUND_Y_OFFSET_CM constant (see
+     * passes the same shared ART.groundYOffsetCm constant (see
      * TaskOrganismController.bindCreatureSlots) so every slot's floor line
      * agrees with HabitatFloor's, but the parameter stays per-creature in
      * case a future caller wants one creature on a raised surface.
@@ -681,7 +667,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.growthScale = 1.0;
         this.targetGrowthScale = 1.0;
         if (this.visualRootObject) {
-            this.presentationScale = HABITAT_VISUAL_SCALE;
+            this.presentationScale = ART.habitatVisualScale;
             this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale * this.growthScale));
             // Matches updatePresentationScale's ground-pivot compensation — set
             // once here too so the very first rendered frame (before onUpdate's
@@ -726,12 +712,12 @@ export class CreatureBehavior extends BaseScriptComponent {
      * world-anchored, not continuously recentered on the camera every frame.
      *
      * wanderTargetY is the literal ground/floor Y (camera-relative) —
-     * HabitatFloor's disc reads the exact same GROUND_Y_OFFSET_CM constant
+     * HabitatFloor's disc reads the exact same ART.groundYOffsetCm constant
      * for its own Y, so MovementRoot and the floor plane can never drift
      * apart. (Previously this was the mesh's vertical CENTER, matched
      * against a separately-derived, independently-tuned HabitatFloor
      * formula — the two numbers only coincidentally lined up for one
-     * specific Preview environment. See CreatureConfig's GROUND_Y_OFFSET_CM
+     * specific Preview environment. See CreatureConfig's ART.groundYOffsetCm
      * doc comment for the full root-cause note.)
      */
     private recomputeHabitatOrigin(): void {
@@ -1019,7 +1005,7 @@ export class CreatureBehavior extends BaseScriptComponent {
 
         // Radial seek toward chaseDistanceCm (110-130cm) — reuses stepSeekArrive
         // as a 1D scalar seek (y/z pinned to 0). Since the target is always well
-        // above CHASE_STOP_DISTANCE_CM, this alone keeps the creature at-or-beyond
+        // above ART.chaseStopDistanceCm, this alone keeps the creature at-or-beyond
         // the floor; the Math.max below is a defensive backstop, not a corrective
         // clamp that fights the steering (unlike the old Cartesian version).
         const radialResult = stepSeekArrive(
@@ -1033,8 +1019,8 @@ export class CreatureBehavior extends BaseScriptComponent {
             dt,
         );
         this.chaseRadialVel = radialResult.velocity.x;
-        this.chaseRadiusCm = Math.max(radialResult.position.x, CHASE_STOP_DISTANCE_CM);
-        if (this.chaseRadiusCm <= CHASE_STOP_DISTANCE_CM && this.chaseRadialVel < 0) {
+        this.chaseRadiusCm = Math.max(radialResult.position.x, ART.chaseStopDistanceCm);
+        if (this.chaseRadiusCm <= ART.chaseStopDistanceCm && this.chaseRadialVel < 0) {
             this.chaseRadialVel = 0;
         }
 
@@ -1111,7 +1097,7 @@ export class CreatureBehavior extends BaseScriptComponent {
     private updatePresentationScale(dt: number): void {
         if (!this.visualRootObject) return;
         const urgent = this.state === CreaturePresentationState.CHASING || this.state === CreaturePresentationState.INTERACTING;
-        const target = urgent ? CHASE_VISUAL_SCALE : HABITAT_VISUAL_SCALE;
+        const target = urgent ? ART.chaseVisualScale : ART.habitatVisualScale;
         this.presentationScale += (target - this.presentationScale) * clamp01(dt * PRESENTATION_SCALE_EASE_PER_S);
         this.growthScale += (this.targetGrowthScale - this.growthScale) * clamp01(dt * GROWTH_EASE_PER_S);
         this.visualRootObject.getTransform().setLocalScale(vec3.one().uniformScale(this.presentationScale * this.growthScale));
@@ -1122,7 +1108,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         // so scaling VisualRoot itself — CALM<->CHASE presentation scale,
         // whole-body growth — drags the feet up/down with it exactly like
         // Body's own breathing scale did before that compensation existed.
-        // MovementRoot's world Y is GROUND_Y_OFFSET_CM directly now (see
+        // MovementRoot's world Y is ART.groundYOffsetCm directly now (see
         // recomputeHabitatOrigin) — the single shared floor reference
         // HabitatFloor also reads — so lifting VisualRoot's local origin by
         // baseOffsetCm * (current total scale) keeps the rendered feet
@@ -1202,12 +1188,12 @@ export class CreatureBehavior extends BaseScriptComponent {
 
         const profile = this.emotionalProfile();
 
-        const breatheAmp = profile === "CALM" ? BREATHE_CALM_AMPLITUDE : profile === "URGENT" ? BREATHE_URGENT_AMPLITUDE : BREATHE_CHASE_AMPLITUDE;
+        const breatheAmp = profile === "CALM" ? ART.breatheCalmAmplitude : profile === "URGENT" ? ART.breatheUrgentAmplitude : ART.breatheChaseAmplitude;
         const breatheHz = profile === "CALM" ? BREATHE_CALM_FREQUENCY_HZ : profile === "URGENT" ? BREATHE_URGENT_FREQUENCY_HZ : BREATHE_CHASE_FREQUENCY_HZ;
         const breathe = 1 + breatheAmp * Math.sin(this.timeS * breatheHz * Math.PI * 2);
 
-        const targetHeight = profile === "CALM" ? POSTURE_CALM_HEIGHT_SCALE : profile === "URGENT" ? POSTURE_URGENT_HEIGHT_SCALE : POSTURE_CHASE_HEIGHT_SCALE;
-        const targetWidth = profile === "CALM" ? POSTURE_CALM_WIDTH_SCALE : profile === "URGENT" ? POSTURE_URGENT_WIDTH_SCALE : POSTURE_CHASE_WIDTH_SCALE;
+        const targetHeight = profile === "CALM" ? ART.postureCalmHeight : profile === "URGENT" ? ART.postureUrgentHeight : ART.postureChaseHeight;
+        const targetWidth = profile === "CALM" ? ART.postureCalmWidth : profile === "URGENT" ? ART.postureUrgentWidth : ART.postureChaseWidth;
         const postureAlpha = clamp01(dt * POSTURE_EASE_PER_S);
         this.postureHeightScale += (targetHeight - this.postureHeightScale) * postureAlpha;
         this.postureWidthScale += (targetWidth - this.postureWidthScale) * postureAlpha;

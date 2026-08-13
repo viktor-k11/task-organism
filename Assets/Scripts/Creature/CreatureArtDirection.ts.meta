@@ -1,0 +1,160 @@
+- !<AssetImportMetadata/8a294bcd-2d3e-4903-ac9e-7b7d79b5412e>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 2e6dec7e-d39e-4727-8711-d5eb2e7fbc83
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 2e6dec7e-d39e-4727-8711-d5eb2e7fbc83
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 76ad91fe-365e-485a-936a-8ef58aadd120
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/76ad91fe-365e-485a-936a-8ef58aadd120>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 734ca1e6-8422-4685-accb-5acfbe3e7c6b
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    breatheCalmAmplitude: false
+    breatheChaseAmplitude: false
+    breatheUrgentAmplitude: false
+    chaseDistanceMaxCm: false
+    chaseDistanceMinCm: false
+    chaseStopDistanceCm: false
+    chaseVisualScale: false
+    groundYOffsetCm: false
+    habitatCapacitySpacingCm: false
+    habitatDepthCm: false
+    habitatLabelMaxChars: false
+    habitatRowDepthStepCm: false
+    habitatSpacingCm: false
+    habitatVisualScale: false
+    paletteColors: false
+    postureCalmHeight: false
+    postureCalmWidth: false
+    postureChaseHeight: false
+    postureChaseWidth: false
+    postureUrgentHeight: false
+    postureUrgentWidth: false
+    releaseBrightenLerp: false
+    releaseDurationS: false
+    releaseParticleCount: false
+    releaseParticleDriftCm: false
+    releaseParticleSizeCm: false
+    releaseParticleSpeedCmS: false
+    selectionLineMaxChars: false
+    selectionPanelYCm: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - paletteColors: !<Vec4[]>
+        []
+      habitatDepthCm: !<float> 0.000000
+      habitatSpacingCm: !<float> 0.000000
+      habitatCapacitySpacingCm: !<float> 0.000000
+      habitatRowDepthStepCm: !<float> 0.000000
+      groundYOffsetCm: !<float> 0.000000
+      habitatVisualScale: !<float> 0.000000
+      chaseVisualScale: !<float> 0.000000
+      breatheCalmAmplitude: !<float> 0.000000
+      breatheUrgentAmplitude: !<float> 0.000000
+      breatheChaseAmplitude: !<float> 0.000000
+      postureCalmHeight: !<float> 0.000000
+      postureCalmWidth: !<float> 0.000000
+      postureUrgentHeight: !<float> 0.000000
+      postureUrgentWidth: !<float> 0.000000
+      postureChaseHeight: !<float> 0.000000
+      postureChaseWidth: !<float> 0.000000
+      chaseDistanceMinCm: !<float> 0.000000
+      chaseDistanceMaxCm: !<float> 0.000000
+      chaseStopDistanceCm: !<float> 0.000000
+      releaseDurationS: !<float> 0.000000
+      releaseParticleCount: !<float> 0.000000
+      releaseParticleSpeedCmS: !<float> 0.000000
+      releaseParticleDriftCm: !<float> 0.000000
+      releaseParticleSizeCm: !<float> 0.000000
+      releaseBrightenLerp: !<float> 0.000000
+      habitatLabelMaxChars: !<float> 0.000000
+      selectionLineMaxChars: !<float> 0.000000
+      selectionPanelYCm: !<float> 0.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #F59E0B;\">Art Direction — safe to edit</span>"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #9CA3AF;\">Defaults match CreatureConfig.ts. See HANDOFF-VISUAL.md.</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Palette (one colour per creature identity)"}'
+    - '// @input vec4[] paletteColors = {} {"hint":"Creature identity colours, picked by appearanceSeed. SPECS composites additively: near-black reads as invisible, pale/desaturated reads as washed out. Keep these saturated and bright.", "widget":"color"}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Habitat placement"}'
+    - '// @input float habitatDepthCm {"hint":"Distance in front of the user where the creatures live, in cm. CLAUDE.md comfort range is 100-150 for the habitat; the demo sits further back so six fit.", "widget":"slider", "min":120, "max":420, "step":5}'
+    - '// @input float habitatSpacingCm {"hint":"Side-to-side gap between creatures in cm, when 4 or fewer are alive.", "widget":"slider", "min":18, "max":60, "step":1}'
+    - "// @input float habitatCapacitySpacingCm {\"hint\":\"Side-to-side gap in cm once 5-6 creatures are alive and the habitat splits into two rows. Tighter than the single-row spacing so the outer creatures stay inside the display's FOV.\", \"widget\":\"slider\", \"min\":18, \"max\":45, \"step\":1}"
+    - '// @input float habitatRowDepthStepCm {"hint":"How much further back the second row sits, in cm.", "widget":"slider", "min":20, "max":80, "step":5}'
+    - "// @input float groundYOffsetCm {\"hint\":\"THE shared ground line, in cm relative to the camera. Negative = below eye level. The floor disc and every creature's feet both derive from this ONE number — changing it moves them together. Derived from 150cm standing eye height; do not split it into per-creature offsets.\", \"widget\":\"slider\", \"min\":-200, \"max\":-80, \"step\":1}"
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Presentation scale"}'
+    - '// @input float habitatVisualScale {"hint":"Overall creature size while resting in the habitat (multiplier). 0.68 renders roughly a 23cm creature from the 34cm model.", "widget":"slider", "min":0.3, "max":1.5, "step":0.01}'
+    - '// @input float chaseVisualScale {"hint":"Overall creature size while chasing. Larger than the habitat scale so the approaching creature gains presence.", "widget":"slider", "min":0.3, "max":1.5, "step":0.01}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Breathing amplitude"}'
+    - '// @input float breatheCalmAmplitude {"hint":"How much a calm creature swells as it breathes. Kept small: at 0.06 the breathing compounded with lean and squash into a visible sway.", "widget":"slider", "min":0, "max":0.08, "step":0.001}'
+    - '// @input float breatheUrgentAmplitude {"hint":"Breathing depth while restless.", "widget":"slider", "min":0, "max":0.08, "step":0.001}'
+    - '// @input float breatheChaseAmplitude {"hint":"Breathing depth while chasing.", "widget":"slider", "min":0, "max":0.08, "step":0.001}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Posture (height / width per state)"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #9CA3AF;\">Height under 1.0 squashes; widen to keep volume. These were tuned against a tall blob and flatten round species (penguin, rabbit) more than tall ones.</span>"}'
+    - '// @input float postureCalmHeight {"widget":"slider", "min":0.6, "max":1.4, "step":0.01}'
+    - '// @input float postureCalmWidth {"widget":"slider", "min":0.6, "max":1.4, "step":0.01}'
+    - '// @input float postureUrgentHeight {"widget":"slider", "min":0.6, "max":1.4, "step":0.01}'
+    - '// @input float postureUrgentWidth {"widget":"slider", "min":0.6, "max":1.4, "step":0.01}'
+    - '// @input float postureChaseHeight {"widget":"slider", "min":0.6, "max":1.4, "step":0.01}'
+    - '// @input float postureChaseWidth {"widget":"slider", "min":0.6, "max":1.4, "step":0.01}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Chase distances (spatial comfort)"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #9CA3AF;\">CLAUDE.md comfort rule: target 110-130cm, hard stop at 100cm. Coming closer than 100cm is uncomfortable in a headset — do not lower the stop distance.</span>"}'
+    - '// @input float chaseDistanceMinCm {"widget":"slider", "min":100, "max":160, "step":1}'
+    - '// @input float chaseDistanceMaxCm {"widget":"slider", "min":100, "max":180, "step":1}'
+    - '// @input float chaseStopDistanceCm {"hint":"Hard floor on how close a creature ever gets. Comfort limit, not a look — raising it is safe, lowering it is not.", "widget":"slider", "min":90, "max":140, "step":1}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Release effect (completion moment)"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #9CA3AF;\">Tone: release and gratitude, never reward or disappearance. See the CLAUDE.md tone rules.</span>"}'
+    - '// @input float releaseDurationS {"widget":"slider", "min":0.5, "max":3, "step":0.1}'
+    - "// @input float releaseParticleCount {\"hint\":\"Particles spawned in one burst. Each is a draw call's worth of work — raising this is the main cost knob in the release moment.\", \"widget\":\"slider\", \"min\":0, \"max\":60, \"step\":1}"
+    - '// @input float releaseParticleSpeedCmS {"widget":"slider", "min":0, "max":30, "step":0.5}'
+    - '// @input float releaseParticleDriftCm {"widget":"slider", "min":0, "max":20, "step":0.5}'
+    - '// @input float releaseParticleSizeCm {"widget":"slider", "min":0.1, "max":3, "step":0.1}'
+    - '// @input float releaseBrightenLerp {"hint":"How far the body brightens toward white at the moment of release.", "widget":"slider", "min":0, "max":1, "step":0.05}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Labels"}'
+    - '// @input float habitatLabelMaxChars {"hint":"Characters before the short habitat label truncates.", "widget":"slider", "min":8, "max":40, "step":1}'
+    - '// @input float selectionLineMaxChars {"hint":"Characters per line in the full task panel. CLAUDE.md caps the panel at two lines.", "widget":"slider", "min":15, "max":60, "step":1}'
+    - '// @input float selectionPanelYCm {"hint":"Height of the selection panel above the creature, in cm.", "widget":"slider", "min":10, "max":60, "step":1}'
+    - '// @ui {"widget":"group_end"}'

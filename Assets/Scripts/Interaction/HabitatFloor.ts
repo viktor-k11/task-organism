@@ -1,9 +1,7 @@
+import { ART } from "../Config/ArtDirection";
 import { buildLathe } from "../Creature/LatheGeometry";
 import {
-    HABITAT_HOME_DEPTH_CM,
     HABITAT_HOME_GROUP_LATERAL_CM,
-    GROUND_Y_OFFSET_CM,
-    CHASE_DISTANCE_MIN_CM,
 } from "../Config/CreatureConfig";
 
 const FLOOR_RADIUS_CM = 200;
@@ -27,7 +25,7 @@ const baseMaterialAsset = requireAsset("../../Materials/BlobBody.mat") as Materi
  * depth/lateral. Split out of buildHabitatFloor so the staging controls can
  * move the floor and the creatures together — if only one of them moved, the
  * disc and the creatures' foot line would drift apart, which is exactly the
- * class of bug GROUND_Y_OFFSET_CM was introduced to prevent.
+ * class of bug ART.groundYOffsetCm was introduced to prevent.
  */
 export function positionHabitatFloor(
     floor: SceneObject,
@@ -49,22 +47,22 @@ export function positionHabitatFloor(
     const right = new vec3(Math.cos(camYaw), 0, Math.sin(camYaw));
     // Disc spans from the chase ring out to the habitat, so its centre sits
     // midway between them and follows the habitat when that is moved.
-    const centerDepthCm = (CHASE_DISTANCE_MIN_CM + habitatDepthCm) / 2;
+    const centerDepthCm = (ART.chaseDistanceMinCm + habitatDepthCm) / 2;
     const center = camPos
         .add(flatFwd.uniformScale(centerDepthCm))
         .add(right.uniformScale(habitatLateralCm));
-    // Same GROUND_Y_OFFSET_CM constant CreatureBehavior uses for MovementRoot's
+    // Same ART.groundYOffsetCm constant CreatureBehavior uses for MovementRoot's
     // world Y (see recomputeHabitatOrigin) — no separate correction term, so
     // this disc and every creature's rendered foot line can never drift apart
-    // (see GROUND_Y_OFFSET_CM's doc comment in CreatureConfig for why the old
+    // (see ART.groundYOffsetCm's doc comment in CreatureConfig for why the old
     // formula, which re-derived its own offset here, was the actual bug).
-    const floorY = camPos.y + GROUND_Y_OFFSET_CM;
+    const floorY = camPos.y + ART.groundYOffsetCm;
     floor.getTransform().setWorldPosition(new vec3(center.x, floorY, center.z));
 }
 
 export function buildHabitatFloor(cameraObject: SceneObject): SceneObject {
     const floor = global.scene.createSceneObject("HabitatFloor");
-    positionHabitatFloor(floor, cameraObject, HABITAT_HOME_DEPTH_CM, HABITAT_HOME_GROUP_LATERAL_CM);
+    positionHabitatFloor(floor, cameraObject, ART.habitatDepthCm, HABITAT_HOME_GROUP_LATERAL_CM);
 
     const rmv = floor.createComponent("Component.RenderMeshVisual") as RenderMeshVisual;
     const builder = new MeshBuilder([

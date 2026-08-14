@@ -51,6 +51,9 @@ project drives all motion by direct transform control.
 
 ## Generated: the other five creatures
 
+Six species ship; five of them are generated. The sixth is the dog above, which
+is the project's only third-party asset.
+
 | File | Species |
 |---|---|
 | `Assets/GeneratedMeshes/cat_lo.glb` | cat |
@@ -66,9 +69,18 @@ all** — there is no upstream author to credit, no license to comply with, and
 no attribution requirement. That is the reason they exist: generating the cat
 retired a licensing question rather than documenting one.
 
-Each was then processed by this project's own pipeline, in order:
-`Tools/prepare-pet-glb.js` → `Tools/seat-pet-glb.js` →
-`Tools/bake-vertex-shading.js`.
+Each was then processed by this project's own pipeline, in this order. What each
+step actually changes in the file:
+
+| Step | What it modifies |
+|---|---|
+| `Tools/prepare-pet-glb.js` | Strips skins, animations, and the `JOINTS_0` / `WEIGHTS_0` / `COLOR_0` attributes. Bakes each node's world matrix into `POSITION` and `NORMAL`, then flattens the scene to a single node, so the mesh is self-contained and carries no inherited transform. Rewrites accessor `min`/`max`, which glTF treats as normative. |
+| `Tools/seat-pet-glb.js` | Translates every vertex so the mesh's min-Y is exactly 0 — feet at the origin, the convention `CreaturePetVisual` assumes when it seats a prefab. Optionally bakes a 180° yaw by negating X and Z on `POSITION` and `NORMAL`, so facing is a property of the asset rather than a per-species runtime correction. Rewrites accessor `min`/`max` again. Measures but does not alter body height. |
+| `Tools/bake-vertex-shading.js` | Adds a `COLOR_0` attribute the generated file does not have: a gamma'd height ramp combined with a `normal.y` dome term, written as normalised unsigned bytes. Reads positions and normals, so it must run last. Skips any primitive that already carries `COLOR_0`. |
+
+None of these steps adds or removes geometry — vertex and triangle counts are
+unchanged by all three. The dog goes through `bake-vertex-shading.js` only; it
+predates the other two tools and keeps its original node transform and skeleton.
 
 ---
 

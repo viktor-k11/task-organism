@@ -719,3 +719,53 @@ by prediction rather than by observation this time.
 **LEAF: 12/12.** The previous entry recorded the untested state honestly as an
 assumption rather than a fact; this closes it. `CreatureBehavior.ts` had changed,
 so "presentation-only, should be fine" was reasoning, not evidence.
+
+## Re-measuring after the urgency shader — the effect is below the noise floor
+
+**Prompt:** "Run the perf trace at 3 / 5 / 6 creatures now that the roster is
+frozen and the urgency shader is in — the shader adds per-pixel work, so this is
+the right moment to measure."
+
+Correct instinct: a rim term plus a pulse is real per-fragment work, added after
+the first sweep. Three fresh 20s captures, same method, full story in each.
+
+| creatures | p50 before | p50 after | Δ | p90 after | p99 after |
+|---|---|---|---|---|---|
+| 3 | 38.86ms | 37.37ms | **−1.49** | 42.28 | 229.48 |
+| 5 | 39.73ms | 39.01ms | **−0.72** | 45.89 | 290.55 |
+| 6 | 43.28ms | 37.67ms | **−5.61** | 41.65 | 58.34 |
+
+**Every count got faster after adding work.** That is not a speedup — it is the
+measurement telling us its own error bar. Run-to-run variance on this desktop is
+at least ±5ms at the median, which is *larger than the effect being measured*.
+The only defensible conclusion is a bound, not a value: **the urgency shader's
+per-pixel cost is below the noise floor of this setup.** Claiming it is "free"
+would be overreading; claiming a regression would be inventing one.
+
+The same pattern holds in the sub-slices, which is what makes noise the
+convincing explanation rather than a lucky frame:
+
+| avg ms/frame | 3 before→after | 5 before→after | 6 before→after |
+|---|---|---|---|
+| `CoreManagerRender` | 6.16 → 7.21 | 8.93 → 8.60 | 11.69 → 9.24 |
+| `RenderFrame` | 2.30 → 2.68 | 3.07 → 3.04 | 3.83 → 2.98 |
+| per-`Visual` draw | 0.069 → 0.062 | 0.060 → 0.056 | 0.070 → 0.051 |
+
+Mixed signs at every level. If the shader were costing meaningfully, per-draw
+cost would rise monotonically — instead it *fell* at all three counts.
+
+**Why that is physically plausible rather than just noise:** at habitat distance
+the creatures cover a small fraction of the frame. A more expensive fragment
+shader only matters when you are fill-bound, and these draws are not — they are
+dispatch- and vertex-bound, at 0.05-0.07ms for a whole creature. The rim adds a
+normalize, a dot and a pow per covered pixel, over very few pixels.
+
+Draw calls are unchanged in structure: 29.4 / 38.9 / 41.3 `Visual` slices per
+frame, `RenderPass` still ~1.6/frame. The shader added no passes and no draws,
+exactly as intended — it extended an existing material rather than introducing a
+second one.
+
+**Verdict unchanged: record at 6.** And a note for anyone re-running this: to
+resolve a sub-5ms effect this harness would need repeated interleaved runs at
+each count, not one run each. That was not worth the freeze-day time when the
+answer needed was only "did this make things materially worse", and it did not.

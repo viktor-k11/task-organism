@@ -8655,6 +8655,48 @@
           }
         }
       ]
+    },
+    {
+      "id": "1d332afc-9f11-4e19-9a25-ba5d92576b31",
+      "name": "TaskOrganism (controller)",
+      "enabled": true,
+      "parentId": null,
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "layers": 1,
+      "components": [
+        {
+          "id": "c2014f64-ead9-42d4-95b0-14970d05aee8",
+          "type": "ScriptComponent",
+          "name": "TaskOrganismController",
+          "enabled": true,
+          "properties": {
+            "scriptAsset": "@asset:Scripts/Interaction/TaskOrganismController.ts",
+            "name": "TaskOrganismController",
+            "enabled": true,
+            "sceneObject": "@sceneObject:TaskOrganism (controller)",
+            "isPrefabInstanceRoot": false,
+            "hasPrefabChanges": false,
+            "id": "c2014f64-ead9-42d4-95b0-14970d05aee8",
+            "type": "ScriptComponent"
+          }
+        }
+      ]
     }
   ],
   "assets": [

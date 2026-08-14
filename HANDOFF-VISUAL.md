@@ -175,7 +175,82 @@ hotkeys. Don't expect keyboard shortcuts to work.
 
 ---
 
-## 6. Vocabulary
+## 6. Visual regression harness — run this before you commit
+
+Every visual change in this project used to be checked by eye. This catches the
+four things that break silently: grounding, facing, label legibility, and the
+release sequence.
+
+It captures seven fixed frames of the demo and compares them against a committed
+golden set in `docs/golden/`.
+
+### Running it
+
+Ask the engineer (or Claude) to capture, because capture needs the Lens Studio
+MCP tools. The comparison half you can run yourself, unattended, with no setup:
+
+```bash
+node Tools/visual-regression.js --candidate <folder-of-new-captures>
+```
+
+It prints one line per frame and exits non-zero if anything moved:
+
+```
+  01-calm-habitat     ok         changed 0.00%  meanDelta 0.00
+  06-release          CHANGED    changed 7.36%  meanDelta 2.71
+  03-approach         MISSING CAPTURE  ...
+```
+
+To accept new frames as the reference after an intentional change:
+
+```bash
+node Tools/visual-regression.js --candidate <folder> --update
+```
+
+`--update` accepts whatever it is given, so look at the pictures first.
+
+### Capturing the seven frames
+
+For each frame index 0–6:
+
+1. Set `VISUAL_HARNESS_FRAME` in `CreatureConfig.ts` to that index.
+2. **Reset the Lens.** This must be `RunAndCollectLogsTool` with `mode: refresh`.
+   The Preview panel's own refresh does **not** reset the Lens — do that and you
+   capture the frozen ending of the previous run instead.
+3. Wait for `[VisualHarness] frame=<name> READY …` in the log. Do not capture
+   before it: the post-release frame settles for three seconds, and capturing
+   early gives you a frame mid-effect.
+4. Screenshot to `<candidate-folder>/<name>.png`. **The folder must already
+   exist** — the screenshot tool reports success even when the directory is
+   missing, and writes nothing. An entire batch was lost to this once.
+
+Set `VISUAL_HARNESS_FRAME` back to `-1` when you are done.
+
+### Why one frame per reset
+
+The harness does not wait for beats — it jumps the demo sequence straight to the
+target state in a single call, then freezes. Nothing about a captured frame
+depends on wall-clock timing, so a slow machine cannot change what a golden
+image records. The mid-gesture frame pumps hold progress by an exact fraction
+rather than waiting for it.
+
+### It checks more than pixels
+
+At every frame the harness logs assertions that an image cannot express:
+
+```
+[VisualHarness] frame=01-calm-habitat READY open=6 chasing=0 (ok) groundedOk=6 groundedBad=0 skipped=0
+```
+
+- `groundedBad` must be 0 — every creature's feet on the shared ground line
+- `chasing` must never exceed 1 — the single-chaser invariant
+- `open` must match the expected task count for that frame
+
+A `GROUND FAIL` line names the offending creature and its Y. These caught two
+real bugs while the harness was being built (see `prompts.md`), both of which
+would have produced a plausible-looking but wrong golden image.
+
+## 7. Vocabulary
 
 | Term | Meaning |
 |---|---|

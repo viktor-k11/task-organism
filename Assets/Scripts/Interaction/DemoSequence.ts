@@ -85,6 +85,28 @@ export class DemoSequence {
         ];
     }
 
+    /** Absolute time at which a named beat fires. Lets a harness ask for
+     *  "the moment SELECT happens" without hard-coding accumulated durations
+     *  that shift whenever a beat length is retuned. */
+    timeOfBeat(beat: DemoBeat): number {
+        if (beat === "CALM") return 0;
+        for (const step of this.steps) if (step.beat === beat) return step.atS;
+        return 0;
+    }
+
+    /**
+     * Jumps to an absolute point on the timeline in ONE call, firing every
+     * step passed on the way, in order. This is what makes the visual
+     * regression harness deterministic: a beat is reached by command rather
+     * than by waiting on wall-clock time, so a slow frame or a loaded machine
+     * cannot change which state a golden image captures.
+     */
+    advanceTo(targetS: number): void {
+        if (!this.started) this.start();
+        const delta = targetS - this.elapsedS;
+        if (delta > 0) this.update(delta);
+    }
+
     /** Total scripted length excluding the trailing "two remain" tail. */
     get scriptedEndS(): number {
         return this.steps.length ? this.steps[this.steps.length - 1].atS : 0;

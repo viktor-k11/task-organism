@@ -15,6 +15,10 @@ import {
     DEMO_TASK_COUNT,
     HABITAT_TWO_ROW_THRESHOLD,
     HABITAT_BACK_ROW_COUNT,
+    VISUAL_HARNESS_FRAME,
+    VISUAL_HARNESS_SETTLE_S,
+    VISUAL_HARNESS_POST_RELEASE_SETTLE_S,
+    RESOLVE_HOLD_DURATION_S as HOLD_S,
 } from "../Config/CreatureConfig";
 import { DemoClock } from "../Data/Clock";
 import { PersistentTaskStorage } from "../Data/TaskStorage";
@@ -68,6 +72,31 @@ const SLOT_NAMES = Array.from({ length: MAX_CREATURE_SLOTS }, (_, i) => `Movemen
  */
 const CREATURE_TEMPLATE_NAME = "CreatureTemplate";
 
+/**
+ * The golden frames, in capture order. Each names a beat to jump to, an extra
+ * hold-progress pump (for the mid-gesture frame, which is not on a beat
+ * boundary), and how long to let eased channels settle before declaring READY.
+ */
+const VISUAL_HARNESS_FRAMES: {
+    name: string;
+    beat: DemoBeat;
+    holdFraction: number;
+    settleS: number;
+}[] = [
+    { name: "01-calm-habitat", beat: "CALM", holdFraction: 0, settleS: VISUAL_HARNESS_SETTLE_S },
+    { name: "02-urgency", beat: "URGENT", holdFraction: 0, settleS: VISUAL_HARNESS_SETTLE_S },
+    { name: "03-approach", beat: "APPROACH", holdFraction: 0, settleS: VISUAL_HARNESS_SETTLE_S },
+    { name: "04-selection-panel", beat: "SELECT", holdFraction: 0, settleS: VISUAL_HARNESS_SETTLE_S },
+    { name: "05-hold-50pct", beat: "RESOLVE", holdFraction: 0.5, settleS: VISUAL_HARNESS_SETTLE_S },
+    // Release frames jump to RESOLVE and then pump the hold to 100%, rather
+    // than jumping to the RELEASED beat. Completion is triggered by hold
+    // progress reaching 1.0 — the same route a user's gesture takes — so
+    // landing on the RELEASED beat with a frozen interaction produced a frame
+    // where nothing had actually completed (open=6 where 5 was expected).
+    { name: "06-release", beat: "RESOLVE", holdFraction: 1.0, settleS: VISUAL_HARNESS_SETTLE_S },
+    { name: "07-post-release", beat: "RESOLVE", holdFraction: 1.0, settleS: VISUAL_HARNESS_POST_RELEASE_SETTLE_S },
+];
+
 interface CreatureSlot {
     taskId: string;
     root: SceneObject;
@@ -111,6 +140,9 @@ export class TaskOrganismController extends BaseScriptComponent {
     private cameraObject: SceneObject | null = null;
     private floorObject: SceneObject | null = null;
     private cloneContainer: SceneObject | null = null;
+    /** Visual-harness state: set when VISUAL_HARNESS_FRAME selects a frame. */
+    private harnessSettleRemainingS = -1;
+    private harnessReported = false;
 
     // Rolling frame-time window for the capacity FPS measurement.
     private fpsAccumS = 0;
@@ -297,7 +329,9 @@ export class TaskOrganismController extends BaseScriptComponent {
             onResolveHoldEnd: () => this.scriptedResolveEnd(),
             onBeat: (beat, elapsedS) => this.onDemoBeat(beat, elapsedS),
         });
-        if (DEMO_AUTOPLAY_ON_START) {
+        if (VISUAL_HARNESS_FRAME >= 0) {
+            this.enterVisualHarness();
+        } else if (DEMO_AUTOPLAY_ON_START) {
             this.sequence.start();
         } else {
             // Staging mode: creatures spawn calm and stay calm until P. Frame
@@ -309,14 +343,88 @@ export class TaskOrganismController extends BaseScriptComponent {
         console.log(`[WednesdayDemo] ready open=${tasks.length} hold=${RESOLVE_HOLD_DURATION_S}s chaser=none autoplay=${DEMO_AUTOPLAY_ON_START}`);
     }
 
+    /**
+     * Jumps straight to one golden frame's state and freezes there.
+     *
+     * Autoplay is irrelevant here — the sequence is driven by advanceTo() in a
+     * single call, so every beat up to the target fires in order, immediately.
+     * Nothing about the resulting state depends on wall-clock timing, which is
+     * the property that makes a golden image comparable across machines.
+     *
+     * The one exception is the mid-gesture frame: hold progress is accumulated
+     * by CreatureInteractionState, so it is pumped explicitly by the exact
+     * fraction wanted rather than waited out.
+     */
+    private enterVisualHarness(): void {
+        const frame = VISUAL_HARNESS_FRAMES[VISUAL_HARNESS_FRAME];
+        if (!frame) {
+            console.error(`[VisualHarness] VISUAL_HARNESS_FRAME=${VISUAL_HARNESS_FRAME} is out of range (0..${VISUAL_HARNESS_FRAMES.length - 1})`);
+            return;
+        }
+        this.sequence.start();
+        this.sequence.advanceTo(this.sequence.timeOfBeat(frame.beat));
+        if (frame.holdFraction > 0) this.interaction.update(HOLD_S * frame.holdFraction);
+        this.harnessSettleRemainingS = frame.settleS;
+        this.harnessReported = false;
+        console.log(`[VisualHarness] frame=${frame.name} beat=${frame.beat} hold=${(frame.holdFraction * 100).toFixed(0)}% settling ${frame.settleS}s`);
+    }
+
+    /** Counts down the settle, then logs the frame's non-visual assertions.
+     *  The capture is taken after READY appears. */
+    private updateVisualHarness(dt: number): void {
+        if (this.harnessSettleRemainingS < 0 || this.harnessReported) return;
+        this.harnessSettleRemainingS -= dt;
+        if (this.harnessSettleRemainingS > 0) return;
+        this.harnessReported = true;
+        const frame = VISUAL_HARNESS_FRAMES[VISUAL_HARNESS_FRAME];
+        const open = this.repository.listOpen().length;
+        let chasing = 0;
+        let groundedOk = 0;
+        let groundedBad = 0;
+        let skipped = 0;
+        const expected = (this.cameraObject ? this.cameraObject.getTransform().getWorldPosition().y : 0) + ART.groundYOffsetCm;
+        for (const slot of this.slots) {
+            // A released creature's root is torn down once the release effect
+            // finishes, so touching it throws — which silently aborted this
+            // whole assertion and meant the post-release frame never reported
+            // READY at all. Skip dead and disabled slots rather than assuming
+            // every slot outlives the frame.
+            try {
+                if (!slot.root || isNull(slot.root) || !slot.root.enabled) { skipped++; continue; }
+                if (slot.creature.isChasing()) chasing++;
+                const y = slot.root.getTransform().getWorldPosition().y;
+                if (Math.abs(y - expected) <= 1.0) groundedOk++;
+                else {
+                    groundedBad++;
+                    console.log(`[VisualHarness] GROUND FAIL ${slot.root.name} y=${y.toFixed(2)} expected=${expected.toFixed(2)}`);
+                }
+            } catch (e) {
+                skipped++;
+            }
+        }
+        const invariant = chasing <= 1 ? "ok" : "*** INVARIANT 4 VIOLATED ***";
+        console.log(`[VisualHarness] frame=${frame.name} READY open=${open} chasing=${chasing} (${invariant}) groundedOk=${groundedOk} groundedBad=${groundedBad} skipped=${skipped}`);
+    }
+
     private onUpdate(): void {
         if (!this.interaction) return;
         const dt = getDeltaTime();
         // Sequence first: a beat fired this frame should take effect before
         // the gesture state machine and arbiter observe the world, so a
         // scripted press is processed on the same frame it is issued.
-        if (this.sequence) this.sequence.update(dt);
-        this.interaction.update(dt);
+        if (VISUAL_HARNESS_FRAME >= 0) {
+            // Frozen: the sequence was already advanced by command. Only the
+            // settle countdown runs, so the captured state cannot drift.
+            this.updateVisualHarness(dt);
+        } else if (this.sequence) {
+            this.sequence.update(dt);
+        }
+        // Frozen while the visual harness holds a frame. Without this the
+        // hold keeps accumulating through the settle window: the 50% frame ran
+        // on to 100%, completed the task and captured a post-release image
+        // instead. The assertion caught it (open=5 where 6 was expected) —
+        // which is exactly the failure the non-visual checks exist for.
+        if (VISUAL_HARNESS_FRAME < 0) this.interaction.update(dt);
         this.syncArbiter();
 
         // Capacity instrumentation: rolling FPS plus a live assertion that

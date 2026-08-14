@@ -57,6 +57,8 @@
     releaseParticleSpeedCmS: false
     selectionLineMaxChars: false
     selectionPanelYCm: false
+    urgencyRimGain: false
+    urgencyRimPower: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -87,6 +89,8 @@
       chaseDistanceMinCm: !<float> 0.000000
       chaseDistanceMaxCm: !<float> 0.000000
       chaseStopDistanceCm: !<float> 0.000000
+      urgencyRimGain: !<float> 0.000000
+      urgencyRimPower: !<float> 0.000000
       releaseDurationS: !<float> 0.000000
       releaseParticleCount: !<float> 0.000000
       releaseParticleSpeedCmS: !<float> 0.000000
@@ -141,6 +145,12 @@
     - '// @input float chaseDistanceMinCm {"widget":"slider", "min":100, "max":160, "step":1}'
     - '// @input float chaseDistanceMaxCm {"widget":"slider", "min":100, "max":180, "step":1}'
     - '// @input float chaseStopDistanceCm {"hint":"Hard floor on how close a creature ever gets. Comfort limit, not a look — raising it is safe, lowering it is not.", "widget":"slider", "min":90, "max":140, "step":1}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"group_start", "label":"Urgency halo (light, not paint)"}'
+    - "// @ui {\"widget\":\"label\", \"label\":\"<span style=\\\"color: #9CA3AF;\\\">Urgency is carried by an additive halo in the creature's own colour, so palette identity survives. These two numbers decide how much of the signal this channel carries. The halo reads strongly on dark backdrops and weakly on bright ones — a small warm colour shift remains as the bright-backdrop fallback.</span>\"}"
+    - '// @input float urgencyRimGain {"hint":"How brightly the halo burns at full urgency. 0 disables the rim entirely and leaves only the warm colour shift.", "widget":"slider", "min":0, "max":4, "step":0.05}'
+    - '// @input float urgencyRimPower {"hint":"How tightly the halo hugs the silhouette. Low (0.5-1.5) washes the whole body; high (4+) is a thin bright edge. Below 0.25 the shader clamps, because a 0 exponent would flood the entire body.", "widget":"slider", "min":0.5, "max":6, "step":0.1}'
     - '// @ui {"widget":"group_end"}'
     - '// @ui {"widget":"separator"}'
     - '// @ui {"widget":"group_start", "label":"Release effect (completion moment)"}'

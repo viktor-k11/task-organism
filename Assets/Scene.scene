@@ -14,6 +14,7 @@
     - !<own> 3fe33e00-526a-4f61-81d2-c2b6ed462f3d
     - !<own> bdc0ec2d-001d-4643-bcbb-4f207667b8ea
     - !<own> e4a6c4b0-7b52-4075-9a12-7b3186df2682
+    - !<own> 1d332afc-9f11-4e19-9a25-ba5d92576b31
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       - id: 1
@@ -742,6 +743,21 @@
     - !<own> ce2244e2-4a4c-4b36-9be2-972843c3614d
   Components:
     []
+- !<SceneObject/1d332afc-9f11-4e19-9a25-ba5d92576b31>
+  PrefabRemaps:
+    []
+  Name: TaskOrganism (controller)
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> c2014f64-ead9-42d4-95b0-14970d05aee8
 - !<SceneObject/1f8d6c1a-c8f8-463c-b55f-82684ef04f45>
   PrefabRemaps:
     []
@@ -2575,22 +2591,6 @@
   ScriptTypes:
     "":
       {}
-- !<ScriptComponent/89362762-7124-4bab-8954-9352d25584a2>
-  PrefabRemaps:
-    []
-  Name: TaskOrganismController
-  Enabled: true
-  ScriptAsset: !<reference> 29659244-0790-4c6e-a556-0084d676053f
-  ScriptInputsDefault:
-    {}
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      {}
-  ScriptTypes:
-    "":
-      {}
 - !<SceneObject/8b877074-7eee-4be1-b669-714f8d5a1da3>
   PrefabRemaps:
     []
@@ -3055,6 +3055,8 @@
       chaseDistanceMinCm: !<float> 110.000000
       chaseDistanceMaxCm: !<float> 130.000000
       chaseStopDistanceCm: !<float> 100.000000
+      urgencyRimGain: 1.350000
+      urgencyRimPower: 2.500000
       releaseDurationS: 1.500000
       releaseParticleCount: !<float> 30.000000
       releaseParticleSpeedCmS: !<float> 8.000000
@@ -3638,6 +3640,22 @@
     []
   Components:
     []
+- !<ScriptComponent/c2014f64-ead9-42d4-95b0-14970d05aee8>
+  PrefabRemaps:
+    []
+  Name: TaskOrganismController
+  Enabled: true
+  ScriptAsset: !<reference> 29659244-0790-4c6e-a556-0084d676053f
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      {}
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/c81412f8-3a85-43a4-ac54-1c72e7475892>
   PrefabRemaps:
     []
@@ -3796,7 +3814,6 @@
     - !<own> 2ecf7402-5427-40c6-8d95-94a437e39d1e
   Components:
     - !<own> 88e8e796-b031-4ece-83f8-14f79ceb2d18
-    - !<own> 89362762-7124-4bab-8954-9352d25584a2
 - !<SceneObject/ce2213a1-7aa1-4201-a3c7-c2aaa06fd4ff>
   PrefabRemaps:
     []

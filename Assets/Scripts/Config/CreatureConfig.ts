@@ -449,6 +449,27 @@ export const TINT_CHASE_HEAT_BLEND = 0.09;
  * (the same task always stirs at the same moment relative to its neighbours)
  * rather than random per playback, which would make the demo unrepeatable.
  */
+/**
+ * VISUAL REGRESSION HARNESS.
+ *
+ * -1 = off (normal demo). 0..6 selects one golden frame; the Lens jumps the
+ * DemoSequence straight to that frame's state, holds it, and logs
+ * "[VisualHarness] frame=<name> READY" once eased channels have settled.
+ *
+ * One frame per Lens reset, on purpose. It removes wall-clock timing from the
+ * capture entirely — a slow frame cannot change which state a golden image
+ * records — and it forces the reset that PreviewPanelTool.refresh does NOT
+ * perform (see Tools/visual-regression.js and HANDOFF-VISUAL.md).
+ */
+export const VISUAL_HARNESS_FRAME = -1;
+/** Real seconds to let eased channels (posture, tint, urgency halo, panel
+ *  fades) reach steady state after the instant jump, before declaring READY.
+ *  Not a beat delay — the beats are already reached by command. */
+export const VISUAL_HARNESS_SETTLE_S = 1.2;
+/** Longer settle for the post-release frame, so the release particles have
+ *  finished and the habitat has actually re-settled. */
+export const VISUAL_HARNESS_POST_RELEASE_SETTLE_S = 3.0;
+
 export const STATE_CUE_STAGGER_WINDOW_S = 0.42;
 /** Hard cap on cues started within one stagger window. Beyond this, later
  *  crossings are dropped rather than queued: a cue that arrives a second after

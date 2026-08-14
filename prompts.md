@@ -887,3 +887,80 @@ What does not, and is recorded rather than hidden:
   prove the listener exists and the effect is enabled, not that a creature
   entering from the left sounds left. That needs a human with headphones, and
   is the one claim here resting on configuration rather than perception.
+
+## Visual regression harness — and the freeze bug it found
+
+**Prompt:** "From Friday a different person will be changing the visuals, and
+nothing would catch it if they silently broke grounding, facing, label
+legibility or the release sequence."
+
+### Design: one frame per Lens reset
+
+The harness does not wait for beats. `VISUAL_HARNESS_FRAME` selects one of seven
+frames; on start the Lens jumps `DemoSequence` straight to that state with a
+single `advanceTo()` call, pumps hold progress by an exact fraction for the
+mid-gesture frame, then freezes and logs READY once eased channels have settled.
+
+One frame per reset looks wasteful and is the point: **nothing about a captured
+frame depends on wall-clock timing**, so a slow machine cannot change what a
+golden image records. It also forces the correct reset, since changing the frame
+requires one.
+
+Both recorded traps were designed around rather than rediscovered: the runner
+creates the golden directory explicitly (the screenshot tool reports success
+while writing nothing when the directory is missing), and the documented reset
+is `RunAndCollectLogsTool mode:refresh`, never the Preview panel's own refresh.
+
+### Diffing with no dependencies
+
+`Tools/visual-regression.js` shells out to macOS `sips` to convert PNG to
+uncompressed 24-bit BMP and parses that in ~40 lines. The audience is a designer
+on a Friday; a harness that opens with `npm install` is a harness that does not
+get run. Two metrics, because they answer different questions: `meanDelta`
+catches a global shift, `changedPct` catches a small real change that a
+whole-frame mean would dilute to nothing.
+
+Verified as a comparator, not assumed: identical input PASSes at 0.00%,
+a substituted frame FAILs at 7.36%, a deleted frame reports MISSING CAPTURE, and
+the exit code is non-zero in both failure cases.
+
+### Non-visual assertions caught two bugs the images would have hidden
+
+Each frame logs `open`, `chasing`, and per-creature ground checks. Both bugs
+below produced *plausible-looking* images:
+
+1. **The 50% hold frame ran to completion.** The explicit pump set progress to
+   50%, then the settle window let `interaction.update(dt)` carry it to 100%,
+   completing the task. The image looked like a release; the assertion said
+   `open=5` where 6 was expected. Fixed by freezing the interaction while the
+   harness holds a frame.
+2. **The release frames released nothing.** After that freeze, jumping to the
+   RELEASED beat no longer completed anything, because completion is triggered
+   by hold progress reaching 1.0. `open=6` where 5 was expected. Fixed by
+   driving the release the way a user does — jump to RESOLVE, pump the hold to
+   100% — rather than by landing on the beat.
+
+### The real find: completing task 1 froze the entire app
+
+The post-release frame never logged READY at all. The cause was not the harness.
+
+`TaskOrganismController` — the composition root — was a component on
+`MovementRoot_1`. `CreatureBehavior.release()` ends by disabling its own
+`sceneObject`. So **completing the first task disabled the object hosting the
+controller**, and every per-frame system stopped: arbiter sync, beats, gesture
+updates, capacity logging.
+
+It had gone unnoticed because the scripted story ENDS at release. Every previous
+log simply stopped there, and a log that stops at the end of the story looks
+exactly like a log that finished.
+
+Fixed by moving the controller onto its own `TaskOrganism (controller)` scene
+object. Evidence it worked: `[Capacity]` lines now continue past
+`beat=RELEASED`, where in every earlier run they stopped dead at it.
+
+This is the strongest argument for the harness. Nobody was going to catch it by
+looking at pictures — it needed a frame captured three seconds after a release,
+and an assertion that noticed the absence of a log rather than the presence of a
+wrong pixel.
+
+**LEAF: 12/12** after moving the composition root.

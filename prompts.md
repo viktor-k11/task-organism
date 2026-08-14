@@ -521,3 +521,97 @@ reading as a disc, and no species in the six-creature habitat reads as flattened
 Six numbers per species is 36 more Inspector inputs, which wants a proper
 per-species sub-panel rather than a flat list. Flagged in `HANDOFF-VISUAL.md`
 and in the table's own doc comment.
+
+## Six-creature performance — measured, and the assumption was wrong in our favour
+
+**Prompt:** "The six-creature capacity build measured 13.9 fps mean in Preview
+with MCP screenshot capture running, which is not performance-representative.
+That number is currently the only evidence behind a product checklist item that
+says 'six creatures hold FPS', and it is not good enough to quote."
+
+Correct to distrust it. The in-app `[Capacity]` counter reads the Lens update
+delta, which in Preview includes editor and MCP overhead — it measures the
+harness, not the content. Replaced with three Perfetto captures via
+`/specs-capture-perf-trace`, at 3, 5 and 6 open tasks, autoplay on, each 20s so
+the whole story (calm → urgent → approach → select → hold → release) fits inside
+one capture. Verified from the logs that every beat landed in-window.
+
+### Frame time distribution (depth-0 `ProcessFrame`, not the mean alone)
+
+| creatures | frames | p50 | p90 | p95 | p99 | max | p50 fps |
+|---|---|---|---|---|---|---|---|
+| 3 | 279 | 38.86ms | 42.50 | 44.48 | 212.67 | 306.67 | 25.7 |
+| 5 | 250 | 39.73ms | 46.37 | 50.35 | 322.02 | 461.79 | 25.2 |
+| 6 | 211 | 43.28ms | 51.02 | 53.79 | 285.69 | 394.12 | 23.1 |
+
+**The 13.9 fps figure was wrong by roughly 10 fps.** Real median is 23–26 fps.
+
+### Where the frame actually goes (avg ms/frame)
+
+| slice | 3 | 5 | 6 | Δ 3→6 |
+|---|---|---|---|---|
+| `Track` (camera/world tracking) | 25.09 | 29.74 | 31.47 | +6.4 |
+| `CoreManagerRender` | 6.16 | 8.93 | 11.69 | **+5.5** |
+| ├ `RenderFrame` | 2.30 | 3.07 | 3.83 | +1.5 |
+| └ `Scene::Update` | 1.16 | 2.30 | 2.69 | +1.5 |
+| `FaceDetectPreprocess` | 4.73 | 4.81 | 5.07 | +0.3 |
+
+**`Track` is 63–70% of every frame and has nothing to do with creatures.** It is
+the Preview's webcam tracking running on the desktop. The entire creature system
+— render, update, everything under `CoreManagerRender` — is 6–12ms of a 39–43ms
+frame.
+
+### Draw calls and geometry
+
+`Visual` slices per frame: **26.9 → 39.8 → 43.5** for 3 → 5 → 6 creatures.
+Linear fit: ~5.5 draws per creature over a fixed base of ~10 (floor, panels,
+UI). `RenderPass` stays at exactly 2.0/frame at every count, so added creatures
+cost draws inside an existing pass rather than new passes. Per-draw cost is flat
+at 0.06–0.07ms, which is what a single unlit material with no texture binding
+should cost. Geometry is ~3.7–4.8k verts per creature, so 6 creatures is roughly
+26k verts — trivial.
+
+### The event spikes, which are real and are NOT caused by creature count
+
+Frames over 80ms, by offset into the capture (story starts ≈1s in):
+
+- **3:** 1.4s→194ms, 4.8s→213, 11.3s→307, 14.8s→281
+- **5:** 0.6s→433, 4.1s→462, 11.0s→322, 14.6s→196, 17.6s→191
+- **6:** 1.3s→394, 4.8s→292, 18.7s→286
+
+Mapping to beats: the ~0.6–1.4s spike is lens activation (`LensTurnOnTime`
+1.21/1.17/1.59s, `Scene::turnOn` 96% of it). ~4–5s is the **urgency
+transition**. ~11s is the **approach**. ~14.6–14.8s is **selection panel
+construction**. ~17.6–18.7s is the **release effect with its 30 particles**.
+
+Each is a single 190–460ms stall. Critically, **they are present at 3 creatures
+too** — 307ms at count 3 against 286ms at count 6 — so they are per-event
+construction costs (building panel text, spawning particle meshes), not a
+capacity problem. The release effect specifically does not scale with creature
+count.
+
+### Verdict
+
+**Is there a measurable regression as count rises?** Yes, but small and it is
+not the bottleneck: +4.4ms at the median from 3 to 6 creatures (38.86 → 43.28),
+about 2.6 fps. Creature-attributable cost is the +5.5ms in `CoreManagerRender`.
+`Track` also grew (+6.4ms), which creatures cannot cause directly — that is most
+likely CPU contention on a loaded desktop, and it is *not* attributed here with
+confidence.
+
+**Is 6 creatures viable for recording? Yes — shoot at 6.** Creature count is not
+what limits the frame rate; Preview tracking is. Dropping to 3 would buy ~2.6 fps
+and cost the entire point of the capacity demo. The transition stalls are worth
+more attention than the count, and they are identical at 3.
+
+**`/specs-lens-perf-attribution` deliberately NOT run.** The instruction was to
+run it only if the trace showed an actual problem. It does not: our content is
+6–12ms of a frame dominated by harness overhead, per-draw cost is already at the
+floor, and a differential sweep on a healthy build measures nothing.
+
+**Standing caveat:** every number here is Lens Studio Preview on a desktop with
+webcam tracking and face detection active. It is not a SPECS device measurement
+and must not be quoted as one — CLAUDE.md keeps this project preview-only. What
+the trace legitimately supports is the *relative* claim (6 vs 3) and the
+*attribution* (tracking dominates, creatures are cheap), not an absolute device
+frame rate.

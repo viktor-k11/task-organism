@@ -31,3 +31,6 @@ leaf_plugin_settings.json
 
 # Asset generator scratch (one-shot regenerator scripts for /build-sfx)
 tempAssetGen/
+
+# Perfetto captures — large binaries, analysis lives in prompts.md
+performance_traces/

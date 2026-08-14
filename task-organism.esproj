@@ -46,8 +46,8 @@ metaInfo:
     build: 0
   documentId: 8e95918c-1f58-4cff-89d9-fcd88fd635d2
   originalDocumentId: 4492aa5f-47e4-4abe-9643-7d6f708b0869
-  packageId: ""
-  packageVersion: ""
+  packageId: com.example.specsbasetemplate
+  packageVersion: 0.0.1
   spkPrivilegeLevel: Generic
   gluboEnabled: false
 targetPlatform: Spectacles

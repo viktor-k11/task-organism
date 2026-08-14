@@ -576,7 +576,15 @@ export const DEMO_BEAT_SECOND_GAP_S = 1.5;
  *  Shorter than the first approach (4.0s) but still long enough to read as
  *  deliberate movement — at 1.2s it read as a teleport. */
 export const DEMO_BEAT_SECOND_APPROACH_S = 3.0;
-export const DEMO_BEAT_SECOND_SELECT_READ_S = 1.2;
+/**
+ * NOT shortened, unlike the other second-cycle beats. The task TEXT is the only
+ * thing that explains the concept without narration: if the viewer cannot read
+ * that the second task is a DIFFERENT one, the second completion reads as a
+ * repeat of the same animation rather than as a system, and the extra five
+ * seconds of runtime buy nothing. Recognition is not enough here — this beat
+ * has to be long enough to actually read.
+ */
+export const DEMO_BEAT_SECOND_SELECT_READ_S = 2.0;
 
 // ── Staging controls (pick a clean spot before recording) ─────────────────
 /**
@@ -590,6 +598,12 @@ export const DEMO_BEAT_SECOND_SELECT_READ_S = 1.2;
  * were ready — see the staging key map in TaskOrganismController.)
  */
 export const DEMO_AUTOPLAY_ON_START = true;
+/**
+ * CLIP MODE — for recording. Hides the staging panel and the "Advance Demo
+ * Time" button so nothing operator-facing is in frame, while KEEPING the status
+ * line, which is content: it is what tells a viewer how many tasks remain.
+ */
+export const DEMO_CLIP_MODE = true;
 /** Per-keypress nudge for the runtime habitat placement controls. */
 export const HABITAT_DEPTH_STEP_CM = 15;
 export const HABITAT_LATERAL_STEP_CM = 15;

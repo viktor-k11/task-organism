@@ -1,4 +1,5 @@
 import { BackPlate } from "SpectaclesUIKit.lspkg/Scripts/BackPlate";
+import { DEMO_CLIP_MODE } from "../Config/CreatureConfig";
 import { Button } from "SpectaclesUIKit.lspkg/Scripts/Components/Button/Button";
 
 /**
@@ -46,6 +47,9 @@ export class DemoControlView {
         this.button = buttonObject.createComponent(Button.getTypeName()) as Button;
         this.button.size = new vec3(30, 5, 1);
         this.button.onTriggerUp.add(onAdvance);
+        // Clip mode keeps the status text (content) and drops the operator
+        // control (furniture).
+        if (DEMO_CLIP_MODE) buttonObject.enabled = false;
 
         const labelObject = global.scene.createSceneObject("AdvanceDemoTimeLabel");
         labelObject.setParent(buttonObject);
@@ -75,6 +79,7 @@ export class DemoControlView {
     private buildStagingRow(camera: SceneObject | null, staging: StagingActions): void {
         const panel = global.scene.createSceneObject("WednesdayStagingControl");
         if (camera) panel.setParent(camera);
+        if (DEMO_CLIP_MODE) { panel.enabled = false; return; }
         // Above centre, not below the main control. The main control already
         // sits at the bottom edge of the render region (measured: the display
         // spans roughly +/-30 units vertically at this 90cm distance), so a

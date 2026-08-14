@@ -1015,3 +1015,113 @@ of travel, which read as a teleport. Restructured with an explicit post-release
 gap; the second approach now gets 2.97s of visible travel and the whole story
 runs **24.76s** against the original 20s target.
 
+
+## Full optimization loop — measure, gate, and decline to optimize
+
+**Prompt:** "Run the full optimization loop and document it with numbers, not
+claims… Step 2 — only if the trace shows pressure."
+
+The gate did not open. This entry records why, with the numbers.
+
+### Step 0 — two facts established before tracing
+
+Reading the shipped GLBs rather than assuming:
+
+| species | verts | tris | prims | materials | COLOR_0 |
+|---|---|---|---|---|---|
+| dog | 3,672 | 5,002 | 1 | 1 | yes |
+| cat | 4,812 | 3,896 | 1 | 1 | yes |
+| owl | 4,530 | 3,904 | 1 | 1 | yes |
+| elephant | 5,267 | 3,959 | 1 | 1 | yes |
+| rabbit | 7,034 | 3,950 | 1 | 1 | yes |
+| penguin | 4,053 | 3,976 | 1 | 1 | yes |
+
+**MergeMeshesTool is ruled out on evidence, not preference:** every species is
+already a SINGLE primitive with ONE material. There is nothing to merge within a
+creature, and merging across creatures is forbidden — they need independent
+transforms and one material clone each.
+
+**Five of six exceed the 4,000-vertex budget**, rabbit worst at 7,034. Note the
+shape of that overage: triangles are all ~3,900-4,000 while vertices run far
+higher, which is vertex duplication at UV/normal seams rather than geometric
+complexity.
+
+### Step 1 — measurement (autoplay on, both completions in every capture)
+
+30s captures, `DEMO_CLIP_MODE` on, identical method at each count.
+
+| creatures | p50 | p90 | p95 | p99 | max | mean |
+|---|---|---|---|---|---|---|
+| 3 | 43.93ms | 57.24 | 60.97 | 233.38 | 372.31 | 47.48 |
+| 5 | 43.93ms | 59.88 | 65.46 | 212.64 | 356.24 | 48.18 |
+| 6 | 42.87ms | 53.18 | 58.31 | 194.63 | 551.34 | 45.77 |
+
+**The median does not move with creature count.** 43.9 / 43.9 / 42.9 — six
+creatures is the *fastest* of the three at p50. Any cost of adding creatures is
+smaller than the run-to-run variance.
+
+Where the frame goes (avg ms/frame):
+
+| slice | 3 | 5 | 6 |
+|---|---|---|---|
+| `Track` (Preview webcam/world tracking) | 37.02 | 37.40 | 35.19 |
+| `CoreManagerRender` | 12.14 | 11.52 | 12.04 |
+| `RenderFrame` | 3.27 | 3.46 | 4.44 |
+| `Scene::Update` | 4.51 | 3.34 | 3.38 |
+| `FaceDetectPreprocess` | 5.56 | 5.71 | 5.34 |
+
+`Track` is **78-82% of every frame** and does not scale with creature count —
+it is desktop Preview overhead, not content. `CoreManagerRender`, which contains
+everything our creatures do to render, is **flat at ~12ms** across 3, 5 and 6.
+
+Draw calls scale as expected and stay cheap: **17.3 / 25.9 / 30.5** `Visual`
+slices per frame, about 4.4 per creature over a fixed base, at 0.10-0.13ms each.
+`RenderPass` stays at exactly 2.0/frame at every count — no added passes.
+
+### The one real pressure point, and step 2's tools do not address it
+
+Spikes over 80ms, by offset (story beats in brackets):
+
+- **3:** 5.6s [urgency], 9.1s→372ms [approach], 16.0s [hold/release], 22.6s [second select]
+- **5:** 6.3s, 12.8s, 15.9s, 19.3s, 22.4s, 25.9s→356ms [second release]
+- **6:** 0.4s [activation], 10.9s, **17.9s→551ms [release]**, 21.4s
+
+At six creatures the release frame also shows `Visual max=273ms` and
+`RenderPass max=292ms` — a single frame in which the 30-particle burst is
+constructed. That is the only content-attributable pressure in the whole trace.
+
+It is **not** a mesh problem. Merging cannot help (nothing to merge) and
+simplification cannot help (the spike is particle construction, not vertex
+throughput). The lever that actually points at it is `releaseParticleCount`,
+which is already exposed on the Art Direction panel.
+
+### Step 2 — NOT RUN, deliberately
+
+The gate was "only if the trace shows pressure". Creature-attributable cost is
+flat across 3→6, per-draw cost is at the floor, and no pass or draw was added.
+Running MergeMeshes against single-primitive meshes and SimplifyMesh against a
+frame that is 80% webcam tracking would have produced a change with nothing to
+show for it — and step 3 would then have reverted it for buying under 10%.
+
+Declining to optimize is the correct output of an optimization loop that found
+nothing to optimize.
+
+### Steps 3 and 4 — not applicable
+
+No change was made, so there is no delta to re-measure. `/specs-lens-perf-attribution`
+is not run: a differential sweep needs a problem to attribute, and the one spike
+found is already fully attributed to a known, tunable cause.
+
+### The open risk this does NOT clear
+
+The vertex budget overage is real and remains unaddressed. Every number above is
+Lens Studio Preview on a desktop, where vertex processing is invisible behind
+webcam tracking; on SPECS hardware it may not be. This measurement is honest
+evidence that there is no pressure **in Preview** — it is not evidence that
+7,034 vertices is fine on device, and CLAUDE.md keeps this project preview-only
+so that question cannot be closed here.
+
+If the budget is to be enforced, the fix is not plain decimation: the overage is
+seam duplication, so the win would come from welding vertices — which risks
+blending `COLOR_0` across seams and taking the creatures back to reading as flat
+cutouts. That is a deliberate piece of work, not a tool invocation.

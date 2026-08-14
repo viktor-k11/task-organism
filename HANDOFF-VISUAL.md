@@ -58,8 +58,9 @@ To change the first three creatures too, make the same edit on `MovementRoot_1`,
 ### Meshes and materials
 
 - Creature models: `Assets/GeneratedMeshes/*.glb` — `dog_lo`, `cat_lo`,
-  `owl_lo`, `rabbit_lo`, `penguin_lo` (and `elephant_lo`, currently not in
-  rotation — see below).
+  `owl_lo`, `elephant_lo`, `rabbit_lo`, `penguin_lo`. All six are in rotation,
+  one per creature identity. Only the dog is a third-party asset; the other
+  five are generated and carry no third-party rights (see `LICENSES.md`).
 - Body material: `Assets/Materials/PetBody.mat`, driven by
   `PetBody.graphShader`. It multiplies a flat base colour by the mesh's baked
   vertex shading. **Do not edit `unlit.graphShader`** — it is shared, and a
@@ -157,15 +158,18 @@ hotkeys. Don't expect keyboard shortcuts to work.
 
 ## 5. Known visual debt — good places to start
 
-- **Posture flattens round species.** `postureCalmHeight` (0.86) and
-  `postureCalmWidth` (1.14) were tuned against a tall blob. On the penguin and
-  rabbit the result reads as a squashed disc. Worth retuning per the current
-  roster.
-- **The elephant is out of rotation.** `elephant_lo.glb` is in the project but
-  withheld from the species list: its ears flare wider than its body and its
-  trunk came out a stub, so at habitat distance it reads as a flat slab.
+- **Per-species posture is not yet editable — the biggest gap in this panel.**
+  The Inspector's posture sliders drive a single global baseline, but round
+  species (penguin, rabbit, cat, owl, elephant) now use their own values from
+  `PET_POSTURE_OVERRIDES` in `Assets/Scripts/Creature/CreaturePetVisual.ts`,
+  which is code, not Inspector. Editing the panel's posture fields therefore
+  affects the **dog only**. Exposing the rest means 36 more inputs, so it wants
+  a proper per-species sub-panel rather than a flat list — the single most
+  worthwhile improvement to this handoff surface.
 - **The rabbit's face is shallow** compared to the owl's, which has the
   strongest sculpted face of the set.
+- **The elephant is busier than the rest** — more surface ridging than the other
+  five, which reads as noise at habitat distance.
 - **Six creatures share one clone template but three authored slots** (see
   §1) — unifying that is the biggest structural cleanup available.
 

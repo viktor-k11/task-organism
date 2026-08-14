@@ -648,7 +648,9 @@ export const OWL_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / OWL_BODY_TO_BB
  *   penguin   1.0000 — no ears at all; bbox IS the body
  */
 export const ELEPHANT_BODY_TO_BBOX_RATIO = 1.0;
-export const ELEPHANT_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / 0.8499;
+/** Attempt 2 measures 0.9992 units tall against 1.0000 wide — near-cubic, where
+ *  attempt 1 was 0.8499 tall and 0.9918 wide and read as a slab. */
+export const ELEPHANT_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / 0.9992;
 export const RABBIT_BODY_TO_BBOX_RATIO = 0.8961;
 export const RABBIT_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / RABBIT_BODY_TO_BBOX_RATIO;
 export const PENGUIN_BODY_TO_BBOX_RATIO = 1.0;

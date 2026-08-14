@@ -23,12 +23,67 @@ export type PetSpecies = "dog" | "cat" | "owl" | "elephant" | "rabbit" | "pengui
  *  what decides which animals a small demo actually shows, so accepted species
  *  are appended rather than inserted — inserting would re-shuffle every
  *  existing task's animal. */
-/** "elephant" is deliberately ABSENT: the asset exists and is fully wired
- *  (PET_DISPLAY_SCALE, petPrefabs), but the generation failed acceptance — its
- *  ears flare wider than its body, the trunk came out a stub, and at habitat
- *  distance it reads as a flat slab rather than an animal. Re-adding it after a
- *  regeneration is exactly one word here. */
-export const PET_SPECIES_BY_SEED: PetSpecies[] = ["dog", "cat", "owl", "rabbit", "penguin"];
+export const PET_SPECIES_BY_SEED: PetSpecies[] = ["dog", "cat", "owl", "elephant", "rabbit", "penguin"];
+
+/** Height/width scale pair for one behaviour state. Height under 1 squashes;
+ *  width above 1 widens to keep the body reading as the same volume. */
+export interface PosturePair { height: number; width: number; }
+export interface SpeciesPosture { calm: PosturePair; urgent: PosturePair; chase: PosturePair; }
+
+/**
+ * PER-SPECIES posture overrides.
+ *
+ * The global posture values (see ArtDirection / CreatureConfig) were tuned
+ * against the original tall procedural blob, where squashing height to 0.86 and
+ * widening to 1.14 read as a creature settling. Applied to the ROUND generated
+ * species the same numbers read as a creature being stepped on: the penguin
+ * flattened into a disc and the rabbit came out squatter than its own model.
+ *
+ * The reason is proportion, not taste. A squash multiplies the existing
+ * silhouette, so the flatter a species already is, the more a fixed height
+ * reduction costs it. A tall quadruped has height to spend; an egg does not.
+ *
+ * Only species that need different numbers appear here. Anything absent — the
+ * dog included, deliberately, so its verified look is untouched — falls back to
+ * the ArtDirection values, which remain live and editable in the Inspector.
+ *
+ * KNOWN GAP (flagged for the designer handoff): this table is not yet on the
+ * editable surface. Six numbers per species is too many for a flat Inspector
+ * panel, so it wants a proper per-species sub-panel rather than 36 more inputs.
+ * See HANDOFF-VISUAL.md.
+ */
+export const PET_POSTURE_OVERRIDES: Partial<Record<PetSpecies, SpeciesPosture>> = {
+    // Upright egg with no height to spare — the worst case, so the least squash.
+    penguin: {
+        calm: { height: 0.96, width: 1.04 },
+        urgent: { height: 1.10, width: 0.95 },
+        chase: { height: 1.05, width: 0.98 },
+    },
+    // Round body, and its upright ears exaggerate any vertical compression.
+    rabbit: {
+        calm: { height: 0.94, width: 1.05 },
+        urgent: { height: 1.12, width: 0.94 },
+        chase: { height: 1.06, width: 0.97 },
+    },
+    // Sitting pose: already wide at the base.
+    cat: {
+        calm: { height: 0.92, width: 1.06 },
+        urgent: { height: 1.13, width: 0.94 },
+        chase: { height: 1.06, width: 0.97 },
+    },
+    // Nearly spherical.
+    owl: {
+        calm: { height: 0.95, width: 1.04 },
+        urgent: { height: 1.11, width: 0.95 },
+        chase: { height: 1.05, width: 0.98 },
+    },
+    // Barrel body, wider than tall.
+    elephant: {
+        calm: { height: 0.94, width: 1.05 },
+        urgent: { height: 1.12, width: 0.94 },
+        chase: { height: 1.06, width: 0.97 },
+    },
+};
 
 /** Per-species localScale for the instantiated prefab root. A table rather than
  *  a ternary chain: every species is measured separately (each generation has

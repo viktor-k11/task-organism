@@ -441,3 +441,83 @@ along; no change made. Config restored from backup and verified by `git diff`.
 Recording this as a closed cycle because the honest outcome of a measurement is
 sometimes that the thing you suspected is fine — and a suspicion retired with
 evidence is worth as much as a bug fixed.
+
+### Elephant attempt 2 — ACCEPTED, and why the rewrite worked
+
+**Prompt:** "Rewrite with the body mass as the explicit subject — a rounded
+barrel body clearly wider than the ears are tall, ears held close to the head
+rather than flared, and a trunk that is thick, short and curved forward so it
+reads as a trunk in silhouette rather than as a stub."
+
+Job `9395d15d`, `balanced`/`high`/`high`, 3,959 tris.
+
+The measurements alone show the rewrite landed, before any judgement of taste:
+
+| | attempt 1 (rejected) | attempt 2 (accepted) |
+|---|---|---|
+| bbox height | 0.8499 | 0.9992 |
+| bbox width | 0.9918 | 1.0000 |
+| display scale | 40.003 | 34.026 |
+
+Attempt 1 was wider than it was tall — the numeric signature of the slab it
+looked like. Attempt 2 is near-cubic.
+
+**What actually changed in the prompt, and the generalisable lesson.** Attempt 1
+repeated "thick, never thin" at the trunk five different ways and got
+thickness — at the cost of length, because nothing asked for length. It also
+never mentioned the body except as a place for other parts to attach, so the
+generator spent its mass budget on ears. Two corrections:
+
+1. **Name the body as the subject, and rank it.** "THE BODY IS THE SUBJECT…
+   clearly the largest single mass in the whole model, much wider than the ears
+   are tall." Constraints expressed as *relationships between parts* survive
+   generation better than adjectives about one part.
+2. **Constrain the silhouette, not the thickness.** "curving smoothly FORWARD
+   and up at the tip like the letter J… roughly as long as the head is tall"
+   plus an explicit "not a short bump, not a stub, not a nub". Attempt 1's
+   failure was over-correction; naming *both* failure modes in the same clause
+   is what kept it between them.
+
+The negative prompt also gained the ear failure directly — `flared ears,
+fanned ears, ears wider than body, dumbo ears` — which attempt 1 lacked
+entirely because that failure had not happened yet.
+
+**Verdict: accepted.** Trunk reads unmistakably in silhouette, barrel body
+dominates, ears are proportionate and held close, eyes read as bumps. It is
+busier than the other five (more surface ridging) — a refinement item, not a
+blocker. Restored to `PET_SPECIES_BY_SEED`, giving the full six-species roster.
+
+### Per-species posture — the squash was never species-neutral
+
+**Prompt:** "POSTURE_CALM_HEIGHT_SCALE 0.86 / WIDTH_SCALE 1.14 were tuned
+against the tall procedural blob and they flatten round species far harder than
+the dog."
+
+Correct diagnosis, and the mechanism is proportional rather than aesthetic: a
+posture scale MULTIPLIES the existing silhouette, so the flatter a species
+already is, the more a fixed height reduction costs it. A tall quadruped has
+height to spend; an upright egg does not. The same 0.86 that reads as "settling"
+on the dog read as "stepped on" for the penguin.
+
+Added `PET_POSTURE_OVERRIDES` — a calm/urgent/chase triple of height+width pairs
+per species. Species absent from the table fall back to the ArtDirection values,
+and the **dog is deliberately absent** so its verified look is bit-for-bit
+unchanged. Round species take proportionally less squash, scaled to how little
+height each has to give:
+
+| species | calm H/W | rationale |
+|---|---|---|
+| dog | 0.86 / 1.14 (fallback) | unchanged baseline |
+| cat | 0.92 / 1.06 | sitting, already wide at the base |
+| owl | 0.95 / 1.04 | nearly spherical |
+| elephant | 0.94 / 1.05 | barrel body |
+| rabbit | 0.94 / 1.05 | upright ears exaggerate compression |
+| penguin | 0.96 / 1.04 | upright egg — worst case, least squash |
+
+Verified by capture: the penguin now holds a rounded belly at rest instead of
+reading as a disc, and no species in the six-creature habitat reads as flattened.
+
+**Recorded as a known gap:** this table is NOT on the designer-editable surface.
+Six numbers per species is 36 more Inspector inputs, which wants a proper
+per-species sub-panel rather than a flat list. Flagged in `HANDOFF-VISUAL.md`
+and in the table's own doc comment.

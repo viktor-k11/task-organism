@@ -1,5 +1,5 @@
 import { ART } from "../Config/ArtDirection";
-import { CreaturePetVisual, PetSpecies, speciesForSeed } from "./CreaturePetVisual";
+import { CreaturePetVisual, PetSpecies, speciesForSeed, PET_POSTURE_OVERRIDES } from "./CreaturePetVisual";
 import { CreatureEyes, CreatureEye } from "./CreatureEyes";
 import { CreatureEarsAndTail } from "./CreatureEarsAndTail";
 import { CreatureMouth } from "./CreatureMouth";
@@ -1192,8 +1192,19 @@ export class CreatureBehavior extends BaseScriptComponent {
         const breatheHz = profile === "CALM" ? BREATHE_CALM_FREQUENCY_HZ : profile === "URGENT" ? BREATHE_URGENT_FREQUENCY_HZ : BREATHE_CHASE_FREQUENCY_HZ;
         const breathe = 1 + breatheAmp * Math.sin(this.timeS * breatheHz * Math.PI * 2);
 
-        const targetHeight = profile === "CALM" ? ART.postureCalmHeight : profile === "URGENT" ? ART.postureUrgentHeight : ART.postureChaseHeight;
-        const targetWidth = profile === "CALM" ? ART.postureCalmWidth : profile === "URGENT" ? ART.postureUrgentWidth : ART.postureChaseWidth;
+        // Posture is per-species where a species needs it (see
+        // PET_POSTURE_OVERRIDES); everything else uses the live ArtDirection
+        // values, so the Inspector panel still drives the baseline.
+        const posture = this.currentSpecies ? PET_POSTURE_OVERRIDES[this.currentSpecies] : undefined;
+        const pair = posture
+            ? (profile === "CALM" ? posture.calm : profile === "URGENT" ? posture.urgent : posture.chase)
+            : null;
+        const targetHeight = pair
+            ? pair.height
+            : profile === "CALM" ? ART.postureCalmHeight : profile === "URGENT" ? ART.postureUrgentHeight : ART.postureChaseHeight;
+        const targetWidth = pair
+            ? pair.width
+            : profile === "CALM" ? ART.postureCalmWidth : profile === "URGENT" ? ART.postureUrgentWidth : ART.postureChaseWidth;
         const postureAlpha = clamp01(dt * POSTURE_EASE_PER_S);
         this.postureHeightScale += (targetHeight - this.postureHeightScale) * postureAlpha;
         this.postureWidthScale += (targetWidth - this.postureWidthScale) * postureAlpha;

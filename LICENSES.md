@@ -1,46 +1,120 @@
-# Third-party asset licenses
+# Asset licenses
 
-Ready-made 3D models used as the creature's visual body (`Assets/3d assets/`,
-simplified copies at `Assets/GeneratedMeshes/dog_lo.glb` and `cat_lo.glb`).
-Attribution fields below are copied verbatim from each GLB's embedded
-`asset.extras` metadata (Sketchfab export), not retyped by hand.
+Every binary asset shipped in this repository, and where it came from.
 
-## Dog
+There is exactly **one** third-party asset left: the dog. Every other creature
+is generated, and the audio is synthesised from code.
 
-- **Title:** Animated Dog Sits Rolls Over Shake Paw
-- **Author:** LasquetiSpice (https://sketchfab.com/LasquetiSpice)
-- **Source:** https://sketchfab.com/3d-models/animated-dog-sits-rolls-over-shake-paw-d9020159339145e6b9ecd5f3d830830f
-- **License:** CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+---
 
-## Cat
+## Third-party: the dog
 
-- **Title:** Bengal Cat Non Commercial
-- **Author:** osmanarici2004_1 (https://sketchfab.com/osmanarici2004_1)
-- **Source:** https://sketchfab.com/3d-models/bengal-cat-non-commercial-ad99670274254e4aa539a90a5dbdb24e
-- **License:** CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+| | |
+|---|---|
+| **Files** | `Assets/3d assets/dog.glb` (source), `Assets/GeneratedMeshes/dog_lo.glb` (shipped) |
+| **Title** | Animated Dog Sits Rolls Over Shake Paw |
+| **Author** | LasquetiSpice — https://sketchfab.com/LasquetiSpice |
+| **Source** | https://sketchfab.com/3d-models/animated-dog-sits-rolls-over-shake-paw-d9020159339145e6b9ecd5f3d830830f |
+| **License** | CC-BY-4.0 — http://creativecommons.org/licenses/by/4.0/ |
 
-> **Flag, not resolved:** this model's own *title* says "Non Commercial,"
-> which directly conflicts with the CC-BY-4.0 value in its embedded license
-> field — CC-BY permits commercial use with attribution; NC licenses do not.
-> The embedded field is what Sketchfab's exporter wrote at download time, but
-> a titled restriction from the author is a real signal it may not reflect
-> the author's actual intent. **Before this project — or the cat asset
-> specifically — is used anywhere beyond this internal hackathon build,
-> verify the license directly on the Sketchfab listing above** rather than
-> trusting the embedded metadata alone.
+Attribution fields are copied verbatim from the GLB's embedded `asset.extras`
+metadata (written by Sketchfab's exporter), not retyped by hand.
 
-## Attribution text (CC-BY-4.0 requires credit)
+### Required attribution
 
 > "Animated Dog Sits Rolls Over Shake Paw" by LasquetiSpice, licensed under
-> CC-BY-4.0. Source: https://sketchfab.com/3d-models/animated-dog-sits-rolls-over-shake-paw-d9020159339145e6b9ecd5f3d830830f
->
-> "Bengal Cat Non Commercial" by osmanarici2004_1, licensed under CC-BY-4.0
-> per embedded metadata (see flag above). Source: https://sketchfab.com/3d-models/bengal-cat-non-commercial-ad99670274254e4aa539a90a5dbdb24e
+> CC-BY-4.0.
+> Source: https://sketchfab.com/3d-models/animated-dog-sits-rolls-over-shake-paw-d9020159339145e6b9ecd5f3d830830f
 
-## Processing applied
+### What we modified
 
-Both source GLBs were decimated for the SPECS polycount budget using
-`@gltf-transform/cli simplify` (meshoptimizer) — see
-`Assets/Scripts/Creature/CreaturePetVisual.ts` for the resulting triangle
-counts and the runtime orientation/scale correction applied. No other
-modification was made to the geometry or textures.
+CC-BY-4.0 permits modification and requires that modifications be indicated.
+Applied to the dog:
+
+- **Decimated** for the SPECS polycount budget with `@gltf-transform/cli
+  simplify` (meshoptimizer). Shipped at 3,672 vertices / 5,002 triangles.
+- **Vertex colours baked** by `Tools/bake-vertex-shading.js`, which writes a
+  `COLOR_0` attribute the source did not have: a height ramp combined with a
+  `normal.y` dome term, used by `Assets/Materials/PetBody.graphShader` to fake
+  vertical shading in an unlit pipeline.
+- **Textures discarded at runtime.** The source ships PBR materials; this
+  project is unlit end to end, so the shipped mesh is rendered with a flat
+  per-creature base colour multiplied by the baked vertex shading. The original
+  textures are neither used nor redistributed in the runtime material.
+- **Orientation and scale corrected at runtime** (not baked): a 180° yaw and a
+  uniform display scale applied by `CreaturePetVisual.ts`.
+
+The skeleton and animation clips remain in the file but are unused — the
+project drives all motion by direct transform control.
+
+---
+
+## Generated: the other five creatures
+
+| File | Species |
+|---|---|
+| `Assets/GeneratedMeshes/cat_lo.glb` | cat |
+| `Assets/GeneratedMeshes/owl_lo.glb` | owl |
+| `Assets/GeneratedMeshes/elephant_lo.glb` | baby elephant |
+| `Assets/GeneratedMeshes/rabbit_lo.glb` | rabbit |
+| `Assets/GeneratedMeshes/penguin_lo.glb` | baby penguin |
+
+These were produced with the **SPECS text-to-3D generation API** from prompts
+written for this project (recorded in full in `prompts.md`). They are not
+derived from any third-party model, so **they carry no third-party rights at
+all** — there is no upstream author to credit, no license to comply with, and
+no attribution requirement. That is the reason they exist: generating the cat
+retired a licensing question rather than documenting one.
+
+Each was then processed by this project's own pipeline, in order:
+`Tools/prepare-pet-glb.js` → `Tools/seat-pet-glb.js` →
+`Tools/bake-vertex-shading.js`.
+
+---
+
+## Generated: audio
+
+| File | |
+|---|---|
+| `Assets/GeneratedSFX/ReleaseBreath.wav` | 1.10 s, stereo |
+| `Assets/GeneratedSFX/ReleaseHum.wav` | 1.10 s, stereo |
+| `Assets/GeneratedSFX/ReleaseBloom.wav` | 1.10 s, stereo |
+
+Three variants of the task-completion release cue; one is selected by
+`RELEASE_SFX_VARIANT`. Synthesised procedurally by the CLAD `build-sfx` DSP
+engine — **no samples, no recordings, no datasets, no model weights** — so they
+are license-clean by construction and carry no third-party rights.
+
+---
+
+## Removed
+
+Assets deleted from the repository, recorded so their absence is not mistaken
+for an oversight:
+
+- **`Assets/3d assets/cat.glb`** — "Bengal Cat Non Commercial" by
+  osmanarici2004_1. Removed over an unresolved licence conflict: the model's
+  own *title* asserted non-commercial use while its embedded license field said
+  CC-BY-4.0, which permits commercial use. Rather than resolve the ambiguity we
+  replaced the asset with a generated cat, which removes the question entirely.
+- **`Assets/3d assets/cat_quaternius.glb`** — a CC0 replacement candidate,
+  never shipped. Rejected because its face was textural rather than geometric:
+  its eyes lived in a texture atlas that this project's unlit pipeline
+  discards, leaving a blank face.
+- **`Assets/GeneratedMeshes/PetCreature.glb`** — an earlier procedurally
+  generated body, unreferenced by any code path once the ready-made and
+  generated models replaced it.
+
+---
+
+## Verification
+
+To confirm the claim that the dog is the only third-party binary:
+
+```bash
+ls "Assets/3d assets/" Assets/GeneratedMeshes/ Assets/GeneratedSFX/
+```
+
+Everything under `Assets/GeneratedMeshes/` except `dog_lo.glb` is generated,
+everything under `Assets/GeneratedSFX/` is synthesised, and `Assets/3d assets/`
+should contain only `dog.glb` and its `.meta`.

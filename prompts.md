@@ -840,3 +840,50 @@ five creatures. A small per-creature stagger is the obvious fix and is *not* in
 this change.
 
 **LEAF: 12/12** after the change, since `CreatureBehavior.ts` was modified again.
+
+### Stagger, spatialisation, and a three-loop repetition test
+
+**Stagger.** Per-creature offset derived from `appearanceSeed` — deterministic,
+not random per playback, so a recorded take is repeatable. Confirmed across
+three consecutive runs: `MovementRoot_2 +0.12s`, `MovementRoot_3 +0.21s`,
+`MovementRoot_1 pad +0.09s`, **byte-identical every time**. The two stirs went
+from 11ms apart (one loud noise) to 124ms apart (two creatures).
+
+A shared module-scope budget caps cues per window at 3. It is module scope
+deliberately: the problem is six creatures sounding together, and a per-creature
+limiter cannot see its neighbours. Over-budget cues are **dropped, not queued** —
+a cue arriving a second after the event it describes is worse than no cue.
+
+Snooze stays immediate and unstaggered: it answers a button press, where delay
+reads as lag rather than as texture.
+
+**Spatialisation — a real miss, now fixed.** The cues were playing
+non-positionally. `SpatialAudio` with `DistanceEffect` (60–700cm) is now enabled
+on both audio components, and an `AudioListenerComponent` is created on the
+camera — without a listener the whole spatial path silently does nothing, which
+is exactly the kind of no-error failure this project has been bitten by before.
+
+This matters more here than in a typical Lens. The additive render region ends
+near ±70cm lateral at habitat distance, so **a creature approaching from the
+side is audible before it is visible**. Sound is the only channel that carries
+anything outside the frame, and playing flat threw that away.
+
+**Three-loop repetition test at capacity.** Three full stories back to back.
+What holds up: cue count stays at exactly 3 per loop, the stagger is identical
+each time, no drift, no doubling, no drops, and the release cue keeps firing
+1–2ms after `ReleaseEffect.play`.
+
+What does not, and is recorded rather than hidden:
+
+- **The stir is the cue that will wear out first.** It fires twice per loop from
+  a single sample with no variation. Three loops is enough to notice the
+  repetition; a judge watching several takes will hear the same rustle six
+  times. Two or three stir variants chosen per creature by seed would fix it,
+  and is the obvious next audio task.
+- **The budget cap has never actually been exercised.** The demo spread only
+  ever crosses two creatures at once, so the 3-per-window limit is untested in
+  practice. It is correct by construction and by reading, not by observation.
+- **Nothing in the loop verifies the spatial panning is audible** — the logs
+  prove the listener exists and the effect is enabled, not that a creature
+  entering from the left sounds left. That needs a human with headphones, and
+  is the one claim here resting on configuration rather than perception.

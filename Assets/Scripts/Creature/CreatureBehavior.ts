@@ -42,6 +42,10 @@ import {
     GAZE_URGENT_TREMOR_HZ,
     TINT_EASE_PER_S,
     TINT_HEAT_COLOR,
+    STATE_CUE_STAGGER_WINDOW_S,
+    STATE_CUE_MAX_PER_WINDOW,
+    SPATIAL_AUDIO_MIN_DISTANCE_CM,
+    SPATIAL_AUDIO_MAX_DISTANCE_CM,
     TINT_URGENT_HEAT_BLEND,
     TINT_CHASE_HEAT_BLEND,
     WANDER_CALM_SPEED_CM_S,
@@ -111,6 +115,22 @@ import {
 /** State-transition cues. Discrete one-shots fired when a creature crosses a
  *  behaviour boundary — deliberately NOT a continuous bed, since CLAUDE.md puts
  *  ambient music out of scope this week. */
+/**
+ * Shared cue budget across ALL creatures. Deliberately module scope rather than
+ * per-creature: the problem being solved is six creatures sounding at once, and
+ * a per-creature limiter cannot see its neighbours.
+ */
+const cueBudget = { windowEndsAtS: -1, used: 0 };
+function claimCueSlot(nowS: number): boolean {
+    if (nowS >= cueBudget.windowEndsAtS) {
+        cueBudget.windowEndsAtS = nowS + STATE_CUE_STAGGER_WINDOW_S;
+        cueBudget.used = 0;
+    }
+    if (cueBudget.used >= STATE_CUE_MAX_PER_WINDOW) return false;
+    cueBudget.used += 1;
+    return true;
+}
+
 const stateStirTrack = requireAsset("../../GeneratedSFX/StateStir.wav") as AudioTrackAsset;
 const statePadTrack = requireAsset("../../GeneratedSFX/StatePad.wav") as AudioTrackAsset;
 const stateSettleTrack = requireAsset("../../GeneratedSFX/StateSettle.wav") as AudioTrackAsset;
@@ -234,6 +254,13 @@ export class CreatureBehavior extends BaseScriptComponent {
      *  only records the profile and plays nothing — otherwise every creature
      *  would stir at startup, and at capacity that is six cues at once. */
     private lastAnnouncedProfile: "CALM" | "URGENT" | "CHASE" | null = null;
+    /** Deterministic per-creature offset inside the stagger window, derived
+     *  from appearanceSeed in setAppearanceSeed. */
+    private cueStaggerS = 0;
+    /** A cue waiting out its stagger offset. Only one is ever pending: a newer
+     *  transition replaces an older undelivered one, because the creature's
+     *  CURRENT state is the only thing worth announcing. */
+    private pendingCue: { track: AudioTrackAsset; label: string; atS: number } | null = null;
 
     private body: CreatureVisual | null = null;
     /** Same object as `body`, kept at its concrete type so the species swap in
@@ -425,6 +452,11 @@ export class CreatureBehavior extends BaseScriptComponent {
         // such second chance, and every creature silently came out as the
         // seed-0 species.
         this.appearanceSeed = seed;
+        // Deterministic offset: the same task always stirs at the same moment
+        // relative to its neighbours, so a recorded demo is repeatable. A
+        // random-per-playback offset would make every take different.
+        const mixed = Math.abs(Math.imul(Math.floor(seed) + 0x9e3779b9, 0x85ebca6b)) % 1000;
+        this.cueStaggerS = (mixed / 1000) * STATE_CUE_STAGGER_WINDOW_S;
 
         // Still handle the already-built case: a seed can change after
         // construction (task rebind), and then the body must be swapped now.
@@ -800,6 +832,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.applyBodyScale(dt);
         this.updateColorTint(dt);
         this.updateStateAudio();
+        this.updatePendingCue();
         this.updateExpression(dt);
         this.updateFaceAndSecondaryMotion(dt);
     }
@@ -1298,16 +1331,66 @@ export class CreatureBehavior extends BaseScriptComponent {
         const audio = visualRoot.createComponent("Component.AudioComponent") as AudioComponent;
         if (!audio) return null;
         audio.playbackMode = Audio.PlaybackMode.LowLatency;
+        CreatureBehavior.spatialise(audio);
         return audio;
+    }
+
+    /**
+     * Makes a cue positional. This matters more here than in a typical Lens:
+     * the additive render region ends near +/-70cm lateral at habitat distance,
+     * so a creature approaching from the side is AUDIBLE BEFORE IT IS VISIBLE.
+     * Sound is the only channel that can carry anything happening outside the
+     * frame, and playing these cues non-positionally threw that away.
+     *
+     * Requires an AudioListenerComponent on the camera — see
+     * TaskOrganismController.ensureAudioListener.
+     */
+    private static spatialise(audio: AudioComponent): void {
+        const spatial = audio.spatialAudio;
+        if (!spatial) return;
+        spatial.enabled = true;
+        const distance = spatial.distanceEffect;
+        if (distance) {
+            distance.enabled = true;
+            distance.minDistance = SPATIAL_AUDIO_MIN_DISTANCE_CM;
+            distance.maxDistance = SPATIAL_AUDIO_MAX_DISTANCE_CM;
+        }
     }
 
     /** Fires one state cue. Swapping audioTrack per cue is safe here because
      *  this component plays nothing else. */
-    private playStateCue(track: AudioTrackAsset | null, label: string): void {
+    /** Schedules a cue after this creature's stagger offset. */
+    private scheduleStateCue(track: AudioTrackAsset | null, label: string): void {
+        if (this.isReleased || !this.stateAudio || !track) return;
+        this.pendingCue = { track, label, atS: getTime() + this.cueStaggerS };
+    }
+
+    /** Fires a scheduled cue once its offset has elapsed, if the shared budget
+     *  still has room. Dropped rather than queued when it does not — see
+     *  STATE_CUE_MAX_PER_WINDOW. */
+    private updatePendingCue(): void {
+        const pending = this.pendingCue;
+        if (!pending) return;
+        const now = getTime();
+        if (now < pending.atS) return;
+        this.pendingCue = null;
+        if (this.isReleased || !this.stateAudio) return;
+        if (!claimCueSlot(now)) {
+            console.log(`[StateAudio] ${pending.label} DROPPED (budget) root=${this.sceneObject.name}`);
+            return;
+        }
+        this.stateAudio.audioTrack = pending.track;
+        this.stateAudio.play(1);
+        console.log(`[StateAudio] ${pending.label} root=${this.sceneObject.name} +${this.cueStaggerS.toFixed(2)}s`);
+    }
+
+    /** Immediate, unstaggered cue — for user-initiated actions, where a delay
+     *  would read as lag rather than as texture. */
+    private playStateCueNow(track: AudioTrackAsset | null, label: string): void {
         if (this.isReleased || !this.stateAudio || !track) return;
         this.stateAudio.audioTrack = track;
         this.stateAudio.play(1);
-        console.log(`[StateAudio] ${label} root=${this.sceneObject.name}`);
+        console.log(`[StateAudio] ${label} root=${this.sceneObject.name} immediate`);
     }
 
     /**
@@ -1326,15 +1409,15 @@ export class CreatureBehavior extends BaseScriptComponent {
         if (profile === this.lastAnnouncedProfile) return;
         const previous = this.lastAnnouncedProfile;
         this.lastAnnouncedProfile = profile;
-        if (profile === "URGENT" && previous === "CALM") this.playStateCue(stateStirTrack, "stir");
-        else if (profile === "CHASE") this.playStateCue(statePadTrack, "pad");
+        if (profile === "URGENT" && previous === "CALM") this.scheduleStateCue(stateStirTrack, "stir");
+        else if (profile === "CHASE") this.scheduleStateCue(statePadTrack, "pad");
     }
 
     /** "Later" — the creature stands down. Fired by the snooze path rather than
      *  by a profile change, because snoozing does not always cross a profile
      *  boundary and the acknowledgement should be heard regardless. */
     playSnoozeCue(): void {
-        this.playStateCue(stateSettleTrack, "settle");
+        this.playStateCueNow(stateSettleTrack, "settle");
     }
 
     /**
@@ -1356,6 +1439,7 @@ export class CreatureBehavior extends BaseScriptComponent {
             audio.audioTrack = track;
             audio.playbackMode = Audio.PlaybackMode.LowLatency;
         }
+        CreatureBehavior.spatialise(audio);
         return audio;
     }
 

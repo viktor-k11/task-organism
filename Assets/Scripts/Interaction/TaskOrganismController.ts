@@ -275,6 +275,7 @@ export class TaskOrganismController extends BaseScriptComponent {
 
         this.bindCreatureSlots(tasks);
         this.cameraObject = this.findSceneObject("Camera Object");
+        this.ensureAudioListener();
         if (this.cameraObject) this.floorObject = buildHabitatFloor(this.cameraObject);
         else console.error("[WednesdayDemo] Camera Object not found — habitat floor not built.");
         this.demoControl = new DemoControlView(() => this.advanceDemoTime(), {
@@ -396,6 +397,25 @@ export class TaskOrganismController extends BaseScriptComponent {
      * carry an identical VisualRoot/Body/ParticleAnchor hierarchy and
      * CreatureBehavior component, so no slot can drift from the verified one.
      */
+    /**
+     * Spatial audio attenuates against an AudioListenerComponent, and without
+     * one every positional cue plays flat — the distance and direction work in
+     * CreatureBehavior.spatialise would silently do nothing. Created on the
+     * camera rather than required as authored, for the same reason the
+     * per-creature AudioComponents are created: a missing optional component
+     * should not mean silence with no diagnostic.
+     */
+    private ensureAudioListener(): void {
+        if (!this.cameraObject) {
+            console.error("[WednesdayDemo] no Camera Object — spatial audio has no listener, cues will play flat.");
+            return;
+        }
+        const existing = this.cameraObject.getComponent("Component.AudioListenerComponent");
+        if (existing) return;
+        const listener = this.cameraObject.createComponent("Component.AudioListenerComponent");
+        console.log(`[StateAudio] audio listener ${listener ? "created on Camera Object" : "FAILED to create"}`);
+    }
+
     private resolveCreatureRoots(needed: number): SceneObject[] {
         const roots: SceneObject[] = [];
         for (const name of SLOT_NAMES) {

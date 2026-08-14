@@ -439,6 +439,31 @@ export const TINT_CHASE_HEAT_BLEND = 0.09;
  * decide how much of the urgency signal this channel carries, and that is a
  * judgement call rather than a constant.
  */
+/**
+ * State-cue staggering. Simultaneous threshold crossings are common — the demo
+ * spread puts several creatures either side of CHASE_THRESHOLD at once — and
+ * five identical rustles inside one frame read as a single loud noise rather
+ * than as five creatures.
+ *
+ * The offset is derived from appearanceSeed, so it is deterministic across runs
+ * (the same task always stirs at the same moment relative to its neighbours)
+ * rather than random per playback, which would make the demo unrepeatable.
+ */
+export const STATE_CUE_STAGGER_WINDOW_S = 0.42;
+/** Hard cap on cues started within one stagger window. Beyond this, later
+ *  crossings are dropped rather than queued: a cue that arrives a second after
+ *  the event it describes is worse than no cue. */
+export const STATE_CUE_MAX_PER_WINDOW = 3;
+
+/**
+ * Spatial audio. The additive render region ends near +/-70cm lateral at
+ * habitat distance, so a creature approaching from the side is audible before
+ * it is visible — sound is the only channel that carries anything outside the
+ * frame, which is the whole reason these cues are positional.
+ */
+export const SPATIAL_AUDIO_MIN_DISTANCE_CM = 60;
+export const SPATIAL_AUDIO_MAX_DISTANCE_CM = 700;
+
 export const URGENCY_RIM_GAIN = 1.35;
 export const URGENCY_RIM_POWER = 2.5;
 

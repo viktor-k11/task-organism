@@ -93,6 +93,7 @@ Nodes:
             // attribute the mesh already carries.
             input_vec4 BaseColor;
             input_float ShadingAmount;
+            input_float Urgency;
             output_vec4 Result;
 
             void main()
@@ -104,7 +105,43 @@ Nodes:
             	// than multiplying raw keeps amount = 0 an exact no-op, so the
             	// failure mode is "unshaded" instead of "invisible".
             	vec3 shade = mix(vec3(1.0), vertexColor.rgb, amount);
-            	Result = vec4(BaseColor.rgb * shade, BaseColor.a);
+            	vec3 body = BaseColor.rgb * shade;
+            	
+            	// ---- Urgency as LIGHT, not paint -------------------------------
+            	// The SPECS display is additive: rendered content adds light over
+            	// passthrough. Blending red into the base colour fought identity —
+            	// at the first values a chasing yellow read identically to a calm
+            	// amber. This channel ADDS the creature's OWN hue instead, so the
+            	// palette entry survives at every urgency level; only its intensity
+            	// changes.
+            	//
+            	// EVERY term below is multiplied by u, so u = 0.0 is an exact
+            	// mathematical no-op (emissive == vec3(0.0)) and Result is
+            	// bit-identical to the pre-existing shader. That is deliberate: a
+            	// previous graph edit silently rendered every body black with no
+            	// compile error, so the calm case must be provably unchanged.
+            	float u = clamp(Urgency, 0.0, 1.0);
+            	
+            	// Rim: camera-space normals, so a surface turned away from the
+            	// viewer glows at its silhouette. abs() makes this independent of
+            	// the z sign convention and of back-facing triangles (the body
+            	// material is two-sided).
+            	vec3 nCam = normalize(system.getSurfaceNormalCameraSpace());
+            	float facing = clamp(abs(nCam.z), 0.0, 1.0);
+            	float rim = pow(1.0 - facing, 2.5);
+            	
+            	// Pulse: rate AND depth rise with urgency. Capped at 0.85 Hz, well
+            	// under the 1.5 Hz where a pulse starts reading as flicker, and far
+            	// from the 3-5 Hz tremor channels that were deliberately removed for
+            	// looking anxious rather than alive.
+            	float hz = mix(0.22, 0.85, u);
+            	float wave = 0.5 + 0.5 * sin(system.getTimeElapsed() * hz * 6.2831853);
+            	float pulse = mix(1.0, wave, 0.55 * u);
+            	
+            	// Emissive is the identity colour scaled, never a foreign hue.
+            	vec3 emissive = body * rim * 1.35 * pulse * u;
+            	
+            	Result = vec4(body + emissive, BaseColor.a);
             }
         CustomCodeNodeAsset:
           ClassType1: REFUID
@@ -122,6 +159,11 @@ Nodes:
         ShadingAmount:
           Connection0:
             NodeLevelID: 2
+            PortID: Output
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        Urgency:
+          Connection0:
+            NodeLevelID: 5
             PortID: Output
           Variable: [0.0, 0.0, 0.0, 0.0]
         Stage:
@@ -143,6 +185,45 @@ Nodes:
       TemplateID: node_util_custom
       TemplateVersionMinor: 2
       Title1: Vertex Shaded Body
+    Node4:
+      DependencyIndex: 4
+      LevelID: 5
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 5
+          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
+        Default:
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        EnableMax:
+          Variable: true
+        EnableMin:
+          Variable: true
+        Group:
+          String: ""
+        Max:
+          Variable: 1.0
+        Min:
+          Variable: 0.0
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: urgencyLevel
+        SortIndex:
+          Variable: 2
+        Step:
+          Variable: 0.009999999776482582
+        Title:
+          String: Urgency
+        Tooltip:
+          String: "0 = calm and an exact no-op. Rising values add a rim halo and a slow pulse in the creature's OWN colour, so identity survives."
+      PositionX: -380
+      PositionY: 320
+      TemplateID: nodes_inputs_parameters_float
+      Title1: Float Parameter
+      Title2: Urgency
     Node3:
       CommentSizeX: 0
       CommentSizeY: 0

@@ -615,3 +615,82 @@ and must not be quoted as one — CLAUDE.md keeps this project preview-only. Wha
 the trace legitimately supports is the *relative* claim (6 vs 3) and the
 *attribution* (tracking dominates, creatures are cheap), not an absolute device
 frame rate.
+
+## Urgency as light, not paint — a second visual channel
+
+**Prompt:** "Today urgency is communicated by blending red into the creature's
+base colour. That channel fights identity… Extend PetBody.graphShader with a
+separate emissive channel driven by setUrgencyLevel01()."
+
+The diagnosis was already in the tree: `TINT_URGENT_HEAT_BLEND` and
+`TINT_CHASE_HEAT_BLEND` had to be cut from 0.32/0.55 to 0.15/0.28 because at the
+original values a chasing yellow creature rendered identically to a calm amber
+one. Paint and identity were competing for the same channel. On an additive
+display, light is a channel that was simply sitting unused.
+
+### The shader
+
+Three inputs on our own `PetBody.graphShader` code node — `BaseColor`,
+`ShadingAmount`, and the new `Urgency`, fed by a `urgencyLevel` float parameter
+so it is per-creature and script-driven. `unlit.graphShader` untouched, verified
+by `git diff` returning zero lines.
+
+- **Rim:** `abs()` of the camera-space normal's z, so the term is independent of
+  both the z sign convention and of back-facing triangles — the body material is
+  two-sided, and a rim built on a signed dot would have inverted on half the
+  surface. `pow(1 - facing, 2.5)` concentrates it into the silhouette.
+- **Pulse:** rate and depth both scale with urgency, `mix(0.22, 0.85, u)` Hz.
+  Capped at 0.85 Hz — comfortably under the 1.5 Hz brief, and deliberately far
+  from the 3.2–5.5 Hz tremor channels that were removed earlier for reading as
+  anxious rather than alive.
+- **Identity preserved by construction:** the emissive term is `body * rim *
+  gain * pulse * u` — the creature's OWN colour scaled, never a foreign hue. A
+  yellow creature at full urgency is a brighter yellow, not an orange one.
+
+### Built against the recorded failure
+
+`prompts.md` already records a graph edit that produced silently black bodies
+with no compile error. Two structural defences, plus a staged rollout:
+
+1. **u = 0 is an exact mathematical no-op.** Every emissive term is multiplied
+   by `u`, so at zero the expression is exactly `vec3(0.0)` and `Result` is
+   bit-identical to the previous shader. Not "close enough" — identical.
+2. **The blend-from-white property is untouched**, so a mesh lacking `COLOR_0`
+   still degrades to unshaded rather than invisible.
+3. **Staged and verified in that order:** first the GLSL alone with `Urgency`
+   left unconnected (so it defaults to 0), refreshed, and confirmed the
+   creatures rendered normally — proving the no-op before any wiring existed.
+   Only then was the parameter node added and connected. Had bodies gone black,
+   the stage would have said whether the fault was the GLSL or the port wiring.
+
+Script side: `setUrgencyLevel01` now stores the continuous value as well as
+driving growth, and `updateColorTint` — the single place that writes the
+material — eases it and pushes `pass.urgencyLevel`. Written from one place on
+one clock so the tint and the emissive can never disagree about how urgent a
+creature is.
+
+### Verification
+
+Captured at urgency 0 / 0.5 / 1.0 with all six palette colours in frame
+(amber, cyan, magenta, green, violet, yellow — six, not the three required),
+against a dark backdrop, and at 0 and 1.0 against the bright wall of the
+Interactive Preview environment. Progressive brightening with a rim halo, and
+every hue survives at every level.
+
+**A verification attempt that failed, recorded as such:** the first bright
+backdrop was a synthetic bright quad added to the scene. It never rendered in
+`CaptureRuntimeViewTool` — first because it sat outside the orthographic capture
+volume, then, after moving it inside, because the plane preset is authored in
+the XZ plane and was being viewed edge-on. Rotating it upright still did not
+make it appear in that capture path. Rather than keep debugging the harness, the
+bright-backdrop check was done with `CapturePanelScreenshotTool` against the
+real Preview environment, which composites an actual bright wall behind the
+creatures — a more representative test than the quad would have been. The quad
+and its two assets were deleted.
+
+**Honest limitation:** the effect is real and hue-safe, but modest at habitat
+distance against a bright wall. It reads clearly in the dark-backdrop captures
+and more subtly in the bright ones. The gain (1.35) and rim exponent (2.5) are
+currently GLSL constants rather than designer-editable inputs; if the channel
+should carry more of the urgency signal, those are the two numbers to raise, and
+they belong on the art-direction panel.

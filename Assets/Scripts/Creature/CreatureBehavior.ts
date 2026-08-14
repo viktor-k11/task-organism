@@ -223,6 +223,12 @@ export class CreatureBehavior extends BaseScriptComponent {
      *  setAppearanceSeed can tear the old prefab down. */
     private petVisual: CreaturePetVisual | null = null;
     private currentSpecies: PetSpecies | null = null;
+    /** Continuous urgency, 0..1, from StateEngine via setUrgencyLevel01. Drives
+     *  the PetBody shader's emissive channel; 0 is an exact no-op there. */
+    private urgencyLevel01 = 0;
+    /** Eased copy actually sent to the shader, so a task crossing a threshold
+     *  brightens over a beat instead of stepping. */
+    private urgencyEased01 = 0;
     /** Set by setAppearanceSeed, which may run before or after onStart — see
      *  the ordering note there. Defaults to 0 so an unseeded creature still
      *  builds a valid species. */
@@ -479,6 +485,11 @@ export class CreatureBehavior extends BaseScriptComponent {
      */
     setUrgencyLevel01(urgency: number): void {
         this.targetGrowthScale = 1.0 + (GROWTH_SCALE_MAX - 1.0) * clamp01(urgency);
+        // Same continuous value also drives the shader's emissive channel (rim
+        // halo + slow pulse). Stored rather than pushed here: the material is
+        // written once per frame in updateColorTint, and writing it from two
+        // places would race whenever a task's urgency changed mid-frame.
+        this.urgencyLevel01 = clamp01(urgency);
     }
 
     /** Stops chase translation at the current reacquirable pose; vitality keeps updating. */
@@ -1296,7 +1307,12 @@ export class CreatureBehavior extends BaseScriptComponent {
         const target = vec4.lerp(this.baseBodyColor, heat, blend);
         const alpha = clamp01(dt * TINT_EASE_PER_S);
         this.currentTint = vec4.lerp(this.currentTint, target, alpha);
-        this.body.renderMeshVisual.mainMaterial.mainPass.baseColor = this.currentTint;
+        const pass = this.body.renderMeshVisual.mainMaterial.mainPass;
+        pass.baseColor = this.currentTint;
+        // Urgency as light. Eased on the same clock as the tint so the two
+        // channels never disagree about how urgent this creature currently is.
+        this.urgencyEased01 += (this.urgencyLevel01 - this.urgencyEased01) * alpha;
+        pass.urgencyLevel = this.urgencyEased01;
     }
 
     private randomRange(min: number, max: number): number {

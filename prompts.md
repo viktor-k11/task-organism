@@ -688,9 +688,34 @@ real Preview environment, which composites an actual bright wall behind the
 creatures — a more representative test than the quad would have been. The quad
 and its two assets were deleted.
 
-**Honest limitation:** the effect is real and hue-safe, but modest at habitat
-distance against a bright wall. It reads clearly in the dark-backdrop captures
-and more subtly in the bright ones. The gain (1.35) and rim exponent (2.5) are
-currently GLSL constants rather than designer-editable inputs; if the channel
-should carry more of the urgency signal, those are the two numbers to raise, and
-they belong on the art-direction panel.
+**Honest limitation, since addressed:** the effect is real and hue-safe, but
+modest at habitat distance against a bright wall. It reads clearly on dark and
+more subtly on bright.
+
+### Closing the cycle: tint reduced, shaping exposed, tests run
+
+Three follow-ups completed the change.
+
+**The old red tint was reduced, not removed.** Light is now the primary urgency
+signal, but the rim is weakest in exactly the case where an additive display is
+weakest — a bright backdrop — so a small warm shift stays as the fallback for
+that case. `TINT_URGENT_HEAT_BLEND` 0.15 -> 0.05 and `TINT_CHASE_HEAT_BLEND`
+0.28 -> 0.09, roughly a third. Verified on both backdrops: the palette is now
+clearly intact where at 0.32/0.55 a chasing yellow had been indistinguishable
+from a calm amber. Two channels, each strongest where the other is weak.
+
+**The two shaping numbers moved onto the Art Direction panel** —
+`urgencyRimGain` (0-4) and `urgencyRimPower` (0.5-6), the pair that decides how
+much of the urgency signal this channel carries. Bounds chosen so a plausible
+range is reachable and an absurd one is not. Both have the zero-default hazard
+handled at *two* levels, because a shader parameter can arrive as 0 from a
+freshly added component AND from an unset material: gain passes through
+unguarded (0 is a legitimate "halo off"), while power falls back in the
+component and is additionally clamped to 0.25 in the GLSL — `pow(x, 0.0)` is
+1.0 everywhere, which would flood the entire body instead of its silhouette.
+That is the same class of bug as the earlier habitat-collapse-to-a-point, caught
+by prediction rather than by observation this time.
+
+**LEAF: 12/12.** The previous entry recorded the untested state honestly as an
+assumption rather than a fact; this closes it. `CreatureBehavior.ts` had changed,
+so "presentation-only, should be fine" was reasoning, not evidence.

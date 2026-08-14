@@ -430,8 +430,17 @@ export const TINT_HEAT_COLOR: [number, number, number, number] = [1.0, 0.26, 0.1
  * into a neighbouring palette hue. State legibility is carried by MOVEMENT
  * (see WANDER_URGENT_*) and posture, not by hue.
  */
-export const TINT_URGENT_HEAT_BLEND = 0.15;
-export const TINT_CHASE_HEAT_BLEND = 0.28;
+export const TINT_URGENT_HEAT_BLEND = 0.05;
+export const TINT_CHASE_HEAT_BLEND = 0.09;
+/**
+ * Urgency emissive shaping (PetBody.graphShader). Gain is how brightly the halo
+ * burns; tightness is the rim exponent — low washes the whole body, high hugs
+ * the silhouette. Both are on the Art Direction panel because together they
+ * decide how much of the urgency signal this channel carries, and that is a
+ * judgement call rather than a constant.
+ */
+export const URGENCY_RIM_GAIN = 1.35;
+export const URGENCY_RIM_POWER = 2.5;
 
 // ── Facing / rotation smoothing ─────────────────────────────────────────────
 /** How quickly Body's facing direction eases toward the desired direction (per second). */

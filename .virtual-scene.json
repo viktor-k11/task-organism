@@ -8426,6 +8426,18 @@
           "name": "CreatureArtDirection",
           "enabled": true,
           "properties": {
+            "urgencyRimPower": {
+              "isScriptInput": true,
+              "value": 2.5,
+              "type": "float",
+              "uiInfo": "{\"hint\":\"How tightly the halo hugs the silhouette. Low (0.5-1.5) washes the whole body; high (4+) is a thin bright edge. Below 0.25 the shader clamps, because a 0 exponent would flood the entire body.\", \"widget\":\"slider\", \"min\":0.5, \"max\":6, \"step\":0.1}"
+            },
+            "urgencyRimGain": {
+              "isScriptInput": true,
+              "value": 1.350000023841858,
+              "type": "float",
+              "uiInfo": "{\"hint\":\"How brightly the halo burns at full urgency. 0 disables the rim entirely and leaves only the warm colour shift.\", \"widget\":\"slider\", \"min\":0, \"max\":4, \"step\":0.05}"
+            },
             "selectionLineMaxChars": {
               "isScriptInput": true,
               "value": 30,
@@ -8631,6 +8643,8 @@
             "inputNames.26": "releaseParticleSpeedCmS",
             "inputNames.27": "selectionLineMaxChars",
             "inputNames.28": "selectionPanelYCm",
+            "inputNames.29": "urgencyRimGain",
+            "inputNames.30": "urgencyRimPower",
             "name": "CreatureArtDirection",
             "enabled": true,
             "sceneObject": "@sceneObject:Art Direction (designer panel)",
@@ -20383,6 +20397,16 @@
         "passInfos.0.urgencyLevel.label": "Urgency",
         "passInfos.0.urgencyLevel.min": 0,
         "passInfos.0.urgencyLevel.max": 1,
+        "passInfos.0.urgencyRimGain.value": null,
+        "passInfos.0.urgencyRimGain.hidden": true,
+        "passInfos.0.urgencyRimGain.label": "Urgency Rim Gain",
+        "passInfos.0.urgencyRimGain.min": 0,
+        "passInfos.0.urgencyRimGain.max": 4,
+        "passInfos.0.urgencyRimPower.value": null,
+        "passInfos.0.urgencyRimPower.hidden": true,
+        "passInfos.0.urgencyRimPower.label": "Urgency Rim Tightness",
+        "passInfos.0.urgencyRimPower.min": 0.5,
+        "passInfos.0.urgencyRimPower.max": 6,
         "passInfos.0.alphaTestThreshold.value": null,
         "passInfos.0.alphaTestThreshold.hidden": true,
         "passInfos.0.alphaTestThreshold.label": "Alpha Test Threshold",

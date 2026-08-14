@@ -1313,6 +1313,8 @@ export class CreatureBehavior extends BaseScriptComponent {
         // channels never disagree about how urgent this creature currently is.
         this.urgencyEased01 += (this.urgencyLevel01 - this.urgencyEased01) * alpha;
         pass.urgencyLevel = this.urgencyEased01;
+        pass.urgencyRimGain = ART.urgencyRimGain;
+        pass.urgencyRimPower = ART.urgencyRimPower;
     }
 
     private randomRange(min: number, max: number): number {

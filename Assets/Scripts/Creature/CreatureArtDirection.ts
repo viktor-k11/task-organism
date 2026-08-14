@@ -124,6 +124,20 @@ export class CreatureArtDirection extends BaseScriptComponent {
     chaseStopDistanceCm: number = ART.chaseStopDistanceCm;
     @ui.group_end
 
+    // ── Urgency halo ──────────────────────────────────────────────────────
+    @ui.separator
+    @ui.group_start("Urgency halo (light, not paint)")
+    @ui.label('<span style="color: #9CA3AF;">Urgency is carried by an additive halo in the creature\'s own colour, so palette identity survives. These two numbers decide how much of the signal this channel carries. The halo reads strongly on dark backdrops and weakly on bright ones — a small warm colour shift remains as the bright-backdrop fallback.</span>')
+    @input
+    @hint("How brightly the halo burns at full urgency. 0 disables the rim entirely and leaves only the warm colour shift.")
+    @widget(new SliderWidget(0, 4, 0.05))
+    urgencyRimGain: number = ART.urgencyRimGain;
+    @input
+    @hint("How tightly the halo hugs the silhouette. Low (0.5-1.5) washes the whole body; high (4+) is a thin bright edge. Below 0.25 the shader clamps, because a 0 exponent would flood the entire body.")
+    @widget(new SliderWidget(0.5, 6, 0.1))
+    urgencyRimPower: number = ART.urgencyRimPower;
+    @ui.group_end
+
     // ── Release effect ────────────────────────────────────────────────────
     @ui.separator
     @ui.group_start("Release effect (completion moment)")
@@ -214,6 +228,10 @@ export class CreatureArtDirection extends BaseScriptComponent {
             chaseDistanceMinCm: positive(this.chaseDistanceMinCm, ART.chaseDistanceMinCm),
             chaseDistanceMaxCm: positive(this.chaseDistanceMaxCm, ART.chaseDistanceMaxCm),
             chaseStopDistanceCm: positive(this.chaseStopDistanceCm, ART.chaseStopDistanceCm),
+            // Gain passes through unguarded: 0 is a legitimate "halo off".
+            // Power does NOT — 0 would flood the body, so it falls back.
+            urgencyRimGain: this.urgencyRimGain,
+            urgencyRimPower: positive(this.urgencyRimPower, ART.urgencyRimPower),
             releaseDurationS: positive(this.releaseDurationS, ART.releaseDurationS),
             releaseParticleCount: this.releaseParticleCount,
             releaseParticleSpeedCmS: this.releaseParticleSpeedCmS,

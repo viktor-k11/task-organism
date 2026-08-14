@@ -94,6 +94,8 @@ Nodes:
             input_vec4 BaseColor;
             input_float ShadingAmount;
             input_float Urgency;
+            input_float RimGain;
+            input_float RimPower;
             output_vec4 Result;
 
             void main()
@@ -128,7 +130,11 @@ Nodes:
             	// material is two-sided).
             	vec3 nCam = normalize(system.getSurfaceNormalCameraSpace());
             	float facing = clamp(abs(nCam.z), 0.0, 1.0);
-            	float rim = pow(1.0 - facing, 2.5);
+            	// RimPower is designer-editable, so guard the degenerate case: pow(x, 0)
+            	// is 1.0 everywhere, which would flood the whole body instead of its
+            	// silhouette. A freshly added parameter also arrives as 0.
+            	float rimPower = max(RimPower, 0.25);
+            	float rim = pow(1.0 - facing, rimPower);
             	
             	// Pulse: rate AND depth rise with urgency. Capped at 0.85 Hz, well
             	// under the 1.5 Hz where a pulse starts reading as flicker, and far
@@ -139,7 +145,7 @@ Nodes:
             	float pulse = mix(1.0, wave, 0.55 * u);
             	
             	// Emissive is the identity colour scaled, never a foreign hue.
-            	vec3 emissive = body * rim * 1.35 * pulse * u;
+            	vec3 emissive = body * rim * max(RimGain, 0.0) * pulse * u;
             	
             	Result = vec4(body + emissive, BaseColor.a);
             }
@@ -164,6 +170,16 @@ Nodes:
         Urgency:
           Connection0:
             NodeLevelID: 5
+            PortID: Output
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        RimGain:
+          Connection0:
+            NodeLevelID: 6
+            PortID: Output
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        RimPower:
+          Connection0:
+            NodeLevelID: 7
             PortID: Output
           Variable: [0.0, 0.0, 0.0, 0.0]
         Stage:
@@ -224,6 +240,84 @@ Nodes:
       TemplateID: nodes_inputs_parameters_float
       Title1: Float Parameter
       Title2: Urgency
+    Node5:
+      DependencyIndex: 5
+      LevelID: 6
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 5
+          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
+        Default:
+          Variable: [1.35, 1.35, 1.35, 1.35]
+        EnableMax:
+          Variable: true
+        EnableMin:
+          Variable: true
+        Group:
+          String: ""
+        Max:
+          Variable: 4.0
+        Min:
+          Variable: 0.0
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: urgencyRimGain
+        SortIndex:
+          Variable: 3
+        Step:
+          Variable: 0.009999999776482582
+        Title:
+          String: Urgency Rim Gain
+        Tooltip:
+          String: "How brightly the urgency halo burns. 0 disables the rim entirely."
+      PositionX: -380
+      PositionY: 460
+      TemplateID: nodes_inputs_parameters_float
+      Title1: Float Parameter
+      Title2: Urgency Rim Gain
+    Node6:
+      DependencyIndex: 6
+      LevelID: 7
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 5
+          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
+        Default:
+          Variable: [2.5, 2.5, 2.5, 2.5]
+        EnableMax:
+          Variable: true
+        EnableMin:
+          Variable: true
+        Group:
+          String: ""
+        Max:
+          Variable: 6.0
+        Min:
+          Variable: 0.5
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: urgencyRimPower
+        SortIndex:
+          Variable: 4
+        Step:
+          Variable: 0.009999999776482582
+        Title:
+          String: Urgency Rim Tightness
+        Tooltip:
+          String: "How tightly the halo hugs the silhouette. Low = broad wash over the whole body, high = a thin edge."
+      PositionX: -380
+      PositionY: 600
+      TemplateID: nodes_inputs_parameters_float
+      Title1: Float Parameter
+      Title2: Urgency Rim Tightness
     Node3:
       CommentSizeX: 0
       CommentSizeY: 0

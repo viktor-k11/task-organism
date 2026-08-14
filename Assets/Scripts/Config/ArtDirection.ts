@@ -56,6 +56,8 @@ import {
     CHASE_DISTANCE_MIN_CM,
     CHASE_DISTANCE_MAX_CM,
     CHASE_STOP_DISTANCE_CM,
+    URGENCY_RIM_GAIN,
+    URGENCY_RIM_POWER,
     RELEASE_DURATION_S,
     RELEASE_PARTICLE_COUNT,
     RELEASE_PARTICLE_SPEED_CM_S,
@@ -102,6 +104,10 @@ export interface ArtDirectionValues {
     chaseDistanceMaxCm: number;
     chaseStopDistanceCm: number;
 
+    // Urgency emissive channel (PetBody.graphShader)
+    urgencyRimGain: number;
+    urgencyRimPower: number;
+
     // Release effect
     releaseDurationS: number;
     releaseParticleCount: number;
@@ -144,6 +150,9 @@ export const ART: ArtDirectionValues = {
     chaseDistanceMinCm: CHASE_DISTANCE_MIN_CM,
     chaseDistanceMaxCm: CHASE_DISTANCE_MAX_CM,
     chaseStopDistanceCm: CHASE_STOP_DISTANCE_CM,
+
+    urgencyRimGain: URGENCY_RIM_GAIN,
+    urgencyRimPower: URGENCY_RIM_POWER,
 
     releaseDurationS: RELEASE_DURATION_S,
     releaseParticleCount: RELEASE_PARTICLE_COUNT,

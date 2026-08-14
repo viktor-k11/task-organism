@@ -1125,3 +1125,68 @@ If the budget is to be enforced, the fix is not plain decimation: the overage is
 seam duplication, so the win would come from welding vertices — which risks
 blending `COLOR_0` across seams and taking the creatures back to reading as flat
 cutouts. That is a deliberate piece of work, not a tool invocation.
+
+### Step 2 revisited — pooling the release particles
+
+**Prompt:** "Do not cut the particle count yet — fix the construction spike
+instead… the release is the product's only reward and weakening it to buy frame
+time is fixing the wrong thing."
+
+Right diagnosis and the right instinct about which lever to pull. The 551ms was
+**construction**, not rendering: in one frame `play()` ran a MeshBuilder,
+uploaded a mesh, and created 30 SceneObjects each with a RenderMeshVisual.
+
+`prewarm()` now builds the mesh and all 30 objects at creature startup, disabled
+and parented to the anchor. `play()` enables them, resets transforms and assigns
+velocities — no allocation, no component creation, no mesh upload. `teardown()`
+disables rather than destroys, so the pool survives for reuse, and `reset()`
+deliberately no longer clears the ReleaseEffect (doing so would put the
+construction cost straight back on the next release).
+
+**Release-frame cost at six creatures — the number asked for:**
+
+| metric | before | after | delta |
+|---|---|---|---|
+| **release-1 frame max** | **551.3ms** | **223.7ms** | **−59.4%** |
+| `Visual` max | 273.25ms | 6.18ms | −97.7% |
+| `RenderPass` max | 291.59ms | 10.83ms | −96.3% |
+| release-2 frame max | 53.2ms | 62.0ms | (both already fine) |
+
+The two slices that carried the construction collapsed by ~97%. That is the
+mechanism confirmed, not just the total moving.
+
+**Well past the 10% bar, so it stays. The 30→15 fallback was not needed and was
+not run — all 30 particles are kept.** Verified by log rather than inference:
+`[ReleaseEffect] 30 particles enabled from pool`, with no `pool MISSING`
+fallback line, and a runtime query showing 180 pooled objects (6 creatures × 30)
+sitting disabled between releases.
+
+**An honest caveat on the whole-trace numbers.** Overall p50 barely moved
+(42.87 → 44.52ms) and the trace-wide max got *worse* (551 → 754ms). That worse
+max is not a regression: it sits at t+6.3s, nowhere near a release, and
+`Track` max rose from 539ms to 742ms over the same period — the desktop was more
+loaded. The release-frame windows above are the honest comparison, because they
+isolate the frames the change actually touches.
+
+**Why this mattered beyond the number:** take 5 of the recording plan is
+hold-through-release, so a half-second hitch would have landed on the exact
+frame being shot.
+
+### What this measurement cannot tell us about the device
+
+Stated plainly, because it would be easy to read the numbers above as a
+performance clearance and they are not one.
+
+**Every figure in this cycle is Lens Studio Preview on a desktop, where `Track`
+— the Preview's own webcam and world tracking — consumes 78-82% of every
+frame.** Vertex cost, fill cost and material cost are all invisible behind it.
+"No pressure in Preview" is evidence about Preview. It is not evidence that six
+creatures at ~4,000-7,000 vertices each, an additive rim shader running
+per-pixel, and twelve spatialised audio sources will hold frame rate on SPECS
+hardware, where the tracking budget, the GPU and the thermal envelope are all
+different.
+
+CLAUDE.md keeps this project preview-only with no device available, so that
+question **cannot be closed here** and is not closed. The measurements are
+sound for what they cover — relative cost between configurations, and the
+before/after of a specific change — and silent on absolute device performance.

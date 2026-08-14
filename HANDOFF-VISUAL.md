@@ -168,6 +168,17 @@ hotkeys. Don't expect keyboard shortcuts to work.
   worthwhile improvement to this handoff surface.
 - **The rabbit's face is shallow** compared to the owl's, which has the
   strongest sculpted face of the set.
+- **The vertex budget is over, and the obvious fix is dangerous.** Five of six
+  species exceed the 4,000-vertex budget (rabbit worst at 7,034), but triangle
+  counts are all ~3,900-4,000. The overage is therefore **seam duplication** —
+  vertices split at UV and normal boundaries — not geometric complexity. Plain
+  decimation will not remove it; the fix is welding vertices at those seams.
+  **That risks blending `COLOR_0` across the seams**, and `COLOR_0` is what
+  makes the creatures read as volumes rather than flat cutouts. This is
+  deliberate work with a real regression risk, not a tool invocation. If someone
+  attempts it, the golden-image harness (§6) is the thing that would catch the
+  regression — run it before and after, and look specifically at whether the
+  bodies still have a light-to-dark gradient.
 - **The elephant is busier than the rest** — more surface ridging than the other
   five, which reads as noise at habitat distance.
 - **Six creatures share one clone template but three authored slots** (see

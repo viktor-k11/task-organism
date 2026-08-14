@@ -584,7 +584,12 @@ export class CreatureBehavior extends BaseScriptComponent {
         // GLBs) — ReleaseEffect.play() accepts an empty list, it just brightens
         // the body alone.
         const eyeRmvs = this.eyeLeft && this.eyeRight ? [this.eyeLeft.white, this.eyeRight.white, this.eyeLeft.pupilVisual, this.eyeRight.pupilVisual] : [];
-        this.releaseEffect = new ReleaseEffect();
+        // Constructed and prewarmed at startup (see onStart) so the release
+        // frame allocates nothing. Recreated here only if a reset() cleared it.
+        if (!this.releaseEffect) {
+            this.releaseEffect = new ReleaseEffect();
+            this.releaseEffect.prewarm(this.particleAnchorObject);
+        }
         this.releaseEffect.play(
             this,
             this.particleAnchorObject,
@@ -684,6 +689,13 @@ export class CreatureBehavior extends BaseScriptComponent {
         // species here and let setAppearanceSeed swap the body if the real seed
         // selects a different one.
         this.buildSpeciesVisual(speciesForSeed(this.appearanceSeed));
+
+        // Pre-allocate the release particle pool now, not at release. Measured
+        // before this change: the release frame hit 551ms at six creatures.
+        if (this.particleAnchorObject) {
+            this.releaseEffect = new ReleaseEffect();
+            this.releaseEffect.prewarm(this.particleAnchorObject);
+        }
         this.shadowObject = buildCreatureShadow(this.visualRootObject!, eyeBaseMaterialAsset);
 
         this.resetToIdle();
@@ -724,7 +736,10 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.mouthCurve = MOUTH_CURVE_CALM;
         this.isWaitingAtWanderTarget = false;
         this.wanderPauseTimer = 0;
-        this.releaseEffect = null;
+        // Deliberately NOT cleared: the ReleaseEffect owns the pre-allocated
+        // particle pool, and dropping it here would move the construction cost
+        // back onto the next release — the exact spike pooling removed.
+        // teardown() already disabled the particles.
         this.blinkElapsed = 0;
         this.blinkTimer = this.randomRange(BLINK_INTERVAL_MIN_S, BLINK_INTERVAL_MAX_S);
         this.growthScale = 1.0;

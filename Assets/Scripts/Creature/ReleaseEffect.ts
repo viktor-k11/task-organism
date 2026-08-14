@@ -26,6 +26,9 @@ interface ReleaseParticle {
  */
 export class ReleaseEffect {
     private particles: ReleaseParticle[] = [];
+    /** Pooled objects, built by prewarm() and reused by play(). */
+    private pool: SceneObject[] = [];
+    private pooledMesh: RenderMesh | null = null;
     private elapsed = 0;
     private particleMaterial: Material | null = null;
     private particleBaseColor: vec4 = new vec4(1, 1, 1, 1);
@@ -33,6 +36,39 @@ export class ReleaseEffect {
     private cleanupEvent: DelayedCallbackEvent | null = null;
     /** Latches on the first cue so a repeat play() cannot retrigger the sound. */
     private hasPlayedAudio = false;
+
+    /**
+     * Builds the particle pool AHEAD of the release, at creature startup.
+     *
+     * Why: the release frame was measured at 551ms (six creatures), with
+     * Visual max 273ms and RenderPass max 292ms — a single frame in which a
+     * MeshBuilder ran, uploaded a mesh, and 30 SceneObjects each got created
+     * and given a RenderMeshVisual. That is CONSTRUCTION cost, not rendering
+     * cost, and it landed exactly on the beat the demo exists to show.
+     *
+     * Cutting the particle count would have bought frame time by weakening the
+     * product's only reward. Pre-allocating buys the same frame time and keeps
+     * all 30.
+     *
+     * The objects are created disabled and parented to the anchor. play() only
+     * enables them, resets their transforms and assigns velocities — no
+     * allocation, no component creation, no mesh upload.
+     */
+    prewarm(particleAnchor: SceneObject): void {
+        if (this.pool.length > 0) return;
+        this.pooledMesh = this.buildParticleMesh(ART.releaseParticleSizeCm * 0.5);
+        for (let i = 0; i < ART.releaseParticleCount; i++) {
+            const obj = global.scene.createSceneObject("ReleaseParticle");
+            obj.setParent(particleAnchor);
+            obj.getTransform().setLocalPosition(vec3.zero());
+            const rmv = obj.createComponent("Component.RenderMeshVisual") as RenderMeshVisual;
+            rmv.mesh = this.pooledMesh;
+            // Disabled until release — a pooled particle must cost nothing to
+            // render while it waits.
+            obj.enabled = false;
+            this.pool.push(obj);
+        }
+    }
 
     play(
         owner: BaseScriptComponent,
@@ -70,15 +106,23 @@ export class ReleaseEffect {
         const brightBody = brightenMaterial(bodyRmv, ART.releaseBrightenLerp);
         eyeRmvs.forEach((rmv) => brightenMaterial(rmv, ART.releaseBrightenLerp));
 
-        // One shared, cheap particle mesh + one shared fading material (reused by all instances).
-        const particleMesh = this.buildParticleMesh(ART.releaseParticleSizeCm * 0.5);
+        // One shared fading material. Still cloned here rather than at prewarm:
+        // the particle colour derives from the creature's BRIGHTENED body, which
+        // does not exist until this moment. One clone is cheap; it was the 30
+        // object creations and the mesh upload that cost.
         this.particleBaseColor = brightBody.mainPass.baseColor as vec4;
         this.particleMaterial = brightBody.clone();
         this.particleMaterial.mainPass.baseColor = this.particleBaseColor;
 
-        for (let i = 0; i < ART.releaseParticleCount; i++) {
-            this.spawnParticle(particleAnchor, particleMesh, this.particleMaterial);
+        // Fall back to building on demand if prewarm never ran, so a caller
+        // that forgets it degrades to the old behaviour rather than to no
+        // particles at all.
+        if (this.pool.length === 0) {
+            console.log("[ReleaseEffect] pool MISSING at release — building inline (prewarm did not run)");
+            this.prewarm(particleAnchor);
         }
+        this.activatePool();
+        console.log(`[ReleaseEffect] ${this.particles.length} particles enabled from pool`);
 
         this.updateEvent = owner.createEvent("UpdateEvent");
         this.updateEvent.bind(() => this.onUpdate());
@@ -91,34 +135,39 @@ export class ReleaseEffect {
         this.cleanupEvent.reset(ART.releaseDurationS);
     }
 
+    /** Enables pooled particles and gives each a fresh velocity. No allocation
+     *  and no component creation happen here — that is the whole point. */
+    private activatePool(): void {
+        this.particles = [];
+        for (const obj of this.pool) {
+            const rmv = obj.getComponent("Component.RenderMeshVisual") as RenderMeshVisual;
+            if (rmv && this.particleMaterial) rmv.mainMaterial = this.particleMaterial;
+            obj.getTransform().setLocalPosition(vec3.zero());
+            obj.enabled = true;
+
+            const angle = Math.random() * Math.PI * 2;
+            const driftRadius = Math.random() * ART.releaseParticleDriftCm;
+            this.particles.push({
+                object: obj,
+                velocity: new vec3(
+                    Math.cos(angle) * driftRadius,
+                    ART.releaseParticleSpeedCmS * (0.6 + Math.random() * 0.8),
+                    Math.sin(angle) * driftRadius,
+                ),
+            });
+        }
+    }
+
     private teardown(): void {
+        // Disable rather than destroy: the pool is reusable, and destroying it
+        // would put the construction cost back on the next release.
         for (const p of this.particles) {
-            p.object.destroy();
+            p.object.enabled = false;
         }
         this.particles = [];
         if (this.updateEvent) {
             this.updateEvent.enabled = false;
         }
-    }
-
-    private spawnParticle(anchor: SceneObject, mesh: RenderMesh, material: Material): void {
-        const obj = global.scene.createSceneObject("ReleaseParticle");
-        obj.setParent(anchor);
-        obj.getTransform().setLocalPosition(vec3.zero());
-
-        const rmv = obj.createComponent("Component.RenderMeshVisual") as RenderMeshVisual;
-        rmv.mesh = mesh;
-        rmv.mainMaterial = material;
-
-        const angle = Math.random() * Math.PI * 2;
-        const driftRadius = Math.random() * ART.releaseParticleDriftCm;
-        const velocity = new vec3(
-            Math.cos(angle) * driftRadius,
-            ART.releaseParticleSpeedCmS * (0.6 + Math.random() * 0.8),
-            Math.sin(angle) * driftRadius,
-        );
-
-        this.particles.push({ object: obj, velocity });
     }
 
     private onUpdate(): void {

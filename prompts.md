@@ -21,6 +21,77 @@ All Lens Studio interaction went through the `lens-studio` MCP server —
 
 ---
 
+## CLAD inventory — what was used, discarded, and declined
+
+Rebuilt 2026-08-14 from the session history and the Lens Studio log. Call counts
+are approximate. Full evidence in `VERIFICATION-2026-08-13.md`.
+
+### Which capabilities carried the most weight
+
+Three did the real work. **SPECS text-to-3D** (`build-mesh`) has the largest
+product consequence: it produced five of the six creature species and, in doing
+so, **retired the project's licensing problem outright rather than documenting
+it** — a generated asset carries no third-party rights at all, so replacing the
+encumbered cat removed the question instead of annotating it. **The Preview
+instrumentation trio** — `RunAndCollectLogsTool` for the only true Lens reset,
+`QueryRuntimeSceneTool` for object-graph truth, and `CaptureRuntimeViewTool` for
+isolated renders — is what turned this project's method from assertion into
+evidence; nearly every correction recorded below was found by one of them
+contradicting something that looked right. And **LEAF** carried the domain,
+with a limit this log is precise about: the suite was 13/13 green throughout the
+entire period when completing the first task silently disabled the composition
+root, because the scenarios exercise the domain and not the object graph's
+lifetime. That gap is now closed by `gate4-controller-survives-release`, and the
+lesson is a more valuable output than the fix.
+
+### Used and load-bearing — the result is in the shipped build
+
+| Capability | ~calls | What it produced |
+|---|---|---|
+| `ExecuteEditorCode` | 40+ | SPECS text-to-3D create/poll for 6 generations; Perfetto start/stop for 10 captures; project save (twice — without it the scene changes never reached disk) |
+| `RunAndCollectLogsTool` (`mode: refresh`) | 60+ | The only true Lens reset; every verification, harness frame and trace depends on it |
+| `run_leaf_scenario` | 80+ | The 13-scenario suite; the regression proof for the controller fix |
+| `CapturePanelScreenshotTool` / `PreviewPanelTool screenshot` | 30+ | Every first-person capture, the golden set, clip-mode verification |
+| `CaptureRuntimeViewTool` | 40+ | Per-species acceptance renders; facing and scale comparisons |
+| `QueryRuntimeSceneTool` | 25+ | Transforms, worldScale, 180 pooled particles, the single controller |
+| `RecompileTypeScriptTool` | 30+ | Compile gate before every refresh |
+| `scene-graphql` | 12 | CreatureTemplate duplicate; controller component removal; enable/disable |
+| `VirtualScene` (read + apply) | 8 | Scene introspection; Art Direction and TaskOrganism objects; Inspector defaults |
+| `build-mesh` (SPECS text-to-3D) | 7 jobs | 5 shipped species + 2 rejected attempts |
+| `build-sfx` | 2 runs | 3 release cues + 3 state cues, all shipped |
+| `shader-graph` | 1 | `PetBody.graphShader` — vertex shading and the urgency halo |
+| `specs-capture-perf-trace` | 10 captures | Every performance number in this log |
+| `perfetto-trace-analysis` | 6 | Frame-time distributions and slice attribution |
+| `ShowPropertyControlsTool` | 1 | Ten live sliders for the designer handoff |
+
+### Used and discarded
+
+| Capability | Why |
+|---|---|
+| Graph-shader editing of `unlit.graphShader` | Rendered every body **silently black**, no compile error. Isolated to the graph, then abandoned for the codeNode route. Root cause never found |
+| `SearchLensStudioAssetLibrary` / `InstallLensStudioPackage` (Kitty.lspkg) | Reverted: FBX + skinned + autoplaying AnimationPlayer + PBR, no local Blender/FBX2glTF |
+| Synthetic bright-backdrop quad | Never rendered in the ortho path; abandoned for the real Preview environment, which was the better test |
+| `InjectPreviewGesture` / `PreviewInteractTool` | Used for staging buttons; dropped as the harness driver in favour of deterministic beat-jumping |
+| `normalize_glb.js` | Miscomputed scale on simplified GLBs (AABB collapsed to ~0.5 cm); replaced by `prepare-pet-glb` → `seat-pet-glb` |
+| `GetBoundingBox` | Returned no bounds (no colliders); fell back to parsing the GLB directly |
+| FAST3D | Deliberately not used — the skill makes it a user-granted speed exception and the user granted the opposite |
+
+### Available and not used — with judgement
+
+| Capability | Judgement |
+|---|---|
+| `MergeMeshesTool` | **Theatre.** Every species is already one primitive, one material; merging across creatures is forbidden |
+| `SimplifyMeshTool` | **Real value, but not yet.** The overage is seam duplication, which simplify does not address, and the trace shows no vertex pressure in Preview |
+| `specs-lens-perf-attribution` | **Theatre today.** Needs a problem to attribute; the one spike found was attributed and fixed by pooling |
+| `MovePreviewCamera` | **Real value, unused.** Would give controlled framing for the golden set |
+| `GenerateTexture` / `ResizeRasterTexture` / `ConvertSvgToTexture` | **Theatre.** Unlit project, textures discarded by design |
+| `GenerateLensIcon` / `IconSelector` | **Real value for submission**, not the build — nobody has produced a Lens icon |
+| `SearchLensStudioMusicLibrary` / `InstallLicensedMusic` | **Theatre, and against the brief** — ambient music is out of scope |
+| `live-lens-tester` agent | **Partial** — LEAF used heavily, but via direct tool calls |
+| `specs-project-migrator`, `sync-kit-validator`, `editor-api-specialist` | **Not applicable** — no migration, no SyncKit, no bulk Editor API work |
+
+---
+
 ## 2026-08-11 — Emotional Prototype acceptance
 
 1. **Inspect:** Read the authored scene with VirtualScene and queried live Camera, Creature, Body, EyeLeft, and EyeRight transforms. The first Preview query landed during reset; after a clean TypeScript compile/runtime refresh, the retry succeeded.

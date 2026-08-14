@@ -4,6 +4,9 @@ import {
     DEMO_BEAT_APPROACH_S,
     DEMO_BEAT_SELECT_READ_S,
     DEMO_BEAT_RESOLVE_SETTLE_S,
+    DEMO_BEAT_SECOND_GAP_S,
+    DEMO_BEAT_SECOND_APPROACH_S,
+    DEMO_BEAT_SECOND_SELECT_READ_S,
     RESOLVE_HOLD_DURATION_S,
 } from "../Config/CreatureConfig";
 
@@ -17,7 +20,11 @@ export type DemoBeat =
     | "APPROACH"    // that creature closes distance deliberately
     | "SELECT"      // short pinch: full task text revealed
     | "RESOLVE"     // press-and-hold: progress fills
-    | "RELEASED";   // creature let go; the remaining two settle
+    | "RELEASED"          // creature let go; the arbiter promotes the next one
+    | "SECOND_APPROACH"   // the newly-urgent creature closes distance in turn
+    | "SECOND_SELECT"     // short pinch on it
+    | "SECOND_RESOLVE"    // press-and-hold again
+    | "SECOND_RELEASED";  // second creature let go; the habitat keeps working
 
 export interface DemoSequenceHooks {
     /** Advance the demo clock so the oldest task crosses CHASE_THRESHOLD. */
@@ -72,6 +79,11 @@ export class DemoSequence {
         const tSelect = tApproach + DEMO_BEAT_APPROACH_S;
         const tResolve = tSelect + DEMO_BEAT_SELECT_READ_S;
         const tHoldEnd = tResolve + RESOLVE_HOLD_DURATION_S + DEMO_BEAT_RESOLVE_SETTLE_S;
+        // Second cycle, at reduced beat lengths — see the config comment.
+        const t2Approach = tHoldEnd + DEMO_BEAT_SECOND_GAP_S;
+        const t2Select = t2Approach + DEMO_BEAT_SECOND_APPROACH_S;
+        const t2Resolve = t2Select + DEMO_BEAT_SECOND_SELECT_READ_S;
+        const t2HoldEnd = t2Resolve + RESOLVE_HOLD_DURATION_S + DEMO_BEAT_RESOLVE_SETTLE_S;
 
         this.steps = [
             { atS: tUrgent, beat: "URGENT", run: (h) => h.onAdvanceTime() },
@@ -82,6 +94,10 @@ export class DemoSequence {
             // cancels as an early release and nothing resolves — the settle
             // margin above is what guarantees completion before this fires.
             { atS: tHoldEnd, beat: "RELEASED", run: (h) => h.onResolveHoldEnd() },
+            { atS: t2Approach, beat: "SECOND_APPROACH", run: (h) => h.onBeginApproach() },
+            { atS: t2Select, beat: "SECOND_SELECT", run: (h) => h.onSelect() },
+            { atS: t2Resolve, beat: "SECOND_RESOLVE", run: (h) => h.onResolveHoldStart() },
+            { atS: t2HoldEnd, beat: "SECOND_RELEASED", run: (h) => h.onResolveHoldEnd() },
         ];
     }
 

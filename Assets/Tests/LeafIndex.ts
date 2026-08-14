@@ -12,6 +12,7 @@ import { Gate3EarlyCancelScenario } from "./Gate3EarlyCancelScenario";
 import { Gate3CompletedHoldScenario } from "./Gate3CompletedHoldScenario";
 import { Gate3NoConflictScenario } from "./Gate3NoConflictScenario";
 import { Gate3LaterScenario } from "./Gate3LaterScenario";
+import { Gate4ControllerSurvivesReleaseScenario } from "./Gate4ControllerSurvivesReleaseScenario";
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -32,5 +33,9 @@ export class LeafIndex extends BaseScriptComponent {
         { id: "gate3-completed-hold", typename: Gate3CompletedHoldScenario.getTypeName() },
         { id: "gate3-no-gesture-conflict", typename: Gate3NoConflictScenario.getTypeName() },
         { id: "gate3-later-snooze", typename: Gate3LaterScenario.getTypeName() },
+        // Gate 4 is the only scenario that inspects the SCENE OBJECT GRAPH
+        // rather than the domain. It exists because all twelve above passed
+        // while the composition root was silently being disabled on release.
+        { id: "gate4-controller-survives-release", typename: Gate4ControllerSurvivesReleaseScenario.getTypeName() },
     ];
 }

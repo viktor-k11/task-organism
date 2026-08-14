@@ -888,79 +888,130 @@ What does not, and is recorded rather than hidden:
   entering from the left sounds left. That needs a human with headphones, and
   is the one claim here resting on configuration rather than perception.
 
-## Visual regression harness — and the freeze bug it found
+## The visual regression harness, and the bug that no picture would have shown
 
-**Prompt:** "From Friday a different person will be changing the visuals, and
-nothing would catch it if they silently broke grounding, facing, label
-legibility or the release sequence."
+This is the entry to read if you only read one. It is a story about a tool built
+for one purpose finding something else entirely, and about why the thing it
+found was invisible.
 
-### Design: one frame per Lens reset
+### Why the harness existed
 
-The harness does not wait for beats. `VISUAL_HARNESS_FRAME` selects one of seven
-frames; on start the Lens jumps `DemoSequence` straight to that state with a
-single `advanceTo()` call, pumps hold progress by an exact fraction for the
-mid-gesture frame, then freezes and logs READY once eased channels have settled.
+"From Friday a different person will be changing the visuals, and nothing would
+catch it if they silently broke grounding, facing, label legibility or the
+release sequence." Every visual change in this project had been checked by a
+human looking at a picture. That does not survive a handover.
 
-One frame per reset looks wasteful and is the point: **nothing about a captured
-frame depends on wall-clock timing**, so a slow machine cannot change what a
-golden image records. It also forces the correct reset, since changing the frame
-requires one.
+Seven fixed frames of the demo, captured deterministically, diffed against a
+committed golden set in `docs/golden/`.
 
-Both recorded traps were designed around rather than rediscovered: the runner
-creates the golden directory explicitly (the screenshot tool reports success
-while writing nothing when the directory is missing), and the documented reset
-is `RunAndCollectLogsTool mode:refresh`, never the Preview panel's own refresh.
+### The design decision that mattered: no waiting
 
-### Diffing with no dependencies
+The harness does not wait for beats. `VISUAL_HARNESS_FRAME` selects a frame; the
+Lens jumps `DemoSequence` straight to that state with a single `advanceTo()`
+call, pumps hold progress by an exact fraction for the mid-gesture frame, then
+freezes and logs READY once eased channels settle. One frame per Lens reset.
 
-`Tools/visual-regression.js` shells out to macOS `sips` to convert PNG to
-uncompressed 24-bit BMP and parses that in ~40 lines. The audience is a designer
-on a Friday; a harness that opens with `npm install` is a harness that does not
-get run. Two metrics, because they answer different questions: `meanDelta`
-catches a global shift, `changedPct` catches a small real change that a
-whole-frame mean would dilute to nothing.
+That looks wasteful and is the point: **nothing about a captured frame depends
+on wall-clock timing**, so a slow machine cannot change what a golden records.
+It also forces the correct reset, because changing frames requires one.
 
-Verified as a comparator, not assumed: identical input PASSes at 0.00%,
-a substituted frame FAILs at 7.36%, a deleted frame reports MISSING CAPTURE, and
-the exit code is non-zero in both failure cases.
+Both previously-recorded traps were designed around rather than rediscovered:
+the runner creates the golden directory explicitly (the screenshot tool reports
+success while writing nothing when the directory is missing), and the documented
+reset is `RunAndCollectLogsTool mode:refresh`, never the Preview panel's own
+refresh.
 
-### Non-visual assertions caught two bugs the images would have hidden
+`Tools/visual-regression.js` diffs with **no npm dependencies** — `sips` converts
+PNG to uncompressed BMP, parsed in about forty lines. The audience is a designer
+on a Friday; a harness that opens with `npm install` does not get run. Verified
+as a comparator rather than assumed: identical input passes at 0.00%, a
+substituted frame fails at 7.36%, a deleted frame reports MISSING CAPTURE.
 
-Each frame logs `open`, `chasing`, and per-creature ground checks. Both bugs
-below produced *plausible-looking* images:
+### Two catches that were merely useful
+
+The non-visual assertions — `open`, `chasing`, per-creature ground checks —
+earned their place immediately by catching two bugs that produced entirely
+**plausible-looking images**:
 
 1. **The 50% hold frame ran to completion.** The explicit pump set progress to
-   50%, then the settle window let `interaction.update(dt)` carry it to 100%,
-   completing the task. The image looked like a release; the assertion said
-   `open=5` where 6 was expected. Fixed by freezing the interaction while the
-   harness holds a frame.
-2. **The release frames released nothing.** After that freeze, jumping to the
-   RELEASED beat no longer completed anything, because completion is triggered
-   by hold progress reaching 1.0. `open=6` where 5 was expected. Fixed by
-   driving the release the way a user does — jump to RESOLVE, pump the hold to
-   100% — rather than by landing on the beat.
+   50%, then the settle window let `interaction.update(dt)` carry it to 100% and
+   complete the task. The picture looked like a release. The assertion said
+   `open=5` where 6 was expected.
+2. **The release frames then released nothing.** After freezing the interaction
+   to fix (1), jumping to the RELEASED beat no longer completed anything,
+   because completion is triggered by hold progress reaching 1.0, not by the
+   beat. `open=6` where 5 was expected. Fixed by driving the release the way a
+   user does: jump to RESOLVE, pump the hold to 100%.
 
-### The real find: completing task 1 froze the entire app
+Both would have been accepted as goldens. Neither was visible.
+
+### The finding
 
 The post-release frame never logged READY at all. The cause was not the harness.
 
-`TaskOrganismController` — the composition root — was a component on
-`MovementRoot_1`. `CreatureBehavior.release()` ends by disabling its own
-`sceneObject`. So **completing the first task disabled the object hosting the
-controller**, and every per-frame system stopped: arbiter sync, beats, gesture
-updates, capacity logging.
+`TaskOrganismController` — the composition root, owner of the repository, state
+engine, arbiter, interaction state and demo sequence — was a ScriptComponent on
+`MovementRoot_1`. And `CreatureBehavior.release()` ends with:
 
-It had gone unnoticed because the scripted story ENDS at release. Every previous
-log simply stopped there, and a log that stops at the end of the story looks
-exactly like a log that finished.
+```ts
+this.sceneObject.enabled = false;
+```
 
-Fixed by moving the controller onto its own `TaskOrganism (controller)` scene
-object. Evidence it worked: `[Capacity]` lines now continue past
-`beat=RELEASED`, where in every earlier run they stopped dead at it.
+**Completing the first task disabled the object hosting the controller.** Every
+per-frame system stopped at once: arbiter sync, demo beats, gesture updates,
+capacity logging. In the product, not just the demo: complete your first task
+and the app quietly stops working.
 
-This is the strongest argument for the harness. Nobody was going to catch it by
-looking at pictures — it needed a frame captured three seconds after a release,
-and an assertion that noticed the absence of a log rather than the presence of a
-wrong pixel.
+Three things conspired to hide it:
 
-**LEAF: 12/12** after moving the composition root.
+- **A stopped log and a finished log look identical.** The scripted story ENDS
+  at release. Every previous run's log simply stopped there, which is exactly
+  what a completed story looks like.
+- **All twelve LEAF scenarios passed the entire time.** They exercise the domain
+  as plain TypeScript and never touch the scene object graph. From the domain's
+  point of view nothing was wrong — the task resolved exactly once, and the
+  arbiter would have promoted the next creature correctly if anything had still
+  been calling it.
+- **No screenshot could show it.** The bug is the absence of subsequent frames,
+  not the content of any frame. It needed a capture three seconds after a
+  release and an assertion that noticed a log that never arrived.
+
+Fixed by moving the controller to its own `TaskOrganism (controller)` scene
+object. The evidence:
+
+> **`[Capacity]` entries now continue past `beat=RELEASED`, where they
+> previously stopped dead at it.**
+
+### Closing the gap the tests left
+
+A fix without a test is a bug waiting to return, and the existing suite had
+already proved it could not see this class of problem. Added
+`gate4-controller-survives-release` — the only scenario that inspects the SCENE
+OBJECT GRAPH rather than the domain. Two halves:
+
+- **Structural (the actual lock):** exactly one object hosts the controller; it
+  is not a creature slot, is not a descendant of one, and is enabled. Finding
+  zero objects fails rather than vacuously passing.
+- **Behavioural:** after one task is released the arbiter promotes a *different*
+  second chaser and it resolves too.
+
+**Verified by reintroducing the bug.** Reparenting the controller under
+`MovementRoot_1` makes the scenario FAIL; moving it back makes it pass. A test
+never seen failing is not a test.
+
+**LEAF: 13/13.**
+
+### What the fix unlocked
+
+Only once the controller survived a release could the demo show a **second
+completion** — and one completion reads as a scene while two read as a system.
+Extended `DemoSequence` with SECOND_APPROACH / SECOND_SELECT / SECOND_RESOLVE /
+SECOND_RELEASED at deliberately reduced beat lengths, since the audience has
+already been taught the interaction by then.
+
+Measured rather than estimated, and the first attempt was wrong: reusing the
+select-read constant for the approach span gave the second creature only 1.24s
+of travel, which read as a teleport. Restructured with an explicit post-release
+gap; the second approach now gets 2.97s of visible travel and the whole story
+runs **24.76s** against the original 20s target.
+

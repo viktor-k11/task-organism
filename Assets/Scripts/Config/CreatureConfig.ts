@@ -554,6 +554,29 @@ export const DEMO_BEAT_SELECT_READ_S = 2.0;
  *  Must be > 0: releasing exactly at completion risks the early-release
  *  cancel path winning the race and nothing resolving at all. */
 export const DEMO_BEAT_RESOLVE_SETTLE_S = 0.5;
+/**
+ * SECOND completion. One completion reads as a scene; two read as a system —
+ * the viewer sees that the habitat keeps working rather than that a single
+ * scripted trick fired.
+ *
+ * Deliberately faster than the first cycle. By this point the audience has
+ * already been taught approach / select / hold, so repeating those beats at
+ * full length adds duration without adding information. The shortening is also
+ * honest to the interaction: a second use IS quicker than a first.
+ *
+ * This beat only became possible once the composition root stopped being
+ * disabled by the first release (see Gate4ControllerSurvivesReleaseScenario) —
+ * before that fix, nothing ran after the first completion at all.
+ */
+/** Pause after the first release before the next creature starts moving. The
+ *  habitat needs a moment to read as "settled again" or the second approach
+ *  looks like part of the first release rather than a new demand. */
+export const DEMO_BEAT_SECOND_GAP_S = 1.5;
+/** How long the second creature is visibly travelling before it is selected.
+ *  Shorter than the first approach (4.0s) but still long enough to read as
+ *  deliberate movement — at 1.2s it read as a teleport. */
+export const DEMO_BEAT_SECOND_APPROACH_S = 3.0;
+export const DEMO_BEAT_SECOND_SELECT_READ_S = 1.2;
 
 // ── Staging controls (pick a clean spot before recording) ─────────────────
 /**

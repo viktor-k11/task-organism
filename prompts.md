@@ -769,3 +769,74 @@ second one.
 resolve a sub-5ms effect this harness would need repeated interleaved runs at
 each count, not one run each. That was not worth the freeze-day time when the
 answer needed was only "did this make things materially worse", and it did not.
+
+## Audio state layer — discrete cues, and a scope question surfaced first
+
+**Prompt:** "Then start the audio state layer."
+
+**Surfaced before building, not after:** CLAUDE.md lists **ambient music** under
+"Out of scope this week". "Audio state layer" has at least three readings — a
+continuous per-creature urgency tone, a single ambient bed keyed to the most
+urgent task, or discrete state-transition one-shots — and two of the three sit
+on or across that line. The readings also imply materially different work, so
+the choice went back to the user rather than being made silently. Chosen:
+**discrete state-transition one-shots**, which carry state without introducing
+continuous sound.
+
+### Three cues, built to the tone rules
+
+Generated with the same `build-sfx` DSP engine as the release cues, so they are
+license-clean by construction and sit tonally with what exists.
+
+| Cue | Transition | Construction |
+|---|---|---|
+| `StateStir.wav` (0.64s) | calm → restless | Body sounds only — a pink-noise rustle over a soft low thump. **No pitched content at all**, so it cannot be mistaken for a notification. A creature shifting its weight, not a warning. |
+| `StatePad.wav` (0.90s) | restless → approaching | Two soft footfalls, the second louder, lower and closer to centre — which is what "coming nearer" actually sounds like. |
+| `StateSettle.wav` (1.41s) | "Later" / snooze | A warm descending exhale, falling only a few semitones and ending warm. This is the cue most at risk of reading as rejection, so it is the one built most carefully. |
+
+`uiNotify`, `uiError`, `uiSuccess`, `coin`, `powerUp` and `magicChime` were all
+avoided — that family is the reward/alarm genre the tone rules exclude, and it
+is the same reason the release cue was hand-rolled.
+
+### Design decisions worth recording
+
+**A second AudioComponent, not a shared one.** The release cue has verified
+timing (fires at the top of `ReleaseEffect.play`, 74ms rather than the original
+510ms) and a play-once latch. Swapping tracks on that component per transition
+would put both at risk for no benefit. Two components is cheaper than one subtle
+regression.
+
+**Edge-triggered, with a null first frame.** `lastAnnouncedProfile` starts null
+so the first evaluation only *records* the profile. Without that, every creature
+would announce its opening state at startup — six cues at once at capacity.
+
+**Settling down is deliberately silent.** Only escalations speak. A creature
+going calm is the *absence* of a demand, and announcing it would make the
+habitat chatter every time urgency eased.
+
+**Snooze fires from the repository path, not from a profile change.** Snoozing
+does not always cross a profile boundary, and the acknowledgement should be
+heard regardless — but only *after* the write succeeds, so the sound can never
+claim a deferral that did not happen.
+
+### Verified by log, not assumed
+
+One full story at capacity produced exactly three cues:
+
+```
+beat=URGENT   -> [StateAudio] stir root=MovementRoot_2
+              -> [StateAudio] stir root=MovementRoot_3
+beat=APPROACH -> [StateAudio] pad  root=MovementRoot_1
+```
+
+Correct on every count: two stirs for the two creatures actually crossing
+calm→restless (demo-1 was already urgent and stayed silent), one pad for the
+single chaser, and nothing at startup.
+
+**Known issue, not yet addressed:** the two stirs fired 11ms apart — effectively
+simultaneous. At capacity up to five creatures can cross the threshold in the
+same frame, and five overlapping rustles will read as one loud noise rather than
+five creatures. A small per-creature stagger is the obvious fix and is *not* in
+this change.
+
+**LEAF: 12/12** after the change, since `CreatureBehavior.ts` was modified again.

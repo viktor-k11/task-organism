@@ -465,6 +465,10 @@ export class TaskOrganismController extends BaseScriptComponent {
             const view = new TaskSelectionView(visualRoot, () => {
                 if (this.interaction.selectedId === task.id && this.interaction.later()) {
                     creature.endChase();
+                    // Acknowledge the deferral audibly. Fired here, after the
+                    // repository write succeeded, so the sound never claims a
+                    // snooze that did not happen.
+                    creature.playSnoozeCue();
                     this.demoControl.setStatus(`${this.repository.listOpen().length} tasks • deferred`);
                 }
             });

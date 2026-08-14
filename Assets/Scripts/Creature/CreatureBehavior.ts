@@ -108,6 +108,13 @@ import {
  * one-constant change with no code edit. ~190KB each; if that ever matters,
  * drop the two unused entries.
  */
+/** State-transition cues. Discrete one-shots fired when a creature crosses a
+ *  behaviour boundary — deliberately NOT a continuous bed, since CLAUDE.md puts
+ *  ambient music out of scope this week. */
+const stateStirTrack = requireAsset("../../GeneratedSFX/StateStir.wav") as AudioTrackAsset;
+const statePadTrack = requireAsset("../../GeneratedSFX/StatePad.wav") as AudioTrackAsset;
+const stateSettleTrack = requireAsset("../../GeneratedSFX/StateSettle.wav") as AudioTrackAsset;
+
 const releaseSfxTracks: Record<ReleaseSfxVariant, AudioTrackAsset> = {
     breath: requireAsset("../../GeneratedSFX/ReleaseBreath.wav") as AudioTrackAsset,
     hum: requireAsset("../../GeneratedSFX/ReleaseHum.wav") as AudioTrackAsset,
@@ -217,6 +224,16 @@ export class CreatureBehavior extends BaseScriptComponent {
     private eyeRightObject: SceneObject | null = null;
     private particleAnchorObject: SceneObject | null = null;
     private audioComponent: AudioComponent | null = null;
+    /** SECOND audio component, dedicated to state cues. The release cue keeps
+     *  its own component and its own track: that path has verified timing (the
+     *  cue fires at the top of ReleaseEffect.play) and a play-once latch, and
+     *  swapping tracks on it per transition would put both at risk for no gain.
+     *  Two components is cheaper than one subtle regression. */
+    private stateAudio: AudioComponent | null = null;
+    /** Last profile actually announced. Starts null so the FIRST evaluation
+     *  only records the profile and plays nothing — otherwise every creature
+     *  would stir at startup, and at capacity that is six cues at once. */
+    private lastAnnouncedProfile: "CALM" | "URGENT" | "CHASE" | null = null;
 
     private body: CreatureVisual | null = null;
     /** Same object as `body`, kept at its concrete type so the species swap in
@@ -610,6 +627,9 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.audioComponent = this.visualRootObject
             ? this.resolveReleaseAudio(this.visualRootObject)
             : null;
+        this.stateAudio = this.visualRootObject
+            ? this.resolveStateAudio(this.visualRootObject)
+            : null;
         // EyeLeft/EyeRight are authored placeholders from the earlier
         // procedural/mesh-generated visuals — still looked up (so a future
         // switch back to CreaturePetVisual's PetCreatureBody-style sibling
@@ -779,6 +799,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.updatePresentationScale(dt);
         this.applyBodyScale(dt);
         this.updateColorTint(dt);
+        this.updateStateAudio();
         this.updateExpression(dt);
         this.updateFaceAndSecondaryMotion(dt);
     }
@@ -1270,6 +1291,50 @@ export class CreatureBehavior extends BaseScriptComponent {
             const shadowScale = 0.92 + 0.08 * finalXZ;
             this.shadowObject.getTransform().setLocalScale(new vec3(shadowScale, 0.06, 0.64 * shadowScale));
         }
+    }
+
+    /** Dedicated component for state cues — see the stateAudio field. */
+    private resolveStateAudio(visualRoot: SceneObject): AudioComponent | null {
+        const audio = visualRoot.createComponent("Component.AudioComponent") as AudioComponent;
+        if (!audio) return null;
+        audio.playbackMode = Audio.PlaybackMode.LowLatency;
+        return audio;
+    }
+
+    /** Fires one state cue. Swapping audioTrack per cue is safe here because
+     *  this component plays nothing else. */
+    private playStateCue(track: AudioTrackAsset | null, label: string): void {
+        if (this.isReleased || !this.stateAudio || !track) return;
+        this.stateAudio.audioTrack = track;
+        this.stateAudio.play(1);
+        console.log(`[StateAudio] ${label} root=${this.sceneObject.name}`);
+    }
+
+    /**
+     * Announces a behaviour transition as sound. Called once per frame; only a
+     * CHANGE produces a cue, so this is edge-triggered rather than level-
+     * triggered and cannot retrigger while a creature sits in a state.
+     *
+     * Only two transitions speak, and both are escalations the user needs to
+     * notice: settling back down is silent on purpose — a creature going calm
+     * is the absence of a demand, and announcing it would make the habitat
+     * chatter every time urgency eased.
+     */
+    private updateStateAudio(): void {
+        const profile = this.emotionalProfile();
+        if (this.lastAnnouncedProfile === null) { this.lastAnnouncedProfile = profile; return; }
+        if (profile === this.lastAnnouncedProfile) return;
+        const previous = this.lastAnnouncedProfile;
+        this.lastAnnouncedProfile = profile;
+        if (profile === "URGENT" && previous === "CALM") this.playStateCue(stateStirTrack, "stir");
+        else if (profile === "CHASE") this.playStateCue(statePadTrack, "pad");
+    }
+
+    /** "Later" — the creature stands down. Fired by the snooze path rather than
+     *  by a profile change, because snoozing does not always cross a profile
+     *  boundary and the acknowledgement should be heard regardless. */
+    playSnoozeCue(): void {
+        this.playStateCue(stateSettleTrack, "settle");
     }
 
     /**

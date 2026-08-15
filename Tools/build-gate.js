@@ -125,7 +125,12 @@ const CONFIG = {
 const PERF_BASELINE = {
     perfettoBeforePoolingMs: 551.3,
     perfettoAfterPoolingMs: 223.7,
-    probeObservedMs: null, // filled in by the first real run; see HANDOFF-VISUAL.md §7
+    /* Still null: the probe has not yet been run against a responsive editor.
+     * The 300ms budget is therefore set from the Perfetto figure plus headroom,
+     * not from this instrument — which is a provisional threshold, not a
+     * measured one. Record the observed value here on the first clean capture
+     * and tighten the budget to match. See HANDOFF-VISUAL.md §8. */
+    probeObservedMs: null,
 };
 
 /* ------------------------------------------------------------------ *

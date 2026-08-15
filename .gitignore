@@ -38,3 +38,22 @@ performance_traces/
 # Build-gate evidence — per-machine capture output, not a shared artifact.
 # The gate judges freshness by mtime, which does not survive a clone anyway.
 .build-gate/
+
+# Untracked Lens Studio packages — verified NOT required to build.
+# Determined empirically: with all three removed (and the parked
+# TaskUnderstandingProbe removed, which a fresh clone also lacks), the project
+# compiles with zero errors outside Cache/, which is itself gitignored.
+#   RemoteServiceGateway — needed ONLY by Assets/Scripts/Debug/TaskUnderstandingProbe.ts,
+#                          an untracked parked AI experiment. Install from the
+#                          Asset Library if that work is resumed.
+#   SnapDecorators       — referenced by nothing in Assets/ or in the SIK,
+#   Utilities              UIKit and Leaf archives (checked inside the .lspkg zips).
+Packages/RemoteServiceGateway.lspkg
+Packages/RemoteServiceGateway.lspkg.meta
+Packages/SnapDecorators.lspkg
+Packages/SnapDecorators.lspkg.meta
+Packages/Utilities.lspkg
+Packages/Utilities.lspkg.meta
+
+# Per-machine Lens Studio plugin state, keyed by a local install UUID.
+Plugins/

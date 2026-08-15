@@ -99,8 +99,7 @@ Nodes:
             input_float DissolveAmount;
             input_float DissolveDirection;
             input_float DissolveEdgeGain;
-            input_float DissolveHeightObj;
-            input_float DissolveBaseY;
+            input_float DissolveHeightCm;
             output_vec4 Result;
 
             // ---- Dissolve tuning, all in FRACTIONS OF BODY HEIGHT -----------
@@ -242,8 +241,15 @@ Nodes:
             		// creature from RenderMesh.aabbMin/aabbMax. h is then 0 at the
             		// feet and 1 at the crown for EVERY species, whatever scale it
             		// was authored at, with no per-species table to forget.
-            		float height = max(DissolveHeightObj, 1e-4);
-            		float h = clamp((localY - DissolveBaseY) / height, 0.0, 1.0);
+            		// Measured bounds show every pet mesh is authored FEET AT
+            		// ORIGIN (baseY 0.0000-0.0069 across all six), so the base is
+            		// 0 and needs no parameter. That is deliberate: a parameter
+            		// that does not exist cannot fail to be exposed, and on this
+            		// platform a newly added one can take hours to become a
+            		// material property. The name says Cm for historical reasons
+            		// — it carries the mesh's OWN object units, whatever they are.
+            		float height = max(DissolveHeightCm, 1e-4);
+            		float h = clamp(localY / height, 0.0, 1.0);
 
             		// Break the waterline into an organic front. Sampled in
             		// body-relative space — offset divided by the same height — so
@@ -324,14 +330,9 @@ Nodes:
             NodeLevelID: 10
             PortID: Output
           Variable: [0.0, 0.0, 0.0, 0.0]
-        DissolveHeightObj:
+        DissolveHeightCm:
           Connection0:
             NodeLevelID: 11
-            PortID: Output
-          Variable: [0.0, 0.0, 0.0, 0.0]
-        DissolveBaseY:
-          Connection0:
-            NodeLevelID: 12
             PortID: Output
           Variable: [0.0, 0.0, 0.0, 0.0]
         Stage:
@@ -612,7 +613,7 @@ Nodes:
           IOType: 1
           Variable: [0.0, 0.0, 0.0, 0.0]
         ScriptName:
-          String: dissolveHeightObj
+          String: dissolveHeightCm
         SortIndex:
           Variable: 7
         Step:
@@ -626,45 +627,6 @@ Nodes:
       TemplateID: nodes_inputs_parameters_float
       Title1: Float Parameter
       Title2: Dissolve Body Height (object units)
-    Node11:
-      DependencyIndex: 11
-      LevelID: 12
-      NodeCount: 0
-      NodeType: 1
-      Ports:
-        Channels:
-          ItemIndex: 5
-          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
-        Default:
-          Variable: [0.0, 0.0, 0.0, 0.0]
-        EnableMax:
-          Variable: true
-        EnableMin:
-          Variable: true
-        Group:
-          String: "Dissolve"
-        Max:
-          Variable: 10000.0
-        Min:
-          Variable: -10000.0
-        Output:
-          IOType: 1
-          Variable: [0.0, 0.0, 0.0, 0.0]
-        ScriptName:
-          String: dissolveBaseY
-        SortIndex:
-          Variable: 8
-        Step:
-          Variable: 0.5
-        Title:
-          String: Dissolve Base Y
-        Tooltip:
-          String: Object-space Y of the mesh's lowest point, from RenderMesh.aabbMin. With Body Height this makes the sweep 0..1 at any authoring scale.
-      PositionX: -380
-      PositionY: 640
-      TemplateID: nodes_inputs_parameters_float
-      Title1: Float Parameter
-      Title2: Dissolve Base Y
     Node3:
       CommentSizeX: 0
       CommentSizeY: 0

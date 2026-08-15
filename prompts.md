@@ -1356,3 +1356,71 @@ in this file format are now on record: bodies rendered black, parameters that do
 not reach the material, and a feature suspected dead on a bad grep. The first
 two cost a full debugging cycle each. This one cost a cycle and produced a
 guard.
+
+---
+
+## Platform finding — shader parameters become material properties on their own schedule
+
+**Prompt:** "Stop diagnosing by looking at the render — the two states are
+visually identical, and that is now a documented property of this platform, not
+a hypothesis."
+
+Correct, and it is the root of two wrong conclusions in a row. Recorded here
+because anyone building a custom shader on this platform will hit it.
+
+### The ambiguity
+
+The dissolve is gated so that `DissolveAmount == 0` executes nothing — a
+deliberate safety property after the black-bodies incident. An unexposed
+parameter also reads as 0. So **an intact creature means either "the effect is
+off" or "the parameter never reached the material", and no capture can tell
+them apart.** Both of my wrong negatives came from reading a render and picking
+the wrong branch.
+
+### The two-stage import, with observed timings
+
+Editing a `.graphShader` triggers two separate things, and only the first is
+prompt:
+
+| Stage | Observed |
+|---|---|
+| `.graphShader` reimport | ~4s, logged as `Imported Assets/Materials/PetBody.graphShader … loaded in 4.04 sec` |
+| parameters becoming material properties | **not observed under 2 hours** |
+
+`dissolveAmount` read back `undefined` at 17:13 and `0` at 19:19 with no action
+taken in between — no edit, no reimport, no restart. Adding the parameter to
+`PetBody.mat`'s `Properties` block did not make it immediate. Renaming an
+already-exposed parameter (`dissolveHeightCm` → `dissolveHeightObj`) **loses**
+the exposure, and reverting the name does not bring it back within a session.
+
+Nothing found to force it: `Support/editor.d.ts` exposes no reimport, no
+asset-refresh and no project-save entry point, so the Editor API route the
+previous cycle recommended does not exist as an API.
+
+### What to do about it, given it cannot be forced
+
+1. **Never add a parameter you can avoid.** Measuring the pet meshes showed
+   every one is authored feet-at-origin — dog `baseY=0.0069 height=83.0092`, the
+   five generated species `baseY=0.0000 height≈1.0000`. So the planned
+   `dissolveBaseY` was unnecessary and was dropped: the sweep is
+   `clamp(localY / height, 0, 1)`. A parameter that does not exist cannot fail
+   to be exposed.
+2. **Never rename an exposed parameter.** The name `dissolveHeightCm` is now a
+   misnomer — it carries the mesh's own object units — and is kept anyway,
+   because the rename cost the exposure.
+3. **Assert the readback, every run.** See `assertDissolveParamsLive`. It logs
+   per creature and names which parameter is undefined; "undefined" without the
+   name cost a cycle by not distinguishing never-exposed from exposure-lost.
+
+### Status
+
+The normalisation is correct in form and **still unverified**: at the end of
+this cycle the precondition reports
+
+```
+[DissolveParams] *** NOT LIVE *** undefined: dissolveHeightCm — …
+```
+
+so the six-creature 50% capture was **not taken**. That is the precondition
+doing its job: refusing to produce a picture that could be misread, which is
+exactly the failure it was built to end.

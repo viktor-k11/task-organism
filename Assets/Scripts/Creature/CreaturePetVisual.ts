@@ -216,14 +216,85 @@ export class CreaturePetVisual {
         // disappeared when a single constant was used. Reading the bounds means
         // a seventh species needs no entry anywhere and cannot be forgotten.
         const bounds = this.measureBodyBounds();
-        fresh.mainPass.dissolveHeightObj = bounds.height;
-        fresh.mainPass.dissolveBaseY = bounds.baseY;
+        // baseY is not passed: measurement shows every pet mesh is authored
+        // feet-at-origin, so the base is 0. One fewer parameter is one fewer
+        // thing that can silently fail to be exposed.
+        fresh.mainPass.dissolveHeightCm = bounds.height;
         fresh.mainPass.dissolveEdgeGain = DISSOLVE_EDGE_GAIN;
         fresh.mainPass.dissolveDirection = DISSOLVE_DEBUG_AMOUNT >= 0 ? DISSOLVE_DEBUG_DIRECTION : 1;
         fresh.mainPass.dissolveAmount = DISSOLVE_DEBUG_AMOUNT >= 0 ? DISSOLVE_DEBUG_AMOUNT : 0;
+        this.assertDissolveParamsLive(fresh, bounds);
         for (const rmv of this.renderMeshVisuals) {
             rmv.mainMaterial = fresh;
         }
+    }
+
+
+    /**
+     * Reads the dissolve parameters back off the material and says loudly
+     * whether they are live.
+     *
+     * WHY THIS IS A PRECONDITION AND NOT A DIAGNOSTIC
+     * -----------------------------------------------
+     * On this platform an intact creature means EITHER "no dissolve is running"
+     * OR "the parameter never reached the material" — the two are pixel
+     * identical, because the shader's no-op is exactly what an unset parameter
+     * produces. That ambiguity has now caused two wrong conclusions, in the same
+     * direction, from looking at renders.
+     *
+     * A parameter becomes a material property some time AFTER the .graphShader
+     * reimports (~4s); the gap has been observed at up to two hours with no
+     * action taken. So "I wrote it" is not evidence that it is set. Only a
+     * readback is.
+     *
+     * Logged on every run, per creature, so no capture is ever interpreted
+     * without knowing whether the parameters were live when it was taken.
+     *
+     * The height is the discriminator, not baseY: a mesh whose lowest point sits
+     * at the origin legitimately has baseY == 0, whereas a height of 0 is always
+     * wrong — it is the value an unexposed parameter reports.
+     */
+    private assertDissolveParamsLive(mat: Material, bounds: { baseY: number; height: number }): void {
+        // Bounds logged unconditionally and BEFORE the liveness branch: if the
+        // mesh is symmetric about its own origin, baseY is derivable as
+        // -height/2 and the parameter can be dropped entirely, which removes
+        // one thing that can fail to be exposed.
+        console.log(
+            `[DissolveBounds] baseY=${bounds.baseY.toFixed(4)} height=${bounds.height.toFixed(4)} ` +
+                `symmetric=${Math.abs(bounds.baseY + bounds.height * 0.5) < bounds.height * 0.02}`
+        );
+        const pass = mat.mainPass;
+        const height = pass.dissolveHeightCm;
+        const amount = pass.dissolveAmount;
+
+        const missing = typeof height !== "number" || typeof amount !== "number";
+        // Compared against what was just written rather than against "> 0", so a
+        // stale value from a previous material is caught too.
+        const matches = !missing && Math.abs((height as number) - bounds.height) < Math.max(1e-4, bounds.height * 1e-3);
+
+        if (missing) {
+            // Names the offender: "undefined" alone cost a whole cycle, because
+            // it did not distinguish a parameter that was never exposed from one
+            // that had been renamed and lost its exposure.
+            const which: string[] = [];
+            if (typeof height !== "number") which.push("dissolveHeightCm");
+            if (typeof amount !== "number") which.push("dissolveAmount");
+            console.log(
+                `[DissolveParams] *** NOT LIVE *** undefined: ${which.join(", ")} — these have not become material ` +
+                    "properties yet. Any capture taken now shows the NO-OP, not the effect."
+            );
+            return;
+        }
+        if (!matches) {
+            console.log(
+                `[DissolveParams] *** NOT LIVE *** wrote height=${bounds.height.toFixed(4)} but read back ` +
+                    `${(height as number).toFixed(4)} — writes are being dropped. Captures are meaningless until this matches.`
+            );
+            return;
+        }
+        console.log(
+            `[DissolveParams] live height=${(height as number).toFixed(4)} amount=${(amount as number).toFixed(3)}`
+        );
     }
 
     /**

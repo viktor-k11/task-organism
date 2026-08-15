@@ -7,6 +7,7 @@
  * Four stages, one report, one exit code:
  *
  *   1. compile   TypeScript across the whole project
+ *   1b. params  every shader parameter has a writer (static)
  *   2. leaf      all registered LEAF scenarios
  *   3. golden    seven-frame golden-image diff
  *   4. perf      release-frame max at six creatures vs a recorded threshold
@@ -309,6 +310,45 @@ function stageCompile() {
 }
 
 /* ------------------------------------------------------------------ *
+ * Stage 1b — shader parameters
+ * ------------------------------------------------------------------ */
+
+/**
+ * A shader parameter that no TypeScript assigns is almost certainly inert, and
+ * this file format fails silently — three times now: bodies rendered black, a
+ * hand-added parameter never reached the material, and a whole feature was
+ * suspected dead because the write was on a locally-aliased pass. Static, cheap
+ * and runs with the compile stage; it does not need the editor.
+ */
+function stageShaderParams() {
+    const audit = path.join(REPO, "Tools", "shader-param-audit.js");
+    if (!fs.existsSync(audit)) {
+        return { name: "shaderParams", status: "ENV", detail: "Tools/shader-param-audit.js is missing" };
+    }
+    const run = spawnSync(process.execPath, [audit], { cwd: REPO, encoding: "utf8" });
+    const out = `${run.stdout || ""}${run.stderr || ""}`;
+    const bad = out
+        .split("\n")
+        .filter((l) => /NO WRITER/.test(l))
+        .map((l) => l.trim());
+    const okCount = (out.match(/ ok  /g) || []).length;
+
+    if (run.status === 0) {
+        return { name: "shaderParams", status: "PASS", detail: `${okCount} parameter(s) all written` };
+    }
+    if (run.status === 2) {
+        return { name: "shaderParams", status: "ENV", detail: out.trim().split("\n")[0] || "audit could not run" };
+    }
+    return {
+        name: "shaderParams",
+        status: "FAIL",
+        detail: `${bad.length} parameter(s) with no writer`,
+        lines: bad,
+        hint: "Drive it from TypeScript, or add it to ALLOWED_UNWRITTEN in Tools/shader-param-audit.js with a reason.",
+    };
+}
+
+/* ------------------------------------------------------------------ *
  * Stage 2 — LEAF scenarios
  * ------------------------------------------------------------------ */
 
@@ -551,6 +591,7 @@ const STATUS_ORDER = { PASS: 0, FAIL: 1, STALE: 1, MISSING: 1, ENV: 2, SKIP: 0 }
 function report(stages, offline) {
     const label = {
         compile: "1. TypeScript compile",
+        shaderParams: "1b. Shader parameters",
         leaf: "2. LEAF scenarios",
         golden: "3. Golden images",
         perf: "4. Release-frame perf",
@@ -618,6 +659,7 @@ function main() {
 
     const runners = [
         { name: "compile", fn: stageCompile, needsEditor: false },
+        { name: "shaderParams", fn: stageShaderParams, needsEditor: false },
         { name: "leaf", fn: stageLeaf, needsEditor: true },
         { name: "golden", fn: stageGolden, needsEditor: true },
         { name: "perf", fn: stagePerf, needsEditor: true },

@@ -1,4 +1,5 @@
 import { ART } from "../Config/ArtDirection";
+import { DISSOLVE_BODY_HEIGHT_CM, DISSOLVE_EDGE_GAIN } from "../Config/CreatureConfig";
 import { brightenMaterial } from "./CreatureMaterials";
 
 
@@ -31,6 +32,10 @@ export class ReleaseEffect {
     private pooledMesh: RenderMesh | null = null;
     private elapsed = 0;
     private particleMaterial: Material | null = null;
+    /** The creature's own body material clone, so the dissolve sweep can be
+     *  driven per frame. Held rather than re-fetched: brightenMaterial clones
+     *  before mutating, so the RenderMeshVisual's material is this instance. */
+    private bodyMaterial: Material | null = null;
     private particleBaseColor: vec4 = new vec4(1, 1, 1, 1);
     private updateEvent: UpdateEvent | null = null;
     private cleanupEvent: DelayedCallbackEvent | null = null;
@@ -104,6 +109,11 @@ export class ReleaseEffect {
 
         // Brighten body + eyes (clone-before-mutate, never mutate the shared base material).
         const brightBody = brightenMaterial(bodyRmv, ART.releaseBrightenLerp);
+        this.bodyMaterial = brightBody;
+        // Release sweeps the front upward and eats the body from the bottom.
+        brightBody.mainPass.dissolveDirection = 1;
+        brightBody.mainPass.dissolveHeightCm = DISSOLVE_BODY_HEIGHT_CM;
+        brightBody.mainPass.dissolveEdgeGain = DISSOLVE_EDGE_GAIN;
         eyeRmvs.forEach((rmv) => brightenMaterial(rmv, ART.releaseBrightenLerp));
 
         // One shared fading material. Still cloned here rather than at prewarm:
@@ -180,6 +190,13 @@ export class ReleaseEffect {
             const transform = p.object.getTransform();
             const pos = transform.getLocalPosition();
             transform.setLocalPosition(pos.add(p.velocity.uniformScale(dt)));
+        }
+
+        // The dissolve IS the release now: the body is eaten from the bottom
+        // up over the same duration the particles drift and fade, so the two
+        // read as one event rather than two overlapping ones.
+        if (this.bodyMaterial) {
+            this.bodyMaterial.mainPass.dissolveAmount = t;
         }
 
         if (this.particleMaterial) {

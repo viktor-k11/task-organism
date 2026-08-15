@@ -144,6 +144,7 @@ node Tools/visual-regression.js --candidate <dir>   # stage 3 on its own
 
 | File | For |
 |---|---|
+| `HANDOFF-NEXT.md` | **Start here if you are taking the project over.** Honest state, open list in priority order, what remains for submission, and the traps this project has already paid for |
 | `HANDOFF-VISUAL.md` | **Start here if you are changing how it looks.** Designer panel, the additive-display colour rules, what not to touch, the build gate in detail (§8) |
 | `CLAUDE.md` | Scope, hard constraints, and the non-negotiable invariants |
 | `AGENTS.md` | Lens Studio conventions and the MCP rules for agents |

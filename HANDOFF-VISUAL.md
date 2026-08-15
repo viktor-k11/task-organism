@@ -7,7 +7,7 @@ how this looks.
 > ```bash
 > node Tools/build-gate.js
 > ```
-> One command, one verdict. It compiles the project, runs all 14 automated
+> One command, one verdict. It compiles the project, runs all 19 automated
 > tests, diffs the seven golden frames, and checks the release-frame cost.
 > It prints what broke and which file to open. Nothing to install.
 >
@@ -105,7 +105,7 @@ constraint, not a bug to fix.
 ### The domain layer — `Assets/Scripts/Data`, `State`, `Input`
 
 This is the task logic: what a task is, when it becomes urgent, which one is
-allowed to approach, what completing it does. It is covered by 14 automated
+allowed to approach, what completing it does. It is covered by 19 automated
 tests. **Changing it is not a visual edit** and will break the tests.
 
 Deliberately kept out of the Inspector, so a colour change can never
@@ -302,7 +302,7 @@ included, and gives you a single yes/no. Run it after any change.
 ────────────────────────────────────────────────────────────────
 
   ok   1. TypeScript compile    PASS     0 errors
-  ok   2. LEAF scenarios        PASS     14/14 ran
+  ok   2. LEAF scenarios        PASS     19/19 ran
   ok   3. Golden images         PASS     7/7 frames within 1%
   ok   4. Release-frame perf    PASS     worst release frame 223.7ms (release 1 of 2, 6 creatures) vs budget 300.0ms
 ```
@@ -372,7 +372,7 @@ cheaper — that spike was desktop webcam tracking, nowhere near a release.
 Gating on a run-wide max would fail on a busy laptop and pass on a real
 regression.
 
-### Why "14/14 ran" is itself an assertion
+### Why "19/19 ran" is itself an assertion
 
 The gate lists every scenario it expects by name. A scenario that quietly stops
 being registered shows up as `13/14 ran — 1 never ran: gate5-snooze-runtime-path`
@@ -402,3 +402,83 @@ named the problem:
 | perf | run with no releases | `no releases recorded` |
 
 A verification script nobody has watched fail is not a verification script.
+
+---
+
+## 9. Interaction tests — gate 6
+
+The five `gate6-*` scenarios are the only ones that test **the gesture**, rather
+than the code behind it.
+
+Everything in `gate3-*` calls `pressStart` / `pressEnd` on the state machine
+directly. That skips the layer where this project's interaction defects have
+actually happened: collider geometry, SIK target resolution, and the
+`Interactable` wiring. Both known examples — buttons left on a default
+20×20×20 collider so SIK could not tell which one was meant, and a BackPlate
+whose collider swallowed the rows above it — are invisible to a test that names
+the task it wants to press.
+
+Gate 6 delivers a real pinch. SIK resolves it against the real collider and
+routes it to the real `Interactable`, exactly as a hand would.
+
+| Scenario | What it drives |
+|---|---|
+| `gate6-pinch-select` | short pinch on a habitat creature selects it |
+| `gate6-pinch-hold-resolve` | select, then hold past the threshold — one save, one release |
+| `gate6-pinch-early-release` | hold released early cancels, selection kept, nothing written |
+| `gate6-pinch-miss` | pinch into empty space writes nothing and hits no other creature |
+| `gate6-moving-chaser` | the approaching creature is acquired **while moving** |
+
+### Proof they catch what gate3 cannot
+
+The creature collider was shrunk from `34×39×30` to `1×1×1` and both suites run:
+
+```
+gate6-pinch-select   FAILED — Timed out waiting for onTriggerStart for "Body" after 5000ms
+gate3-short-pinch-select  PASSED
+```
+
+The synthetic test is blind to a collider that no longer works. That is the
+whole reason gate 6 exists.
+
+### Why the pinch is driven from inside the Lens
+
+The obvious design — arm the state, fire `PreviewInteractTool` from the agent,
+assert in a second run — does not work, and the reason is worth knowing before
+anyone tries it again:
+
+**The LEAF plugin resets the Lens before every scenario run.** So a scenario
+cannot observe anything a previous run set up, and cannot observe a gesture
+injected between two runs; the reset wipes the armed story, the recorded
+baseline and the gesture's effect together.
+
+The scenarios therefore use `AiHandInteractor` directly — the same class
+`PreviewInteractTool` drives remotely. It puppets the hand rig and feeds SIK's
+real `PinchDetector`, so the event stream is identical, and setup, gesture and
+assertion all stay inside one run. That is also what makes them deterministic:
+the story is put on a named beat by command (`gestureHarnessJumpTo`), never by
+waiting on a clock, because preview here runs at 0.1–15 fps.
+
+### Two findings
+
+**1. The moving chaser CAN be acquired — the recorded limitation did not
+reproduce.** `prompts.md` records that a synthetic hold "could not reacquire the
+moving target". A short pinch on the moving chaser succeeded on four
+consecutive runs, with the creature travelling 4.3–5.2 cm during the gesture.
+The scenario fails if travel is under 2 cm, so a pass on a creature that had
+already settled cannot be mistaken for success.
+
+Still open: the original note was about a **hold**, not a short pinch. Holding a
+moving creature through to completion is not covered by these five scenarios.
+
+**2. Deselect-on-miss is not implemented, and this is a product decision.** A
+pinch into empty space currently leaves the selection panel open.
+`CreatureInteractionState.pressStart` is reachable only from a creature's own
+`Interactable` and the scripted demo beats — there is no global background
+handler, so a miss never reaches the state machine at all.
+
+`gate6-pinch-miss` asserts the half that is a real invariant (a miss writes
+nothing and must not land on a neighbouring creature — which is a genuine test
+of collider size) and *reports* the selection behaviour rather than asserting
+it, because whether the panel should close when you pinch away is a design
+choice nobody has made yet.

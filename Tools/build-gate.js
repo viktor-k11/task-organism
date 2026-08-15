@@ -88,6 +88,14 @@ const CONFIG = {
         "gate3-later-snooze",
         "gate4-controller-survives-release",
         "gate5-snooze-runtime-path",
+        // Gate 6 drives the real input path — a pinch SIK resolves against the
+        // real collider. These are the only scenarios that can see a collider
+        // or targeting defect; everything above calls pressStart directly.
+        "gate6-pinch-select",
+        "gate6-pinch-hold-resolve",
+        "gate6-pinch-early-release",
+        "gate6-pinch-miss",
+        "gate6-moving-chaser",
     ],
 
     /** Share of pixels that may differ before a frame counts as changed.

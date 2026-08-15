@@ -143,6 +143,18 @@ export class TaskOrganismController extends BaseScriptComponent {
     private cloneContainer: SceneObject | null = null;
     /** Visual-harness state: set when VISUAL_HARNESS_FRAME selects a frame. */
     private harnessSettleRemainingS = -1;
+    // ── Gesture-harness state (see the gestureHarness* members below) ────────
+    /** Latest hold progress, mirrored from onResolveProgress so a scenario can
+     *  read it without subscribing. */
+    private lastResolveProgress = 0;
+    /** Number of completed releases this session. Counts the presentation
+     *  event, which is what "one release effect" means to a test. */
+    private releaseEventCount = 0;
+    /** When true the scripted story stops advancing. Distinct from
+     *  VISUAL_HARNESS_FRAME, which also freezes `interaction.update` — a
+     *  gesture test needs beats held still but the gesture clock RUNNING, or a
+     *  pinch-and-hold could never reach 100%. */
+    private gestureHarnessPaused = false;
     private harnessReported = false;
 
     // Rolling frame-time window for the capacity FPS measurement.
@@ -420,7 +432,7 @@ export class TaskOrganismController extends BaseScriptComponent {
             // Frozen: the sequence was already advanced by command. Only the
             // settle countdown runs, so the captured state cannot drift.
             this.updateVisualHarness(dt);
-        } else if (this.sequence) {
+        } else if (this.sequence && !this.gestureHarnessPaused) {
             this.sequence.update(dt);
         }
         // Frozen while the visual harness holds a frame. Without this the
@@ -621,6 +633,94 @@ export class TaskOrganismController extends BaseScriptComponent {
         }
     }
 
+    /* ══════════════════════════════════════════════════════════════════════
+     * GESTURE HARNESS — read/controlled by the gate6 LEAF scenarios only.
+     *
+     * These exist because the gate6 scenarios test the REAL input path: a
+     * pinch injected by PreviewInteractTool, resolved by SIK against the real
+     * collider, arriving at the real Interactable. That path cannot be driven
+     * from inside the Lens, so a scenario has to (a) put the story in a known
+     * state, (b) hand the agent the object to pinch, and (c) read back what
+     * happened. Nothing here is used by the demo itself.
+     * ══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Jumps the story to a named beat in one call and holds it there, so a
+     * gesture fires against a known state rather than whatever the wall clock
+     * happened to reach. Same beat-jump the golden-image harness relies on.
+     */
+    gestureHarnessJumpTo(beat: DemoBeat, pause: boolean): void {
+        if (!this.sequence) return;
+        this.sequence.advanceTo(this.sequence.timeOfBeat(beat));
+        this.gestureHarnessPaused = pause;
+        this.syncArbiter();
+    }
+
+    /** Lets the story run again. Scenario 5 needs the chaser actually moving. */
+    gestureHarnessResume(): void {
+        this.gestureHarnessPaused = false;
+    }
+
+    /**
+     * Everything a gesture scenario asserts on, in one read. Returned as plain
+     * data so a scenario can snapshot it before a gesture and diff after.
+     */
+    gestureHarnessSnapshot(): {
+        beat: string;
+        selectedId: string | null;
+        openCount: number;
+        releaseCount: number;
+        holdProgress: number;
+        chaserId: string | null;
+        slots: { taskId: string; objectName: string; worldPosition: vec3; isChaser: boolean }[];
+    } {
+        return {
+            beat: this.sequence ? this.sequence.beat : "NONE",
+            selectedId: this.interaction ? this.interaction.selectedId : null,
+            openCount: this.repository ? this.repository.listOpen().length : -1,
+            releaseCount: this.releaseEventCount,
+            holdProgress: this.lastResolveProgress,
+            chaserId: this.activeChaserId,
+            slots: this.slots.map((s) => ({
+                taskId: s.taskId,
+                // The Body child is what carries the collider and Interactable,
+                // so it is the object the agent must target — not the root.
+                objectName: this.interactionBodyOf(s.root) ? this.interactionBodyOf(s.root)!.name : "(no body)",
+                worldPosition: this.interactionBodyOf(s.root)
+                    ? this.interactionBodyOf(s.root)!.getTransform().getWorldPosition()
+                    : s.root.getTransform().getWorldPosition(),
+                isChaser: s.taskId === this.activeChaserId,
+            })),
+        };
+    }
+
+    /**
+     * The live Interactable for a task, so a scenario can drive a real SIK
+     * pinch at it. Returning the component rather than a name keeps the test
+     * pointed at the same object the runtime wired up in attachInteraction.
+     */
+    gestureHarnessInteractableOf(taskId: string): Interactable | null {
+        const slot = this.slots.find((s) => s.taskId === taskId);
+        if (!slot) return null;
+        const body = this.interactionBodyOf(slot.root);
+        return body ? (body.getComponent(Interactable.getTypeName()) as Interactable) : null;
+    }
+
+    /** Finds the descendant carrying the Interactable for a creature root. */
+    private interactionBodyOf(root: SceneObject): SceneObject | null {
+        let found: SceneObject | null = null;
+        const visit = (obj: SceneObject): void => {
+            if (found) return;
+            if (obj.getComponent(Interactable.getTypeName())) {
+                found = obj;
+                return;
+            }
+            for (let i = 0; i < obj.getChildrenCount(); i++) visit(obj.getChild(i));
+        };
+        visit(root);
+        return found;
+    }
+
     private attachInteraction(body: SceneObject, taskId: string): void {
         let collider = body.getComponent("Physics.ColliderComponent") as ColliderComponent;
         if (!collider) {
@@ -703,6 +803,7 @@ export class TaskOrganismController extends BaseScriptComponent {
     }
 
     private onResolveProgress(progress: number): void {
+        this.lastResolveProgress = progress;
         const selectedId = this.interaction ? this.interaction.selectedId : null;
         for (const slot of this.slots) {
             if (slot.taskId === selectedId) slot.view.setProgress(progress);
@@ -727,6 +828,7 @@ export class TaskOrganismController extends BaseScriptComponent {
         // effect's cost. Counts live slots, not open tasks — the perf number is
         // about how many creatures are on screen.
         PerfGate.markRelease(this.slots.length);
+        this.releaseEventCount += 1;
         console.log(`[WednesdayEvidence] release requested task=${taskId} remaining=${remaining}`);
         this.activeChaserId = null;
         // Close the gate again so the next-most-urgent task (which is also

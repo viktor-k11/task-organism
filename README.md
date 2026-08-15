@@ -22,7 +22,7 @@ node Tools/build-gate.js
 ────────────────────────────────────────────────────────────────
 
   ok   1. TypeScript compile    PASS     0 errors
-  ok   2. LEAF scenarios        PASS     14/14 ran
+  ok   2. LEAF scenarios        PASS     19/19 ran
   ok   3. Golden images         PASS     7/7 frames within 1%
   ok   4. Release-frame perf    PASS     worst release frame 223.7ms (release 1 of 2, 6 creatures) vs budget 300.0ms
 ```
@@ -39,7 +39,7 @@ compiler.
 | # | Stage | Checks | Needs Lens Studio |
 |---|---|---|---|
 | 1 | TypeScript compile | whole project, via Lens Studio's `lensifyts` | no |
-| 2 | LEAF scenarios | all 14 registered scenarios ran and passed | yes |
+| 2 | LEAF scenarios | all 19 registered scenarios ran and passed | yes |
 | 3 | Golden images | 7 fixed frames vs `docs/golden/` | capture only |
 | 4 | Release-frame perf | release cost at 6 creatures vs a 300ms budget | yes |
 
@@ -100,7 +100,7 @@ Assets/Scripts/
   Interaction/  controller, gesture handling, selection UI
   Creature/     presentation, movement, release effect
   Debug/        probes, including PerfGateProbe (feeds gate stage 4)
-Assets/Tests/   14 LEAF scenarios + LeafIndex
+Assets/Tests/   19 LEAF scenarios + LeafIndex
 Tools/          build-gate.js, visual-regression.js, asset scripts
 docs/golden/    the 7 committed reference frames
 ```

@@ -1359,68 +1359,81 @@ guard.
 
 ---
 
-## Platform finding — shader parameters become material properties on their own schedule
+## Platform finding — shader parameter exposure is tied to the MATERIAL import, and the "2 hour" figure was wrong
 
-**Prompt:** "Stop diagnosing by looking at the render — the two states are
-visually identical, and that is now a documented property of this platform, not
-a hypothesis."
+**Prompt:** "Check whether a Lens Studio restart happened between those two
+observations."
 
-Correct, and it is the root of two wrong conclusions in a row. Recorded here
-because anyone building a custom shader on this platform will hit it.
+**It did not, and that is checkable rather than arguable.** The Lens Studio
+process has run continuously since the project was opened:
 
-### The ambiguity
+```
+$ ps -o lstart=,etime=,pid= -p 40768
+Tue Aug 11 14:20:17 2026     04-05:26:36 40768
+```
 
-The dissolve is gated so that `DissolveAmount == 0` executes nothing — a
-deliberate safety property after the black-bodies incident. An unexposed
-parameter also reads as 0. So **an intact creature means either "the effect is
-off" or "the parameter never reached the material", and no capture can tell
-them apart.** Both of my wrong negatives came from reading a render and picking
-the wrong branch.
+Four days five hours of uptime, and a single unbroken log file
+(`LensStudioLog-2026-08-11-14-20-18-443-6657f.txt`) covering every observation in
+this cycle. So a restart is **not** what flushed `dissolveAmount` from
+`undefined` to `0`, and the restart hypothesis is disproved for that transition.
 
-### The two-stage import, with observed timings
+### The "up to 2 hours" figure was an artefact of not sampling
 
-Editing a `.graphShader` triggers two separate things, and only the first is
-prompt:
+I recorded a two-hour range because I read `undefined` at 17:13:53 and `0` at
+19:19 and never looked in between. The log shows what actually happened in that
+gap:
+
+```
+17:13:53   readback undefined            (my test)
+17:14:43   Source file was changed, reimporting Assets/Materials/PetBody.mat
+17:14:43   Imported PetBody.mat (MaterialImporter) in 10.231 ms
+17:14:44   Asset PetBody.mat loaded in 1.09 sec
+19:19      readback 0                    (my next test)
+```
+
+My test ran **fifty seconds before the material reimported**. The exposure
+almost certainly landed at 17:14:44, about one second after the `.mat` was
+touched — not two hours later. Two separate imports are involved and only the
+first is the shader:
 
 | Stage | Observed |
 |---|---|
-| `.graphShader` reimport | ~4s, logged as `Imported Assets/Materials/PetBody.graphShader … loaded in 4.04 sec` |
-| parameters becoming material properties | **not observed under 2 hours** |
+| `.graphShader` reimport | ~4s (`loaded in 4.04 sec`) |
+| `.mat` reimport | ~10ms + ~1s load |
 
-`dissolveAmount` read back `undefined` at 17:13 and `0` at 19:19 with no action
-taken in between — no edit, no reimport, no restart. Adding the parameter to
-`PetBody.mat`'s `Properties` block did not make it immediate. Renaming an
-already-exposed parameter (`dissolveHeightCm` → `dissolveHeightObj`) **loses**
-the exposure, and reverting the name does not bring it back within a session.
+**A shader parameter appears to become a material property when the MATERIAL is
+reimported, not when the shader is.** Editing only the `.graphShader` leaves it
+unexposed however long you wait.
 
-Nothing found to force it: `Support/editor.d.ts` exposes no reimport, no
-asset-refresh and no project-save entry point, so the Editor API route the
-previous cycle recommended does not exist as an API.
+### What still does not fit, and where it stands
 
-### What to do about it, given it cannot be forced
+The mechanism did not reproduce later in the same session. At 19:33:50 and
+19:41:42 both files reimported cleanly, and readbacks at 19:39, 19:40 and 19:41
+still reported `undefined`. The distinguishing feature of those attempts is that
+the parameter had been **renamed** (`dissolveHeightCm` → `dissolveHeightObj`) and
+then reverted; adding a parameter and renaming one may not behave the same way.
 
-1. **Never add a parameter you can avoid.** Measuring the pet meshes showed
-   every one is authored feet-at-origin — dog `baseY=0.0069 height=83.0092`, the
-   five generated species `baseY=0.0000 height≈1.0000`. So the planned
-   `dissolveBaseY` was unnecessary and was dropped: the sweep is
-   `clamp(localY / height, 0, 1)`. A parameter that does not exist cannot fail
-   to be exposed.
-2. **Never rename an exposed parameter.** The name `dissolveHeightCm` is now a
-   misnomer — it carries the mesh's own object units — and is kept anyway,
-   because the rename cost the exposure.
-3. **Assert the readback, every run.** See `assertDissolveParamsLive`. It logs
-   per creature and names which parameter is undefined; "undefined" without the
-   name cost a cycle by not distinguishing never-exposed from exposure-lost.
+By the end of the cycle the file watcher had stopped responding to `.mat` edits
+altogether — the file was changed at ~19:47 and no reimport was logged, with
+19:41:43 still the most recent material import. That is a stuck watcher, which
+is itself an argument for the restart test rather than against it.
 
-### Status
+**The restart test was not run** — the stated hypothesis was disproved from the
+log first, the cheaper `.mat`-touch mechanism was pursued instead, and the
+session ended before the restart itself. It is still worth running, now with a
+sharper question: does a restart un-stick the file watcher and expose the
+renamed parameter.
 
-The normalisation is correct in form and **still unverified**: at the end of
-this cycle the precondition reports
+### Rules that follow
 
-```
-[DissolveParams] *** NOT LIVE *** undefined: dissolveHeightCm — …
-```
-
-so the six-creature 50% capture was **not taken**. That is the precondition
-doing its job: refusing to produce a picture that could be misread, which is
-exactly the failure it was built to end.
+1. **Never rename an exposed shader parameter.** The rename cost this cycle and
+   reverting it did not undo the damage. Now recorded in HANDOFF-VISUAL.md.
+2. **Never add a parameter you can avoid.** Measuring the pet meshes showed all
+   six are authored feet-at-origin — dog `baseY=0.0069 height=83.0092`, the five
+   generated species `baseY=0.0000 height≈1.0000` — so the planned
+   `dissolveBaseY` was unnecessary and was dropped.
+3. **Touch the `.mat`, not just the `.graphShader`,** after changing shader
+   parameters.
+4. **Assert the readback every run.** `assertDissolveParamsLive` names which
+   parameter is undefined, because "undefined" alone does not distinguish
+   never-exposed from exposure-lost.

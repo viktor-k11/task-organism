@@ -127,6 +127,27 @@ concept — several creatures converging on someone's face is the difference
 between a pet and a swarm. It is enforced in code and verified by tests. Nothing
 in the designer panel can break it, and nothing you add should try to.
 
+### Never rename an exposed shader parameter
+
+A parameter in `PetBody.graphShader` becomes usable from TypeScript only once
+Lens Studio has exposed it as a material property. **Renaming one loses that
+exposure, and renaming it back does not restore it** — verified the hard way,
+and it cost a full working cycle.
+
+So `dissolveHeightCm` is a misnomer: it carries the mesh's own object units, not
+centimetres. It is staying that way. If a name is wrong, leave it wrong and fix
+the comment.
+
+The same reasoning says: **do not add a shader parameter you can avoid.** A
+parameter that does not exist cannot fail to be exposed. The dissolve sweep
+derives its base from the meshes being authored feet-at-origin rather than
+taking a second parameter for it.
+
+If something driven from a shader parameter is not visibly working, check the
+`[DissolveParams]` line in the log **before** looking at the picture. An
+unexposed parameter reads as 0, and 0 is the effect's own no-op, so the two are
+pixel identical and no capture can tell them apart.
+
 ### The shared ground line — `groundYOffsetCm`
 
 One number defines the floor. The habitat floor disc and **every** creature's

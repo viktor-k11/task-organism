@@ -128,8 +128,17 @@ export const PRESENTATION_SCALE_EASE_PER_S = 2.8;
 // ── Chase ────────────────────────────────────────────────────────────────
 export const CHASE_DISTANCE_MIN_CM = 110; // 1.1m
 export const CHASE_DISTANCE_MAX_CM = 130; // 1.3m
-export const CHASE_SIDE_OFFSET_MIN_DEG = 0;
-export const CHASE_SIDE_OFFSET_MAX_DEG = 0;
+// The approaching creature settles off to one side rather than dead-ahead.
+// This is a comfort and tone rule, not a look: a creature that walks straight
+// down the user's centre line reads as confrontational, and the whole concept
+// depends on it reading like a cat asking for attention. The side is chosen
+// per approach, so it does not always come from the same direction.
+//
+// These were briefly 0/0 — zeroed inside an unrelated presentation commit with
+// no recorded reason, which left the code contradicting the written rule in
+// CLAUDE.md for three days. Restored to the specified 8-12 degrees.
+export const CHASE_SIDE_OFFSET_MIN_DEG = 8;
+export const CHASE_SIDE_OFFSET_MAX_DEG = 12;
 export const CHASE_STOP_DISTANCE_CM = 100; // 1.0m hard stop, never gets closer
 export const MAX_SPEED_CM_S = 50; // 0.5 m/s hard cap (CLAUDE.md)
 export const CHASE_MAX_ACCEL_CM_S2 = 90;
@@ -624,7 +633,6 @@ export const TASK_SELECTION_PANEL_Y_CM = 25;
 // ── Lathe geometry (egg/teardrop silhouette, ~16cm tall x ~14cm wide) ──────
 // Kept for BlobMeshBuilder.ts (see the wobble section above — same status).
 export const LATHE_SEGMENTS = 80;
-export const VISUAL_BASELINE_SCALE = 0.88;
 /** [radius_cm, height_cm, x_offset_cm, z_offset_cm] — smooth asymmetric bean, 39cm tall. */
 export const BLOB_PROFILE: [number, number, number?, number?][] = [
     [0.0, -19.0, -0.8, 0.0],
@@ -739,7 +747,6 @@ export const OWL_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / OWL_BODY_TO_BB
  *   rabbit    0.8961 — upright ears, closest to the cat
  *   penguin   1.0000 — no ears at all; bbox IS the body
  */
-export const ELEPHANT_BODY_TO_BBOX_RATIO = 1.0;
 /** Attempt 2 measures 0.9992 units tall against 1.0000 wide — near-cubic, where
  *  attempt 1 was 0.8499 tall and 0.9918 wide and read as a slab. */
 export const ELEPHANT_DISPLAY_SCALE = READYMADE_PET_TARGET_HEIGHT_CM / 0.9992;
@@ -813,7 +820,6 @@ export const LEAN_CHASE_PITCH_DEG = 9;
  * on/off switch (WOBBLE_ENABLED-style) so it can be cut with no other code
  * changes if it doesn't read well before the visual pass lands.
  */
-export const MOUTH_ENABLED = true;
 export const MOUTH_SEGMENT_COUNT: number = 5;
 export const MOUTH_WIDTH_CM = 5.0;
 export const MOUTH_BEAD_RADIUS_CM = 1.3;

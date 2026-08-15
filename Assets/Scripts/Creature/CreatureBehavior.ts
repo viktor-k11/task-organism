@@ -229,9 +229,6 @@ export class CreatureBehavior extends BaseScriptComponent {
     @input
     @hint("The scene's main Camera SceneObject — used to compute the habitat center and the chase target.")
     cameraObject!: SceneObject;
-    @input
-    @hint("Which ready-made model this slot uses: \"dog\" or \"cat\" (see CreaturePetVisual.ts).")
-    petSpecies: string = "dog";
     @ui.group_end
 
     private state: CreaturePresentationState = CreaturePresentationState.IDLE;

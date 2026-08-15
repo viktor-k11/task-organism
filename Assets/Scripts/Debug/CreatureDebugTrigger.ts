@@ -1,5 +1,5 @@
 import { CreatureBehavior } from "../Creature/CreatureBehavior";
-import { RELEASE_DURATION_S } from "../Config/CreatureConfig";
+import { ART } from "../Config/ArtDirection";
 
 type AutoCyclePhase = "IDLE" | "CHASING" | "RELEASED";
 
@@ -134,7 +134,7 @@ export class CreatureDebugTrigger extends BaseScriptComponent {
                 break;
             case "RELEASED":
                 // Wait for the release effect to finish, plus a short pause, then loop.
-                if (this.autoCycleTimer >= RELEASE_DURATION_S + 1.0) {
+                if (this.autoCycleTimer >= ART.releaseDurationS + 1.0) {
                     this.creature.reset();
                     this.autoCyclePhase = "IDLE";
                     this.autoCycleTimer = 0;

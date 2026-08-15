@@ -13,6 +13,7 @@ import { Gate3CompletedHoldScenario } from "./Gate3CompletedHoldScenario";
 import { Gate3NoConflictScenario } from "./Gate3NoConflictScenario";
 import { Gate3LaterScenario } from "./Gate3LaterScenario";
 import { Gate4ControllerSurvivesReleaseScenario } from "./Gate4ControllerSurvivesReleaseScenario";
+import { Gate5SnoozeRuntimePathScenario } from "./Gate5SnoozeRuntimePathScenario";
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -37,5 +38,9 @@ export class LeafIndex extends BaseScriptComponent {
         // rather than the domain. It exists because all twelve above passed
         // while the composition root was silently being disabled on release.
         { id: "gate4-controller-survives-release", typename: Gate4ControllerSurvivesReleaseScenario.getTypeName() },
+        // Gate 5 drives CreatureInteractionState.later() — the method the Later
+        // button actually calls — rather than repository.snooze(). gate3-later-snooze
+        // passed for the project's whole life while this path had never run.
+        { id: "gate5-snooze-runtime-path", typename: Gate5SnoozeRuntimePathScenario.getTypeName() },
     ];
 }

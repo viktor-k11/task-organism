@@ -99,17 +99,26 @@ Nodes:
             input_float DissolveAmount;
             input_float DissolveDirection;
             input_float DissolveEdgeGain;
-            input_float DissolveHeightCm;
+            input_float DissolveHeightObj;
+            input_float DissolveBaseY;
             output_vec4 Result;
 
-            // ---- Dissolve tuning that is not worth an Inspector row --------
-            // Edge band thickness as a fraction of body height. 0.06 of a ~40cm
-            // creature is ~2.5cm, which is the "few centimetres" the beat wants.
+            // ---- Dissolve tuning, all in FRACTIONS OF BODY HEIGHT -----------
+            // Everything here is unitless on purpose. The meshes are authored at
+            // wildly different object-space scales — the dog is ~205 units tall,
+            // the generated species ~1 — so any constant expressed in mesh units
+            // or centimetres can only ever be correct for one species, and a
+            // wrong value makes a creature VANISH rather than error. Fractions
+            // are the only form that survives a seventh species being added by
+            // someone who forgets to add a table entry.
+            //
+            // Edge band thickness: 0.06 of the body, so ~2.5cm on a 40cm
+            // creature — the "few centimetres" the beat wants — and still ~2.5cm
+            // equivalent on a mesh authored 200x larger.
             const float DISSOLVE_EDGE = 0.06;
-            // Noise frequency in object-space cm, and how far it displaces the
-            // front. Amplitude is in the same normalised height units as the
-            // threshold, so 0.10 lets the front wander a tenth of the body.
-            const float DISSOLVE_NOISE_SCALE = 0.18;
+            // Noise frequency in bodies (not units), and how far it displaces
+            // the front as a fraction of height.
+            const float DISSOLVE_NOISE_SCALE = 7.0;
             const float DISSOLVE_NOISE_AMP = 0.10;
 
             // Value noise. Procedural because the pipeline discards textures on
@@ -226,14 +235,22 @@ Nodes:
             		vec3 originW = model[3].xyz;
             		vec3 upW = model[1].xyz;
             		float upLen = max(length(upW), 1e-4);
-            		float localCm = dot(system.getSurfacePosition() - originW, upW / upLen) / upLen;
-            		float height = max(DissolveHeightCm, 1.0);
-            		float h = clamp(localCm / height, 0.0, 1.0);
+            		// World offset back into the mesh's OWN object units.
+            		vec3 objOffset = (system.getSurfacePosition() - originW) / upLen;
+            		float localY = dot(objOffset, upW / upLen);
+            		// Normalise against the mesh's own measured bounds, passed per
+            		// creature from RenderMesh.aabbMin/aabbMax. h is then 0 at the
+            		// feet and 1 at the crown for EVERY species, whatever scale it
+            		// was authored at, with no per-species table to forget.
+            		float height = max(DissolveHeightObj, 1e-4);
+            		float h = clamp((localY - DissolveBaseY) / height, 0.0, 1.0);
 
-            		// Break the waterline into an organic front. Noise is sampled
-            		// in object space so the pattern is welded to the body and
-            		// does not swim while the creature moves.
-            		vec3 noisePos = (system.getSurfacePosition() - originW) / upLen;
+            		// Break the waterline into an organic front. Sampled in
+            		// body-relative space — offset divided by the same height — so
+            		// the pattern is welded to the body, does not swim while the
+            		// creature moves, and has the same apparent grain on a mesh
+            		// authored at 1 unit as on one authored at 205.
+            		vec3 noisePos = objOffset / height;
             		float n = dissolveNoise(noisePos * DISSOLVE_NOISE_SCALE);
             		float hn = h + (n - 0.5) * DISSOLVE_NOISE_AMP;
 
@@ -307,9 +324,14 @@ Nodes:
             NodeLevelID: 10
             PortID: Output
           Variable: [0.0, 0.0, 0.0, 0.0]
-        DissolveHeightCm:
+        DissolveHeightObj:
           Connection0:
             NodeLevelID: 11
+            PortID: Output
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        DissolveBaseY:
+          Connection0:
+            NodeLevelID: 12
             PortID: Output
           Variable: [0.0, 0.0, 0.0, 0.0]
         Stage:
@@ -590,20 +612,59 @@ Nodes:
           IOType: 1
           Variable: [0.0, 0.0, 0.0, 0.0]
         ScriptName:
-          String: dissolveHeightCm
+          String: dissolveHeightObj
         SortIndex:
           Variable: 7
         Step:
           Variable: 0.5
         Title:
-          String: Dissolve Body Height
+          String: Dissolve Body Height (object units)
         Tooltip:
           String: Body height in cm used to normalise the sweep. Set per species so the front crosses the whole creature.
       PositionX: -380
       PositionY: 560
       TemplateID: nodes_inputs_parameters_float
       Title1: Float Parameter
-      Title2: Dissolve Body Height
+      Title2: Dissolve Body Height (object units)
+    Node11:
+      DependencyIndex: 11
+      LevelID: 12
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 5
+          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
+        Default:
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        EnableMax:
+          Variable: true
+        EnableMin:
+          Variable: true
+        Group:
+          String: "Dissolve"
+        Max:
+          Variable: 10000.0
+        Min:
+          Variable: -10000.0
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: dissolveBaseY
+        SortIndex:
+          Variable: 8
+        Step:
+          Variable: 0.5
+        Title:
+          String: Dissolve Base Y
+        Tooltip:
+          String: Object-space Y of the mesh's lowest point, from RenderMesh.aabbMin. With Body Height this makes the sweep 0..1 at any authoring scale.
+      PositionX: -380
+      PositionY: 640
+      TemplateID: nodes_inputs_parameters_float
+      Title1: Float Parameter
+      Title2: Dissolve Base Y
     Node3:
       CommentSizeX: 0
       CommentSizeY: 0

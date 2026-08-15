@@ -1,5 +1,5 @@
 import { ART } from "../Config/ArtDirection";
-import { DISSOLVE_BODY_HEIGHT_CM, DISSOLVE_EDGE_GAIN } from "../Config/CreatureConfig";
+import { DISSOLVE_EDGE_GAIN } from "../Config/CreatureConfig";
 import { brightenMaterial } from "./CreatureMaterials";
 
 
@@ -112,7 +112,10 @@ export class ReleaseEffect {
         this.bodyMaterial = brightBody;
         // Release sweeps the front upward and eats the body from the bottom.
         brightBody.mainPass.dissolveDirection = 1;
-        brightBody.mainPass.dissolveHeightCm = DISSOLVE_BODY_HEIGHT_CM;
+        // Height and base Y are measured per mesh in CreaturePetVisual and are
+        // already on this material — deliberately NOT re-set here, because a
+        // constant written at release time is what made five of six creatures
+        // vanish.
         brightBody.mainPass.dissolveEdgeGain = DISSOLVE_EDGE_GAIN;
         eyeRmvs.forEach((rmv) => brightenMaterial(rmv, ART.releaseBrightenLerp));
 

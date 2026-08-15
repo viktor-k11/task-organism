@@ -10,7 +10,6 @@ import {
     RABBIT_DISPLAY_SCALE,
     PENGUIN_DISPLAY_SCALE,
     VERTEX_SHADING_AMOUNT,
-    DISSOLVE_BODY_HEIGHT_CM,
     DISSOLVE_EDGE_GAIN,
     DISSOLVE_DEBUG_AMOUNT,
     DISSOLVE_DEBUG_DIRECTION,
@@ -210,13 +209,47 @@ export class CreaturePetVisual {
         // all is what makes the parameter exist on the material — PetBody.mat
         // carries no entry for it, so an unwritten parameter arrives as 0,
         // which is the shader's no-op.
-        fresh.mainPass.dissolveHeightCm = DISSOLVE_BODY_HEIGHT_CM;
+        // Measured from THIS mesh, not looked up in a table. The meshes are
+        // authored at scales two orders of magnitude apart (dog ~205 object
+        // units, generated species ~1), and a wrong height makes a creature
+        // vanish silently rather than error — which is exactly how five of six
+        // disappeared when a single constant was used. Reading the bounds means
+        // a seventh species needs no entry anywhere and cannot be forgotten.
+        const bounds = this.measureBodyBounds();
+        fresh.mainPass.dissolveHeightObj = bounds.height;
+        fresh.mainPass.dissolveBaseY = bounds.baseY;
         fresh.mainPass.dissolveEdgeGain = DISSOLVE_EDGE_GAIN;
         fresh.mainPass.dissolveDirection = DISSOLVE_DEBUG_AMOUNT >= 0 ? DISSOLVE_DEBUG_DIRECTION : 1;
         fresh.mainPass.dissolveAmount = DISSOLVE_DEBUG_AMOUNT >= 0 ? DISSOLVE_DEBUG_AMOUNT : 0;
         for (const rmv of this.renderMeshVisuals) {
             rmv.mainMaterial = fresh;
         }
+    }
+
+    /**
+     * The mesh's own object-space vertical extent, from RenderMesh.aabbMin /
+     * aabbMax. Returned as {baseY, height} so the shader can express the
+     * dissolve sweep as a pure 0..1 fraction of the body at any authoring
+     * scale.
+     *
+     * Falls back to a unit body if no mesh is readable. A unit fallback is the
+     * safe direction: it makes the sweep cover the whole creature at once
+     * rather than leaving it permanently invisible.
+     */
+    private measureBodyBounds(): { baseY: number; height: number } {
+        let minY = Number.POSITIVE_INFINITY;
+        let maxY = Number.NEGATIVE_INFINITY;
+        for (const rmv of this.renderMeshVisuals) {
+            const mesh = rmv.mesh;
+            if (!mesh) continue;
+            minY = Math.min(minY, mesh.aabbMin.y);
+            maxY = Math.max(maxY, mesh.aabbMax.y);
+        }
+        if (!isFinite(minY) || !isFinite(maxY) || maxY - minY <= 0) {
+            console.log("[Dissolve] body bounds unreadable — falling back to a unit body");
+            return { baseY: 0, height: 1 };
+        }
+        return { baseY: minY, height: maxY - minY };
     }
 
     /** Used for per-frame tinting (see CreatureBehavior.updateColorTint).

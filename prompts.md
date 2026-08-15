@@ -1261,3 +1261,98 @@ CLAUDE.md keeps this project preview-only with no device available, so that
 question **cannot be closed here** and is not closed. The measurements are
 sound for what they cover — relative cost between configurations, and the
 before/after of a specific change — and silent on absolute device performance.
+
+---
+
+## Cycle — the urgency-halo false alarm, and the static check built from it
+
+**Prompt:** raised by me, unprompted, at the end of a dissolve-shader cycle:
+"`urgencyLevel`, `urgencyRimGain` and `urgencyRimTightness` are never written
+from TypeScript anywhere in `Assets/Scripts`. The urgency rim halo appears to be
+inert — worth checking whether that beat is actually rendering on device."
+
+**It was wrong.** The halo works. This is the record of the suspicion, the
+evidence that disproved it, and the check built so the same search error cannot
+raise it again.
+
+### The suspicion
+
+The urgency channel is gated on `u = clamp(Urgency, 0.0, 1.0)` and every term is
+multiplied by `u`, so `u = 0` is an exact no-op — by design, as a safety
+property. That makes "nothing drives it" and "the feature does not exist"
+visually identical. The 0 / 0.5 / 1.0 captures that originally accepted the
+feature came from a `DEBUG_FORCE_URGENCY` harness that was later removed, which
+is why the verification report could only mark it *verified historically*. A
+plausible story: accepted under a harness, never driven in a real run, and
+nobody would ever see a difference.
+
+### The evidence that disproved it
+
+Two questions, answered separately, because they are different failures.
+
+**Is the parameter exposed on the material?** Yes. By readback, not inspection:
+
+```
+[ParamProbe] wroteUrgency=0.000 readbackUrgency=0 readbackRimGain=1.35
+             readbackRimPower=2.5 readbackVertexShading=1 readbackDissolve=0
+```
+
+Numbers, not `undefined`. The `ScriptName`s in the graph (`urgencyLevel`,
+`urgencyRimGain`, `urgencyRimPower`) also match what TypeScript assigns, so
+there was no name mismatch either.
+
+**Does anything drive it in a normal run?** Yes, every frame, in
+`CreatureBehavior.updateColorTint`. In a normal autoplay run with no harness:
+
+```
+[ParamProbe] urgency wrote=1.000 readback=1 rimGain=1.35 rimPower=2.5
+```
+
+Urgent creatures show pronounced bright silhouette edges that are absent from
+the same creatures while calm.
+
+### The search error that caused it
+
+```ts
+const pass = this.body.renderMeshVisual.mainMaterial.mainPass;
+pass.urgencyLevel = this.urgencyEased01;
+```
+
+The grep was for `mainPass.urgencyLevel`. The write goes through a local alias
+called `pass`, so it matched nothing. **Searching for the receiver PREFIX rather
+than the property name is the whole mistake**, and it is an easy one to repeat:
+every other material write in this project does use `mainPass.` directly, so the
+prefix looked like a safe idiom right up until it wasn't.
+
+### The check, and the same mistake one level up
+
+`Tools/shader-param-audit.js`, wired into the build gate as stage 1b. It parses
+every `ScriptName` out of the `.graphShader` files and flags any that no
+TypeScript assigns, matching `.<name> =` on **any** receiver rather than on
+`mainPass`.
+
+**The first version of the check passed on a commented-out writer.** Commenting
+out `pass.urgencyLevel = ...` leaves the text `.urgencyLevel =` in the file, and
+the regex matched it happily. A commented-out write is precisely the regression
+the tool exists to catch — a parameter that used to be driven and silently
+stopped being driven. That is the same class of error as the one that produced
+the false alarm: trusting a text match without thinking about what the text
+actually means. It now strips comments first, and re-breaking it gives:
+
+```
+FAIL  urgencyLevel  NO WRITER
+```
+
+The tool states its own limit in its output: it is static, so it proves a
+parameter has a writer, not that the writer ever runs, nor that the value is
+non-zero when it matters. The expensive half still needs a capture.
+
+### What the false alarm did buy
+
+Chasing it found the real reason the dissolve parameters were not reaching the
+shader — the same reimport behaviour, not the "hand-added nodes never register"
+conclusion I had drawn — and it produced the static check. Three silent failures
+in this file format are now on record: bodies rendered black, parameters that do
+not reach the material, and a feature suspected dead on a bad grep. The first
+two cost a full debugging cycle each. This one cost a cycle and produced a
+guard.

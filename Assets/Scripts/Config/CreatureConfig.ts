@@ -482,10 +482,6 @@ export const TINT_CHASE_HEAT_BLEND = 0.09;
 export const DISSOLVE_DEBUG_AMOUNT = -1;
 /** +1 release (eaten bottom-up), -1 spawn (fills bottom-up). Debug only. */
 export const DISSOLVE_DEBUG_DIRECTION = 1;
-/** Body height in cm the sweep is normalised against. The pet meshes are
- *  authored feet-at-origin and stand about this tall before presentation
- *  scale, which the shader divides out via the model matrix. */
-export const DISSOLVE_BODY_HEIGHT_CM = 40;
 /** Brightness of the emissive band at the front. On an additive display this
  *  band is the reward — added light is the medium. */
 export const DISSOLVE_EDGE_GAIN = 1.6;

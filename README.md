@@ -8,6 +8,67 @@ Built for CLAD Hackathon Week 1 (Organize). Lens Studio 5.22+, preview-only.
 
 ---
 
+## Getting started
+
+Verified by cloning this repository into a clean directory and running it — the
+steps below are what actually happened, not what should happen.
+
+### 1. Clone
+
+```bash
+git clone git@github.com:viktor-k11/task-organism.git
+cd task-organism
+```
+
+**You do not need git-lfs.** `.gitattributes` marks `*.glb` as `filter=lfs`, but
+git-lfs was never installed on the machine these were committed from, so the
+meshes went in as ordinary blobs and a clone gets the real files — verified:
+`dog_lo.glb` arrives as 5,975,012 bytes beginning with the `glTF` magic number,
+not a pointer stub. If you *do* have git-lfs installed, take care committing new
+`.glb` files: they would become real LFS pointers, and no LFS remote is
+configured for this repo.
+
+### 2. Open the project in Lens Studio 5.22+ once, before anything else
+
+**A fresh clone does not compile.** This is expected and is not a broken
+checkout:
+
+```
+$ node Tools/build-gate.js --stage compile
+883 errors — Cannot find name 'vec3', 'SceneObject', 'MeshBuilder', …
+```
+
+691 of those are missing Lens API globals and 59 are unresolved package imports.
+Both live in `Cache/`, which is gitignored because Lens Studio generates it:
+opening the project writes the API declarations to
+`Cache/TypeScript/lib/LensifyTS/Declarations/` and unpacks the `.lspkg`
+archives into `Cache/TypeScript/Src/Packages/`.
+
+So: open `task-organism.esproj` in Lens Studio and let it finish importing. The
+compile stage passes from then on.
+
+### 3. Check the build
+
+```bash
+node Tools/build-gate.js --offline   # compile + shader parameters, no editor
+node Tools/build-gate.js             # all five stages
+```
+
+See [The build gate](#the-build-gate) for what the stages mean and how the
+editor-driven half is captured.
+
+### What you do NOT need
+
+- **git-lfs** — see above.
+- **npm install** — there are no npm dependencies anywhere in `Tools/`.
+- **RemoteServiceGateway, SnapDecorators or Utilities packages** — all three are
+  gitignored and none is required to build. Verified by removing all three and
+  compiling clean. RemoteServiceGateway is needed only by
+  `Assets/Scripts/Debug/TaskUnderstandingProbe.ts`, a parked AI experiment that
+  is itself untracked; install it from the Asset Library if that work resumes.
+
+---
+
 ## The build gate
 
 **One command decides whether this build is healthy.**

@@ -34,3 +34,7 @@ tempAssetGen/
 
 # Perfetto captures — large binaries, analysis lives in prompts.md
 performance_traces/
+
+# Build-gate evidence — per-machine capture output, not a shared artifact.
+# The gate judges freshness by mtime, which does not survive a clone anyway.
+.build-gate/

@@ -3,6 +3,17 @@
 For the designer picking this up. You do not need to read TypeScript to change
 how this looks.
 
+> ## Run this after any change
+> ```bash
+> node Tools/build-gate.js
+> ```
+> One command, one verdict. It compiles the project, runs all 14 automated
+> tests, diffs the seven golden frames, and checks the release-frame cost.
+> It prints what broke and which file to open. Nothing to install.
+>
+> It is the first thing to run after you change anything and the last thing to
+> run before you hand work back. Full detail in [§8](#8-the-build-gate--one-command-for-the-whole-build).
+
 **What the project is:** a spatial task manager where each unfinished task is a
 small creature living about 2.4 m in front of the user. Ignored tasks grow
 restless. The single most urgent one walks toward the user. Completing a task
@@ -94,7 +105,7 @@ constraint, not a bug to fix.
 ### The domain layer — `Assets/Scripts/Data`, `State`, `Input`
 
 This is the task logic: what a task is, when it becomes urgent, which one is
-allowed to approach, what completing it does. It is covered by 12 automated
+allowed to approach, what completing it does. It is covered by 14 automated
 tests. **Changing it is not a visual edit** and will break the tests.
 
 Deliberately kept out of the Inspector, so a colour change can never
@@ -271,3 +282,123 @@ would have produced a plausible-looking but wrong golden image.
 | Chaser | The single most urgent creature, the only one allowed to approach |
 | Release | The completion moment: the creature is let go, with gratitude |
 | Slot | One of six creature positions; 1–3 authored, 4–6 cloned from the template |
+
+---
+
+## 8. The build gate — one command for the whole build
+
+```bash
+node Tools/build-gate.js
+```
+
+Everything in §6 checks pictures. This checks the whole build, pictures
+included, and gives you a single yes/no. Run it after any change.
+
+### What it reports
+
+```
+────────────────────────────────────────────────────────────────
+  BUILD GATE: PASS
+────────────────────────────────────────────────────────────────
+
+  ok   1. TypeScript compile    PASS     0 errors
+  ok   2. LEAF scenarios        PASS     14/14 ran
+  ok   3. Golden images         PASS     7/7 frames within 1%
+  ok   4. Release-frame perf    PASS     worst release frame 223.7ms (release 1 of 2, 6 creatures) vs budget 300.0ms
+```
+
+Exit code is 0 only when every stage passes. On failure it names the artifact
+to open:
+
+```
+ FAIL  3. Golden images         FAIL     1 frame(s) changed of 7
+        06-release          CHANGED         changed 1.84%  meanDelta 0.57
+        -> Compare by eye: open .build-gate/candidate/06-release.png against docs/golden/06-release.png
+```
+
+### The one thing to understand about it
+
+Two of the four stages need a **running Lens Studio**, and Lens Studio can only
+be driven by an agent (Claude), not by a plain script — the project forbids
+talking to the editor over raw HTTP, and the MCP tools that do it properly only
+exist inside an agent session.
+
+So the work splits in two:
+
+| Half | Who runs it | What it covers |
+|---|---|---|
+| **Capture** | Claude, via `node Tools/build-gate.js --plan` | runs the tests, captures the frames, records the perf number into `.build-gate/` |
+| **Judge** | you, unattended | reads `.build-gate/`, compiles, diffs, prints the verdict |
+
+In practice: **ask Claude to run the build gate.** It does the capture half and
+then the judging half, and you get the report. If you just want to re-check
+without recapturing, run the command yourself.
+
+`node Tools/build-gate.js --offline` skips the editor stages entirely and says
+`PARTIAL` — useful on a machine without Lens Studio, but a PARTIAL verdict is
+explicitly *not* a healthy build.
+
+### Stale evidence fails — this is the point
+
+The gate compares the timestamp of every captured artifact against the newest
+edit in `Assets/Scripts`. Captures older than the last code change are `STALE`
+and **fail**:
+
+```
+ FAIL  2. LEAF scenarios        STALE    captured 3 min before the newest source edit — recapture: ...
+```
+
+A build gate that can go green on last week's screenshots is worse than no gate,
+because it looks like coverage. You cannot get a PASS out of this without
+evidence that is newer than the code it describes.
+
+### Stage 4, and why it is not a Perfetto trace
+
+The release frame once cost **551ms** at six creatures — `play()` built a mesh
+and created 30 SceneObjects in a single frame. Pooling that work into
+`prewarm()` brought it to **224ms**. That is the number this stage guards, with
+a budget of 300ms.
+
+Perfetto found that regression, and Perfetto is the right tool for working out
+*which slice* grew. It is the wrong tool for a gate: multi-megabyte traces and a
+human reading slice tables. So the runtime reports the number itself —
+`PerfGateProbe` logs one `[PerfGate] release=…` line per release, and the gate
+reads it.
+
+It measures only the frames just after a release, deliberately. A run-wide
+maximum would be useless here, and this project has the receipts: after pooling,
+the *trace-wide* max got worse (551 → 754ms) while the release itself got 59%
+cheaper — that spike was desktop webcam tracking, nowhere near a release.
+Gating on a run-wide max would fail on a busy laptop and pass on a real
+regression.
+
+### Why "14/14 ran" is itself an assertion
+
+The gate lists every scenario it expects by name. A scenario that quietly stops
+being registered shows up as `13/14 ran — 1 never ran: gate5-snooze-runtime-path`
+and fails, rather than passing as a smaller green run.
+
+That is not hypothetical here. `gate4` exists because twelve scenarios passed
+while the composition root was being disabled on release, and `gate5` exists
+because `gate3-later-snooze` passed for the project's whole life while the code
+path the Later button actually calls had never run. Counting the tests is a
+cheap guard against the third instance of that.
+
+### This gate has been seen to fail
+
+Every stage was verified by deliberately breaking it and confirming the report
+named the problem:
+
+| Stage | Break | Reported as |
+|---|---|---|
+| compile | type error in `CreatureConfig.ts` | `1 error(s)` + file and line |
+| leaf | one scenario set to fail | `1 failed: gate4-controller-survives-release` |
+| leaf | one scenario removed from the run | `13/14 ran; 1 never ran: gate5-…` |
+| leaf | source touched after capture | `STALE` |
+| golden | one frame subtly resampled | `1 frame(s) changed — 06-release 1.84%` |
+| golden | one frame deleted from the batch | `1 frame(s) never captured` |
+| perf | release cost set back to 551.3ms | `FAIL … vs budget 300.0ms` |
+| perf | capture at 4 creatures | `captured at 4 creatures, needs 6` |
+| perf | run with no releases | `no releases recorded` |
+
+A verification script nobody has watched fail is not a verification script.

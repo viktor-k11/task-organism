@@ -37,6 +37,7 @@ import { DemoBeat, DemoSequence } from "./DemoSequence";
 import { DemoControlView } from "./DemoControlView";
 import { TaskSelectionView } from "./TaskSelectionView";
 import { buildHabitatFloor, positionHabitatFloor } from "./HabitatFloor";
+import { PerfGate } from "../Debug/PerfGateProbe";
 
 // v4: staggered creation times changed (see seedStaggeredDemoTasks) so a
 // single "Advance Demo Time" press now produces one of each behavior state
@@ -409,6 +410,9 @@ export class TaskOrganismController extends BaseScriptComponent {
     private onUpdate(): void {
         if (!this.interaction) return;
         const dt = getDeltaTime();
+        // Rides the existing update rather than owning one, so the probe costs
+        // a single comparison per frame outside a release window.
+        PerfGate.sample(dt);
         // Sequence first: a beat fired this frame should take effect before
         // the gesture state machine and arbiter observe the world, so a
         // scripted press is processed on the same frame it is issued.
@@ -719,6 +723,10 @@ export class TaskOrganismController extends BaseScriptComponent {
         const remaining = this.repository.listOpen().length;
         console.log(`[WednesdayDemo] repository saved completion task=${taskId} open=${remaining}`);
         if (slot) slot.creature.release();
+        // Marked after release() so the window covers the frames that carry the
+        // effect's cost. Counts live slots, not open tasks — the perf number is
+        // about how many creatures are on screen.
+        PerfGate.markRelease(this.slots.length);
         console.log(`[WednesdayEvidence] release requested task=${taskId} remaining=${remaining}`);
         this.activeChaserId = null;
         // Close the gate again so the next-most-urgent task (which is also

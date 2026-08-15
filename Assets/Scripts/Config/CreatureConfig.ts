@@ -470,6 +470,26 @@ export const TINT_CHASE_HEAT_BLEND = 0.09;
  * records — and it forces the reset that PreviewPanelTool.refresh does NOT
  * perform (see Tools/visual-regression.js and HANDOFF-VISUAL.md).
  */
+/**
+ * Pins every creature's dissolve to a fixed amount so the effect can be
+ * captured at exact percentages instead of chased in real time. -1 = off (the
+ * shipping value); 0..1 pins the sweep.
+ *
+ * 0 is also the shader's proven no-op, so pinning to 0 and pinning to -1 must
+ * look identical — that equality is the cheapest available check that the
+ * dissolve is not leaking into the normal render path.
+ */
+export const DISSOLVE_DEBUG_AMOUNT = -1;
+/** +1 release (eaten bottom-up), -1 spawn (fills bottom-up). Debug only. */
+export const DISSOLVE_DEBUG_DIRECTION = 1;
+/** Body height in cm the sweep is normalised against. The pet meshes are
+ *  authored feet-at-origin and stand about this tall before presentation
+ *  scale, which the shader divides out via the model matrix. */
+export const DISSOLVE_BODY_HEIGHT_CM = 40;
+/** Brightness of the emissive band at the front. On an additive display this
+ *  band is the reward — added light is the medium. */
+export const DISSOLVE_EDGE_GAIN = 1.6;
+
 export const VISUAL_HARNESS_FRAME = -1;
 /** Real seconds to let eased channels (posture, tint, urgency halo, panel
  *  fades) reach steady state after the instant jump, before declaring READY.

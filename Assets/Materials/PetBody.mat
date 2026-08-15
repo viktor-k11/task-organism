@@ -28,4 +28,16 @@
     vertexShadingAmount:
       typeIdx: 1
       value: 1.000000
+    dissolveAmount:
+      typeIdx: 1
+      value: 0.000000
+    dissolveDirection:
+      typeIdx: 1
+      value: 1.000000
+    dissolveEdgeGain:
+      typeIdx: 1
+      value: 1.600000
+    dissolveHeightCm:
+      typeIdx: 1
+      value: 40.000000
   Pass: !<reference> 17f4d130-67b6-4fa1-adc3-5ea09dc62edf

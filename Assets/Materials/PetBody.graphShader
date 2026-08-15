@@ -96,7 +96,53 @@ Nodes:
             input_float Urgency;
             input_float RimGain;
             input_float RimPower;
+            input_float DissolveAmount;
+            input_float DissolveDirection;
+            input_float DissolveEdgeGain;
+            input_float DissolveHeightCm;
             output_vec4 Result;
+
+            // ---- Dissolve tuning that is not worth an Inspector row --------
+            // Edge band thickness as a fraction of body height. 0.06 of a ~40cm
+            // creature is ~2.5cm, which is the "few centimetres" the beat wants.
+            const float DISSOLVE_EDGE = 0.06;
+            // Noise frequency in object-space cm, and how far it displaces the
+            // front. Amplitude is in the same normalised height units as the
+            // threshold, so 0.10 lets the front wander a tenth of the body.
+            const float DISSOLVE_NOISE_SCALE = 0.18;
+            const float DISSOLVE_NOISE_AMP = 0.10;
+
+            // Value noise. Procedural because the pipeline discards textures on
+            // these meshes — the same constraint that forced the vertex-colour
+            // bake. Hash-based, so it costs arithmetic and no bandwidth.
+            float dissolveHash(vec3 p)
+            {
+            	p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
+            	p += dot(p, p.yzx + 19.19);
+            	return fract((p.x + p.y) * p.z);
+            }
+
+            float dissolveNoise(vec3 x)
+            {
+            	vec3 i = floor(x);
+            	vec3 f = fract(x);
+            	// Smoothstep weights: a linear blend would show the lattice as
+            	// visible diamonds along the front.
+            	f = f * f * (3.0 - 2.0 * f);
+            	float n000 = dissolveHash(i + vec3(0.0, 0.0, 0.0));
+            	float n100 = dissolveHash(i + vec3(1.0, 0.0, 0.0));
+            	float n010 = dissolveHash(i + vec3(0.0, 1.0, 0.0));
+            	float n110 = dissolveHash(i + vec3(1.0, 1.0, 0.0));
+            	float n001 = dissolveHash(i + vec3(0.0, 0.0, 1.0));
+            	float n101 = dissolveHash(i + vec3(1.0, 0.0, 1.0));
+            	float n011 = dissolveHash(i + vec3(0.0, 1.0, 1.0));
+            	float n111 = dissolveHash(i + vec3(1.0, 1.0, 1.0));
+            	float nx00 = mix(n000, n100, f.x);
+            	float nx10 = mix(n010, n110, f.x);
+            	float nx01 = mix(n001, n101, f.x);
+            	float nx11 = mix(n011, n111, f.x);
+            	return mix(mix(nx00, nx10, f.y), mix(nx01, nx11, f.y), f.z);
+            }
 
             void main()
             {
@@ -146,7 +192,71 @@ Nodes:
             	
             	// Emissive is the identity colour scaled, never a foreign hue.
             	vec3 emissive = body * rim * max(RimGain, 0.0) * pulse * u;
-            	
+
+            	// ---- Dissolve / spawn ------------------------------------------
+            	// One channel drives both beats. DissolveAmount is "how gone the
+            	// body is": 0 = whole, 1 = absent. Release runs it 0 -> 1, spawn
+            	// runs it 1 -> 0, so BOTH beats end at 0 and 0 means "fully
+            	// present" in either direction.
+            	//
+            	// The entire effect sits behind `a > 0.0` for two reasons. First
+            	// safety: a previous graph edit rendered every body silently
+            	// black, so the untouched case must be provably untouched — with
+            	// a == 0.0 not one line below executes and Result is
+            	// bit-identical to the shader before this block existed. Second
+            	// cost: `discard` forces a fragment shader to defer depth writes
+            	// and disables early-z for the whole draw. Gating it on a uniform
+            	// means only a creature actually mid-effect pays, and only for
+            	// the second or so it is running — the other five keep the fast
+            	// path. That matters here because pooling brought the release
+            	// frame from 551ms to 224ms and a blanket discard would hand
+            	// that back.
+            	float a = clamp(DissolveAmount, 0.0, 1.0);
+            	if (a > 0.0)
+            	{
+            		// Object-space height, derived from the model matrix rather
+            		// than a texture or a second UV set. getSurfacePosition() is
+            		// WORLD space (it is compared against getCameraPosition()
+            		// elsewhere), so project the offset from the object's origin
+            		// onto its own up axis and divide out world scale. This keeps
+            		// the sweep tied to the body while the creature walks,
+            		// breathes and squashes — a world-space threshold would slide
+            		// down the creature as it moved.
+            		mat4 model = system.getMatrixWorld();
+            		vec3 originW = model[3].xyz;
+            		vec3 upW = model[1].xyz;
+            		float upLen = max(length(upW), 1e-4);
+            		float localCm = dot(system.getSurfacePosition() - originW, upW / upLen) / upLen;
+            		float height = max(DissolveHeightCm, 1.0);
+            		float h = clamp(localCm / height, 0.0, 1.0);
+
+            		// Break the waterline into an organic front. Noise is sampled
+            		// in object space so the pattern is welded to the body and
+            		// does not swim while the creature moves.
+            		vec3 noisePos = (system.getSurfacePosition() - originW) / upLen;
+            		float n = dissolveNoise(noisePos * DISSOLVE_NOISE_SCALE);
+            		float hn = h + (n - 0.5) * DISSOLVE_NOISE_AMP;
+
+            		// Direction picks which side survives, and both sweep UPWARD:
+            		//   +1 release  threshold = a      keep above  (eaten bottom-up)
+            		//   -1 spawn    threshold = 1 - a  keep below  (fills bottom-up)
+            		// An unset/zero parameter falls back to release rather than to
+            		// a degenerate 0 comparison.
+            		float dir = (DissolveDirection < 0.0) ? -1.0 : 1.0;
+            		float threshold = (dir > 0.0) ? a : (1.0 - a);
+            		float signedDist = (hn - threshold) * dir;
+            		if (signedDist < 0.0) discard;
+
+            		// The band at the front. On an additive display added light IS
+            		// the medium, so the reward reads as emission rather than as
+            		// a colour change: the creature's own palette entry pushed
+            		// most of the way to white, so identity survives while the
+            		// band still blooms.
+            		float edge = 1.0 - smoothstep(0.0, DISSOLVE_EDGE, signedDist);
+            		vec3 edgeColor = mix(BaseColor.rgb, vec3(1.0), 0.75);
+            		emissive += edgeColor * edge * max(DissolveEdgeGain, 0.0);
+            	}
+
             	Result = vec4(body + emissive, BaseColor.a);
             }
         CustomCodeNodeAsset:
@@ -180,6 +290,26 @@ Nodes:
         RimPower:
           Connection0:
             NodeLevelID: 7
+            PortID: Output
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        DissolveAmount:
+          Connection0:
+            NodeLevelID: 8
+            PortID: Output
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        DissolveDirection:
+          Connection0:
+            NodeLevelID: 9
+            PortID: Output
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        DissolveEdgeGain:
+          Connection0:
+            NodeLevelID: 10
+            PortID: Output
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        DissolveHeightCm:
+          Connection0:
+            NodeLevelID: 11
             PortID: Output
           Variable: [0.0, 0.0, 0.0, 0.0]
         Stage:
@@ -318,6 +448,162 @@ Nodes:
       TemplateID: nodes_inputs_parameters_float
       Title1: Float Parameter
       Title2: Urgency Rim Tightness
+    Node7:
+      DependencyIndex: 7
+      LevelID: 8
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 5
+          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
+        Default:
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        EnableMax:
+          Variable: true
+        EnableMin:
+          Variable: true
+        Group:
+          String: "Dissolve"
+        Max:
+          Variable: 1.0
+        Min:
+          Variable: 0.0
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: dissolveAmount
+        SortIndex:
+          Variable: 4
+        Step:
+          Variable: 0.009999999776482582
+        Title:
+          String: Dissolve Amount
+        Tooltip:
+          String: How gone the body is. 0 = whole (and an exact no-op), 1 = absent. Release runs 0 to 1, spawn runs 1 to 0.
+      PositionX: -380
+      PositionY: 320
+      TemplateID: nodes_inputs_parameters_float
+      Title1: Float Parameter
+      Title2: Dissolve Amount
+    Node8:
+      DependencyIndex: 8
+      LevelID: 9
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 5
+          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
+        Default:
+          Variable: [1.0, 1.0, 1.0, 1.0]
+        EnableMax:
+          Variable: true
+        EnableMin:
+          Variable: true
+        Group:
+          String: "Dissolve"
+        Max:
+          Variable: 1.0
+        Min:
+          Variable: -1.0
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: dissolveDirection
+        SortIndex:
+          Variable: 5
+        Step:
+          Variable: 1.0
+        Title:
+          String: Dissolve Direction
+        Tooltip:
+          String: +1 release (body is eaten from the bottom up). -1 spawn (body fills in from the bottom up). Both sweep upward.
+      PositionX: -380
+      PositionY: 400
+      TemplateID: nodes_inputs_parameters_float
+      Title1: Float Parameter
+      Title2: Dissolve Direction
+    Node9:
+      DependencyIndex: 9
+      LevelID: 10
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 5
+          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
+        Default:
+          Variable: [1.6, 1.6, 1.6, 1.6]
+        EnableMax:
+          Variable: true
+        EnableMin:
+          Variable: true
+        Group:
+          String: "Dissolve"
+        Max:
+          Variable: 6.0
+        Min:
+          Variable: 0.0
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: dissolveEdgeGain
+        SortIndex:
+          Variable: 6
+        Step:
+          Variable: 0.009999999776482582
+        Title:
+          String: Dissolve Edge Gain
+        Tooltip:
+          String: Brightness of the emissive band at the dissolve front. This is the part that reads on an additive display.
+      PositionX: -380
+      PositionY: 480
+      TemplateID: nodes_inputs_parameters_float
+      Title1: Float Parameter
+      Title2: Dissolve Edge Gain
+    Node10:
+      DependencyIndex: 10
+      LevelID: 11
+      NodeCount: 0
+      NodeType: 1
+      Ports:
+        Channels:
+          ItemIndex: 5
+          ItemList: "xyzw : rgba : xyz : rgb : xy : x"
+        Default:
+          Variable: [40.0, 40.0, 40.0, 40.0]
+        EnableMax:
+          Variable: true
+        EnableMin:
+          Variable: true
+        Group:
+          String: "Dissolve"
+        Max:
+          Variable: 200.0
+        Min:
+          Variable: 1.0
+        Output:
+          IOType: 1
+          Variable: [0.0, 0.0, 0.0, 0.0]
+        ScriptName:
+          String: dissolveHeightCm
+        SortIndex:
+          Variable: 7
+        Step:
+          Variable: 0.5
+        Title:
+          String: Dissolve Body Height
+        Tooltip:
+          String: Body height in cm used to normalise the sweep. Set per species so the front crosses the whole creature.
+      PositionX: -380
+      PositionY: 560
+      TemplateID: nodes_inputs_parameters_float
+      Title1: Float Parameter
+      Title2: Dissolve Body Height
     Node3:
       CommentSizeX: 0
       CommentSizeY: 0

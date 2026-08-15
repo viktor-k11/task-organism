@@ -10,6 +10,10 @@ import {
     RABBIT_DISPLAY_SCALE,
     PENGUIN_DISPLAY_SCALE,
     VERTEX_SHADING_AMOUNT,
+    DISSOLVE_BODY_HEIGHT_CM,
+    DISSOLVE_EDGE_GAIN,
+    DISSOLVE_DEBUG_AMOUNT,
+    DISSOLVE_DEBUG_DIRECTION,
 } from "../Config/CreatureConfig";
 
 export type PetSpecies = "dog" | "cat" | "owl" | "elephant" | "rabbit" | "penguin";
@@ -201,6 +205,15 @@ export class CreaturePetVisual {
         // (Tools/bake-vertex-shading.js), so this is one interpolated vertex
         // attribute and a multiply, no lighting and no extra fetch.
         fresh.mainPass.vertexShadingAmount = VERTEX_SHADING_AMOUNT;
+        // Dissolve channel. Static settings go on every clone; the amount is
+        // driven per-creature during release/spawn. Setting the amount here at
+        // all is what makes the parameter exist on the material — PetBody.mat
+        // carries no entry for it, so an unwritten parameter arrives as 0,
+        // which is the shader's no-op.
+        fresh.mainPass.dissolveHeightCm = DISSOLVE_BODY_HEIGHT_CM;
+        fresh.mainPass.dissolveEdgeGain = DISSOLVE_EDGE_GAIN;
+        fresh.mainPass.dissolveDirection = DISSOLVE_DEBUG_AMOUNT >= 0 ? DISSOLVE_DEBUG_DIRECTION : 1;
+        fresh.mainPass.dissolveAmount = DISSOLVE_DEBUG_AMOUNT >= 0 ? DISSOLVE_DEBUG_AMOUNT : 0;
         for (const rmv of this.renderMeshVisuals) {
             rmv.mainMaterial = fresh;
         }

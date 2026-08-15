@@ -96,6 +96,7 @@ const CONFIG = {
         "gate6-pinch-early-release",
         "gate6-pinch-miss",
         "gate6-moving-chaser",
+        "gate6-moving-chaser-hold",
     ],
 
     /** Share of pixels that may differ before a frame counts as changed.

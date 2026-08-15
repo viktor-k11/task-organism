@@ -132,6 +132,13 @@ export class DemoSequence {
         return this.currentBeat;
     }
 
+    /** Seconds into the story. Read by the gesture harness to tell whether a
+     *  requested beat is still ahead or has already passed — advanceTo only
+     *  moves forward, so that difference decides between a jump and a restart. */
+    get elapsed(): number {
+        return this.elapsedS;
+    }
+
     get isFinished(): boolean {
         return this.nextStepIndex >= this.steps.length;
     }

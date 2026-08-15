@@ -102,14 +102,13 @@ export function armAt(
     const snap = controller.gestureHarnessSnapshot();
     if (snap.slots.length === 0) throw new Error(`[${scenarioId}] no creature slots alive — nothing to pinch`);
 
-    /* DemoSequence.advanceTo only moves FORWARD. If the story has already run
-     * past the target beat the jump is a no-op and the state freezes wherever
-     * it happened to be, quietly testing something other than the named beat.
-     * Refuse rather than mislead. */
+    /* Defence in depth. gestureHarnessJumpTo restarts the story when the
+     * target beat has already passed, so this should not fire — but a scenario
+     * that ran against the wrong beat would test something other than what it
+     * claims, which is worse than failing. */
     if (snap.beat !== beat) {
         throw new Error(
-            `[${scenarioId}] wanted beat ${beat} but the story is at ${snap.beat}. ` +
-                `The timeline cannot rewind — the Lens must be reset before this scenario.`
+            `[${scenarioId}] wanted beat ${beat} but the story is at ${snap.beat} after a jump and restart.`
         );
     }
 
@@ -219,6 +218,30 @@ export async function settle(): Promise<void> {
     for (let i = 0; i < SETTLE_FRAMES; i++) await nextFrame();
     await sleep(0.05);
 }
+
+/**
+ * How far a creature travelled between two snapshots.
+ *
+ * Reported and asserted by the moving-chaser scenarios so a pass on a creature
+ * that had already arrived and settled cannot be mistaken for proof that a
+ * MOVING one can be grabbed — which would quietly turn them into duplicates of
+ * the stationary tests while claiming something stronger.
+ */
+export function travelOf(
+    before: { taskId: string; worldPosition: vec3 }[],
+    after: { taskId: string; worldPosition: vec3 }[],
+    taskId: string
+): number {
+    const a = before.find((s) => s.taskId === taskId);
+    const b = after.find((s) => s.taskId === taskId);
+    if (!a || !b) return 0;
+    return a.worldPosition.distance(b.worldPosition);
+}
+
+/** Minimum travel for a moving-target scenario to have tested anything. At the
+ *  0.5 m/s speed cap a 150ms pinch spans up to ~7.5cm, so 2cm is a low bar
+ *  that still excludes a settled creature. */
+export const MIN_TRAVEL_CM = 2;
 
 /** Prints the before/after pair so a failing run shows what moved, not just
  *  which assertion threw. */

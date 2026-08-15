@@ -19,6 +19,7 @@ import { Gate6PinchHoldResolveScenario } from "./Gate6PinchHoldResolveScenario";
 import { Gate6EarlyReleaseScenario } from "./Gate6EarlyReleaseScenario";
 import { Gate6PinchMissScenario } from "./Gate6PinchMissScenario";
 import { Gate6MovingChaserScenario } from "./Gate6MovingChaserScenario";
+import { Gate6MovingChaserHoldScenario } from "./Gate6MovingChaserHoldScenario";
 
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -62,5 +63,9 @@ export class LeafIndex extends BaseScriptComponent {
         { id: "gate6-pinch-early-release", typename: Gate6EarlyReleaseScenario.getTypeName() },
         { id: "gate6-pinch-miss", typename: Gate6PinchMissScenario.getTypeName() },
         { id: "gate6-moving-chaser", typename: Gate6MovingChaserScenario.getTypeName() },
+        // The hold on a moving creature — the product's central gesture, and
+        // the case prompts.md recorded as unresolved. Acquisition and
+        // completion are different questions; this is the second one.
+        { id: "gate6-moving-chaser-hold", typename: Gate6MovingChaserHoldScenario.getTypeName() },
     ];
 }

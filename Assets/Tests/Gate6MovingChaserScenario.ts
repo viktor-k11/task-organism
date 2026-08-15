@@ -1,13 +1,8 @@
 import { Scenario } from "Leaf.lspkg/Scenarios/scenario/Scenario";
 import { expect } from "Leaf.lspkg/Utils/common/Expect";
-import { armAt, chaserTarget, logOutcome, pinchCreature } from "./Gate6Support";
+import { armAt, chaserTarget, logOutcome, MIN_TRAVEL_CM, pinchCreature, travelOf } from "./Gate6Support";
 
 const ID = "gate6-moving-chaser";
-
-/** Minimum travel during the gesture for this scenario to have tested
- *  anything. At the 0.5 m/s speed cap a 150ms pinch spans up to ~7.5cm, so
- *  2cm is a low bar that still excludes a settled creature. */
-const MIN_TRAVEL_CM = 2;
 
 /**
  * Gate 6.5 — can the approaching creature be grabbed while it is still moving?
@@ -46,7 +41,7 @@ export class Gate6MovingChaserScenario extends Scenario {
         const after = controller.gestureHarnessSnapshot();
         logOutcome(ID, before, after);
 
-        const moved = distance(before.slots, after.slots, target.taskId);
+        const moved = travelOf(before.slots, after.slots, target.taskId);
         console.log(`[${ID}] chaser travelled ${moved.toFixed(1)}cm during the gesture`);
 
         // Re-pause so a failure does not leave the story galloping into
@@ -69,17 +64,4 @@ export class Gate6MovingChaserScenario extends Scenario {
 
         console.log(`[${ID}] PASS — the approaching chaser ${after.selectedId} was acquired while moving ${moved.toFixed(1)}cm`);
     }
-}
-
-/** How far the target travelled between the two snapshots — reported so a
- *  pass on a barely-moving creature is not mistaken for a strong result. */
-function distance(
-    before: { taskId: string; worldPosition: vec3 }[],
-    after: { taskId: string; worldPosition: vec3 }[],
-    taskId: string
-): number {
-    const a = before.find((s) => s.taskId === taskId);
-    const b = after.find((s) => s.taskId === taskId);
-    if (!a || !b) return 0;
-    return a.worldPosition.distance(b.worldPosition);
 }

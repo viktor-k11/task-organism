@@ -38,6 +38,8 @@ import { DemoControlView } from "./DemoControlView";
 import { TaskSelectionView } from "./TaskSelectionView";
 import { buildHabitatFloor, positionHabitatFloor } from "./HabitatFloor";
 import { PerfGate } from "../Debug/PerfGateProbe";
+import { SIK } from "SpectaclesInteractionKit.lspkg/SIK";
+import { InteractorInputType } from "SpectaclesInteractionKit.lspkg/Core/Interactor/Interactor";
 
 // v4: staggered creation times changed (see seedStaggeredDemoTasks) so a
 // single "Advance Demo Time" press now produces one of each behavior state
@@ -72,6 +74,9 @@ const SLOT_NAMES = Array.from({ length: MAX_CREATURE_SLOTS }, (_, i) => `Movemen
  * Kept disabled so it never renders as a seventh creature.
  */
 const CREATURE_TEMPLATE_NAME = "CreatureTemplate";
+/** Frames to wait after a pinch before deciding it missed. Two is enough for
+ *  SIK's update to have delivered onTriggerStart to a creature it did hit. */
+const MISS_CHECK_DELAY_FRAMES = 2;
 
 /**
  * The golden frames, in capture order. Each names a beat to jump to, an extra
@@ -155,6 +160,16 @@ export class TaskOrganismController extends BaseScriptComponent {
      *  gesture test needs beats held still but the gesture clock RUNNING, or a
      *  pinch-and-hold could never reach 100%. */
     private gestureHarnessPaused = false;
+    /** Clock value before the story ran, so a restart can rewind to it. */
+    private storyStartNowMs = 0;
+    // ── Deselect-on-miss bookkeeping (playbook v3 §3.2) ──────────────────────
+    /** Monotonic frame count; the three counters below are compared against it
+     *  rather than against wall-clock time, because preview frame times here
+     *  range from 60ms to 10s. */
+    private frameCounter = 0;
+    private pinchDownFrame = -1;
+    private creaturePressFrame = -1;
+    private missCheckAtFrame = -1;
     private harnessReported = false;
 
     // Rolling frame-time window for the capacity FPS measurement.
@@ -319,6 +334,7 @@ export class TaskOrganismController extends BaseScriptComponent {
         });
 
         this.bindCreatureSlots(tasks);
+        this.bindDeselectOnMiss();
         this.cameraObject = this.findSceneObject("Camera Object");
         this.ensureAudioListener();
         if (this.cameraObject) this.floorObject = buildHabitatFloor(this.cameraObject);
@@ -334,14 +350,10 @@ export class TaskOrganismController extends BaseScriptComponent {
         this.demoControl.setStatus(`${tasks.length} tasks • all calm`);
         this.syncArbiter();
 
-        this.sequence = new DemoSequence({
-            onAdvanceTime: () => this.advanceDemoTime(),
-            onBeginApproach: () => this.openApproachGate(),
-            onSelect: () => this.scriptedSelect(),
-            onResolveHoldStart: () => this.scriptedResolveStart(),
-            onResolveHoldEnd: () => this.scriptedResolveEnd(),
-            onBeat: (beat, elapsedS) => this.onDemoBeat(beat, elapsedS),
-        });
+        // Captured before the story runs, so the gesture harness can put the
+        // clock back where it started. See gestureHarnessRestartStory.
+        this.storyStartNowMs = this.clock.nowMs();
+        this.sequence = this.buildSequence();
         if (VISUAL_HARNESS_FRAME >= 0) {
             this.enterVisualHarness();
         } else if (DEMO_AUTOPLAY_ON_START) {
@@ -425,6 +437,7 @@ export class TaskOrganismController extends BaseScriptComponent {
         // Rides the existing update rather than owning one, so the probe costs
         // a single comparison per frame outside a release window.
         PerfGate.sample(dt);
+        this.updateDeselectOnMiss();
         // Sequence first: a beat fired this frame should take effect before
         // the gesture state machine and arbiter observe the world, so a
         // scripted press is processed on the same frame it is issued.
@@ -651,14 +664,60 @@ export class TaskOrganismController extends BaseScriptComponent {
      */
     gestureHarnessJumpTo(beat: DemoBeat, pause: boolean): void {
         if (!this.sequence) return;
+        // Pause FIRST. Everything below reads the story's position, and on a
+        // slow preview autoplay can advance between the read and the jump.
+        this.gestureHarnessPaused = true;
+        // DemoSequence cannot rewind, so reaching a beat that has already
+        // passed means restarting. See gestureHarnessRestartStory for why this
+        // is not an exotic case.
+        if (this.sequence.timeOfBeat(beat) < this.sequence.elapsed) this.gestureHarnessRestartStory();
         this.sequence.advanceTo(this.sequence.timeOfBeat(beat));
         this.gestureHarnessPaused = pause;
         this.syncArbiter();
     }
 
-    /** Lets the story run again. Scenario 5 needs the chaser actually moving. */
+    /**
+     * Puts the scripted story back to its opening state.
+     *
+     * WHY A TEST NEEDS THIS
+     * ---------------------
+     * The LEAF plugin resets the Lens before each scenario, so the story starts
+     * at CALM — but the scenario BODY does not run until the preview has booted
+     * and the plugin has handed over, and autoplay is running the whole time.
+     * On a loaded machine that gap has been observed at 2.5 minutes, by which
+     * point the story had reached URGENT and a scenario arming at CALM could
+     * only refuse. The race is invisible when the preview is fast and certain
+     * when it is not, which is the worst combination for a test suite.
+     *
+     * Rewinding removes the dependency on how quickly the preview boots.
+     *
+     * Undoes exactly what the beats mutate: the demo clock jump, the approach
+     * gate, and any selection. It deliberately does NOT resurrect completed
+     * tasks — a resolve is a real repository write, and pretending otherwise
+     * would make a test that quietly disagrees with storage.
+     */
+    gestureHarnessRestartStory(): void {
+        this.clock.setNowMs(this.storyStartNowMs);
+        this.demoAdvanced = false;
+        this.approachGateOpen = false;
+        this.activeChaserId = null;
+        if (this.interaction) this.interaction.deselect();
+        this.sequence = this.buildSequence();
+        this.sequence.start();
+        this.syncArbiter();
+        console.log("[WednesdayDemo] gesture harness restarted the story at CALM");
+    }
+
+    /** Lets the story run again. The moving-chaser scenarios need it running. */
     gestureHarnessResume(): void {
         this.gestureHarnessPaused = false;
+    }
+
+    /** Stops the story where it stands, without moving to a beat. Used to
+     *  settle the world before assertions so a failure does not leave the
+     *  sequence running on into whatever executes next. */
+    gestureHarnessPause(): void {
+        this.gestureHarnessPaused = true;
     }
 
     /**
@@ -721,6 +780,83 @@ export class TaskOrganismController extends BaseScriptComponent {
         return found;
     }
 
+    /** The scripted story's hook set, in one place so the gesture harness can
+     *  rebuild an identical sequence when it rewinds. */
+    private buildSequence(): DemoSequence {
+        return new DemoSequence({
+            onAdvanceTime: () => this.advanceDemoTime(),
+            onBeginApproach: () => this.openApproachGate(),
+            onSelect: () => this.scriptedSelect(),
+            onResolveHoldStart: () => this.scriptedResolveStart(),
+            onResolveHoldEnd: () => this.scriptedResolveEnd(),
+            onBeat: (beat, elapsedS) => this.onDemoBeat(beat, elapsedS),
+        });
+    }
+
+    /**
+     * Playbook v3 §3.2: "tapping elsewhere deselects".
+     *
+     * WHY THIS LISTENS TO THE INTERACTOR RATHER THAN ADDING A BACKDROP
+     * ---------------------------------------------------------------
+     * The obvious implementation is a big invisible collider behind the
+     * habitat to catch stray pinches. That is exactly the shape of a defect
+     * this project has already had: a BackPlate whose collider sat in front of
+     * the rows above it and swallowed their pinches. A backdrop large enough to
+     * catch every miss is large enough to steal hits from the creatures.
+     *
+     * WHY IT LISTENS TO THE HAND AND NOT TO THE INTERACTOR
+     * ----------------------------------------------------
+     * `Interactor.onTriggerStart` carries `Interactable | null` and looks like
+     * the obvious hook, but SIK never fires it with null: `processTriggerEvents`
+     * only raises a Select trigger once something is targeted, so a pinch into
+     * empty space produces no interactor event at all. Verified directly — a
+     * pinch on a creature logged `onTriggerStart target=Body`, and a free-space
+     * pinch logged nothing.
+     *
+     * So the signal has to come from the hand itself, which pinches regardless
+     * of what is under it. A pinch is a miss when it did not begin a press on
+     * any creature — determined by comparing frame counters rather than by
+     * asking SIK what it hit, which keeps this independent of targeting.
+     *
+     * The check is deferred a couple of frames because the creature's
+     * Interactable fires on SIK's own update, which may land after the pinch
+     * event. Preview here runs as low as 0.1 fps, so this counts frames rather
+     * than milliseconds.
+     *
+     * Bound in onStart, not onAwake: SIK builds its hand providers during the
+     * ScriptComponent boot cycle, and subscribing earlier finds nothing.
+     */
+    private bindDeselectOnMiss(): void {
+        const hands = [SIK.HandInputData.getHand("right"), SIK.HandInputData.getHand("left")];
+        let bound = 0;
+        for (const hand of hands) {
+            if (!hand) continue;
+            hand.onPinchDown.add(() => {
+                this.pinchDownFrame = this.frameCounter;
+                this.missCheckAtFrame = this.frameCounter + MISS_CHECK_DELAY_FRAMES;
+            });
+            bound++;
+        }
+        if (bound === 0) {
+            console.error("[WednesdayDemo] no SIK hands — deselect-on-miss not bound");
+            return;
+        }
+        console.log(`[WednesdayDemo] deselect-on-miss bound to ${bound} hand(s)`);
+    }
+
+    /** Runs the deferred miss check. Called once per frame from onUpdate. */
+    private updateDeselectOnMiss(): void {
+        this.frameCounter++;
+        if (this.missCheckAtFrame < 0 || this.frameCounter < this.missCheckAtFrame) return;
+        this.missCheckAtFrame = -1;
+        // A creature press that started at or after the pinch means the pinch
+        // found something. Anything else is "elsewhere".
+        if (this.creaturePressFrame >= this.pinchDownFrame) return;
+        if (this.interaction && this.interaction.deselect()) {
+            console.log("[WednesdayEvidence] deselected — pinch landed on no creature");
+        }
+    }
+
     private attachInteraction(body: SceneObject, taskId: string): void {
         let collider = body.getComponent("Physics.ColliderComponent") as ColliderComponent;
         if (!collider) {
@@ -732,7 +868,12 @@ export class TaskOrganismController extends BaseScriptComponent {
         let interactable = body.getComponent(Interactable.getTypeName()) as Interactable;
         if (!interactable) interactable = body.createComponent(Interactable.getTypeName()) as Interactable;
         interactable.targetingMode = 3;
-        interactable.onTriggerStart.add(() => this.interaction.pressStart(taskId));
+        interactable.onTriggerStart.add(() => {
+            // Stamped so the deferred miss check can tell a pinch that found a
+            // creature from one that found nothing.
+            this.creaturePressFrame = this.frameCounter;
+            this.interaction.pressStart(taskId);
+        });
         interactable.onTriggerEnd.add(() => this.interaction.pressEnd());
         interactable.onTriggerEndOutside.add(() => this.interaction.pressEnd());
         interactable.onTriggerCanceled.add(() => this.interaction.pressEnd());

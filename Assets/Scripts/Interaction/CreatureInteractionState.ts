@@ -65,6 +65,30 @@ export class CreatureInteractionState {
         this.completedThisGesture = false;
     }
 
+    /**
+     * Closes the panel without touching the task. Playbook v3 §3.2: "tapping
+     * elsewhere deselects" — a pinch that lands on no creature.
+     *
+     * This is the only way out of a selection that neither defers the task nor
+     * completes it. Without it, a user who opens the panel and changes their
+     * mind has no exit at all.
+     *
+     * Writes nothing: no repository call, no resolution. Returns whether
+     * anything was actually deselected, so a caller can tell a real dismissal
+     * from a pinch into empty space with no panel open.
+     */
+    deselect(): boolean {
+        // Never interrupt a gesture already in flight on a creature. A miss
+        // cannot happen mid-press in practice, but if the interactor ever
+        // reports one, the press that IS underway owns the state.
+        if (this.role !== null) return false;
+        if (!this.selectedTaskId) return false;
+        this.selectedTaskId = null;
+        this.hooks.onResolveProgress(0);
+        this.hooks.onSelectionChanged(null);
+        return true;
+    }
+
     later(): boolean {
         if (!this.selectedTaskId) return false;
         if (!this.repository.snooze(this.selectedTaskId, LATER_SNOOZE_DURATION_MS)) return false;

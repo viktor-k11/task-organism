@@ -7,7 +7,7 @@ how this looks.
 > ```bash
 > node Tools/build-gate.js
 > ```
-> One command, one verdict. It compiles the project, runs all 19 automated
+> One command, one verdict. It compiles the project, runs all 20 automated
 > tests, diffs the seven golden frames, and checks the release-frame cost.
 > It prints what broke and which file to open. Nothing to install.
 >
@@ -105,7 +105,7 @@ constraint, not a bug to fix.
 ### The domain layer — `Assets/Scripts/Data`, `State`, `Input`
 
 This is the task logic: what a task is, when it becomes urgent, which one is
-allowed to approach, what completing it does. It is covered by 19 automated
+allowed to approach, what completing it does. It is covered by 20 automated
 tests. **Changing it is not a visual edit** and will break the tests.
 
 Deliberately kept out of the Inspector, so a colour change can never
@@ -302,7 +302,7 @@ included, and gives you a single yes/no. Run it after any change.
 ────────────────────────────────────────────────────────────────
 
   ok   1. TypeScript compile    PASS     0 errors
-  ok   2. LEAF scenarios        PASS     19/19 ran
+  ok   2. LEAF scenarios        PASS     20/20 ran
   ok   3. Golden images         PASS     7/7 frames within 1%
   ok   4. Release-frame perf    PASS     worst release frame 223.7ms (release 1 of 2, 6 creatures) vs budget 300.0ms
 ```
@@ -372,7 +372,7 @@ cheaper — that spike was desktop webcam tracking, nowhere near a release.
 Gating on a run-wide max would fail on a busy laptop and pass on a real
 regression.
 
-### Why "19/19 ran" is itself an assertion
+### Why "20/20 ran" is itself an assertion
 
 The gate lists every scenario it expects by name. A scenario that quietly stops
 being registered shows up as `13/14 ran — 1 never ran: gate5-snooze-runtime-path`
@@ -426,8 +426,9 @@ routes it to the real `Interactable`, exactly as a hand would.
 | `gate6-pinch-select` | short pinch on a habitat creature selects it |
 | `gate6-pinch-hold-resolve` | select, then hold past the threshold — one save, one release |
 | `gate6-pinch-early-release` | hold released early cancels, selection kept, nothing written |
-| `gate6-pinch-miss` | pinch into empty space writes nothing and hits no other creature |
+| `gate6-pinch-miss` | pinch into empty space deselects and writes nothing |
 | `gate6-moving-chaser` | the approaching creature is acquired **while moving** |
+| `gate6-moving-chaser-hold` | the approaching creature is **held to completion** while moving — currently red, see findings |
 
 ### Proof they catch what gate3 cannot
 
@@ -459,26 +460,80 @@ assertion all stay inside one run. That is also what makes them deterministic:
 the story is put on a named beat by command (`gestureHarnessJumpTo`), never by
 waiting on a clock, because preview here runs at 0.1–15 fps.
 
-### Two findings
+### These scenarios need the preview above ~5 fps
 
-**1. The moving chaser CAN be acquired — the recorded limitation did not
-reproduce.** `prompts.md` records that a synthetic hold "could not reacquire the
-moving target". A short pinch on the moving chaser succeeded on four
-consecutive runs, with the creature travelling 4.3–5.2 cm during the gesture.
-The scenario fails if travel is under 2 cm, so a pass on a creature that had
-already settled cannot be mistaken for success.
+`AiHandInteractor` waits up to **5000 ms of wall clock** for SIK to confirm a
+pinch, but delivering one costs a fixed number of FRAMES (offset measurement,
+placement, a gesture settle, the pinch-down). At 15 fps that is comfortable; at
+3 fps the frames do not arrive in time and the scenario fails with:
 
-Still open: the original note was about a **hold**, not a short pinch. Holding a
-moving creature through to completion is not covered by these five scenarios.
+```
+Timed out waiting for onTriggerStart for "Body" after 5000ms
+```
 
-**2. Deselect-on-miss is not implemented, and this is a product decision.** A
-pinch into empty space currently leaves the selection panel open.
-`CreatureInteractionState.pressStart` is reachable only from a creature's own
-`Interactable` and the scripted demo beats — there is no global background
-handler, so a miss never reaches the state machine at all.
+That is an environment symptom, not a product defect. `gate6-pinch-hold-resolve`
+passed repeatedly at 12–16 fps on the same build that failed it at 3 fps. If a
+gate6 scenario fails this way, check the `[Capacity] fps=` line in the log
+before looking at the code.
 
-`gate6-pinch-miss` asserts the half that is a real invariant (a miss writes
-nothing and must not land on a neighbouring creature — which is a genuine test
-of collider size) and *reports* the selection behaviour rather than asserting
-it, because whether the panel should close when you pinch away is a design
-choice nobody has made yet.
+### Findings
+
+**1. Deselect-on-miss is now implemented.** Playbook v3 §3.2 specifies "tapping
+elsewhere deselects"; it had never been built, which also left a product hole —
+with the panel open the only exits were Later and completing the task, so a user
+who changed their mind was stuck.
+
+The implementation does *not* add a backdrop collider. That would repeat the
+BackPlate defect: a backdrop large enough to catch every miss is large enough to
+steal hits from the creatures. It listens to the hand instead.
+
+Note for anyone extending this: `Interactor.onTriggerStart` is typed
+`Interactable | null` and looks like the right hook, but **SIK never fires it
+with null** — `processTriggerEvents` only raises a Select trigger once something
+is targeted. Verified directly: a pinch on a creature logged
+`onTriggerStart target=Body`, a free-space pinch logged nothing at all. So the
+signal comes from `TrackedHand.onPinchDown`, and a pinch counts as a miss when
+it did not start a press on any creature within two frames.
+
+**2. A moving creature can be ACQUIRED. Holding one is still unproven, and the
+blocker is the test instrument, not the product.**
+
+`gate6-moving-chaser` passes consistently — four runs, 4.3–5.2 cm of travel
+during the gesture. So the short pinch is fine.
+
+`gate6-moving-chaser-hold` **currently fails**, and the failure is diagnostic
+rather than mysterious. Within a single run:
+
+```
+PINCH task=demo-1 durationMs=150    (creature stationary at CALM)  -> lands
+PINCH task=demo-1 durationMs=2700   (approach released, moving)    -> Timed out
+       waiting for onTriggerStart for "Body" after 5000ms
+```
+
+The cause is in the harness, not the Lens. `AiHandInteractor.pinchInteractable`
+samples the target's world position **once**, places the hand there, and never
+updates it. Delivering a pinch takes roughly half a second of wall clock
+(offset measurement, placement, a frame, an 80 ms gesture settle, then the
+pinch-down). A chaser at the 0.5 m/s speed cap covers ~25 cm in that window,
+against a collider half-width of 17 cm — so the aim point goes stale before SIK
+resolves the target. A real hand tracks a moving creature; this synthetic one
+cannot.
+
+That most likely also explains the original note in `prompts.md` that a
+"synthetic hold could not reacquire the moving target" — which means the
+project's record should probably be corrected from a suspected product
+limitation to a known harness one.
+
+**What is still genuinely unknown:** whether a hold, once started, survives the
+creature continuing to walk. The one run where the hold did land had the
+creature already arrived (0.3 cm of travel during the hold), so it proves
+nothing about motion. Two ways forward, and this is a call to make rather than
+something to paper over:
+
+- teach the harness to track — re-sample the target and reposition the hand
+  during placement, which is what a user's hand does; or
+- accept the limitation and leave the property covered by hand-testing only.
+
+Until then `gate6-moving-chaser-hold` is red, and the build gate is red with it.
+It was left registered on purpose: dropping it would hide an open question, and
+weakening it to pass would assert the opposite of the property in question.

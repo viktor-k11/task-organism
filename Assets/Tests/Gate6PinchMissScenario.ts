@@ -5,28 +5,19 @@ import { armAt, habitatTarget, logOutcome, pinchCreature, pinchEmptySpace } from
 const ID = "gate6-pinch-miss";
 
 /**
- * Gate 6.4 — a pinch that misses every creature must do no harm.
+ * Gate 6.4 — a pinch that misses every creature deselects, and does no harm.
  *
- * WHAT THIS ASSERTS, AND WHAT IT DELIBERATELY DOES NOT
- * ----------------------------------------------------
- * The brief for this scenario was "a pinch that misses every creature
- * deselects and does nothing". The second half is a real invariant and is
- * asserted below. The first half — deselection — IS NOT IMPLEMENTED, and this
- * scenario does not pretend otherwise.
+ * Playbook v3 §3.2 specifies "tapping elsewhere deselects". It went unbuilt
+ * until this scenario reported it missing, which also made it a product hole:
+ * with the panel open, the only exits were Later and completing the task, so a
+ * user who simply changed their mind was stuck.
  *
- * `CreatureInteractionState.pressStart` is reachable from exactly two places:
- * a creature's own Interactable (`attachInteraction`) and the scripted demo
- * beats. There is no global background handler, so a pinch into empty space
- * never reaches the state machine at all and the current selection simply
- * stays. Adding a deselect would be a product decision about whether the panel
- * should close when you look away and pinch — not a bug fix — so this scenario
- * reports the observed behaviour rather than asserting a contract nobody has
- * chosen yet.
- *
- * The safety half is where the value is, and it is a real test of collider
- * geometry: if a creature's collider is far larger than the creature — the
- * 20x20x20-default defect in its other direction — then a pinch aimed at
- * nothing still lands on something, and these assertions catch it.
+ * Both halves are asserted here:
+ *   - the panel closes
+ *   - and nothing is written; in particular the miss must not land on some
+ *     OTHER creature, which is a real test of collider size. If a collider is
+ *     far larger than its creature — the 20x20x20-default defect in its other
+ *     direction — a pinch aimed at nothing still hits something.
  */
 @component
 export class Gate6PinchMissScenario extends Scenario {
@@ -56,21 +47,12 @@ export class Gate6PinchMissScenario extends Scenario {
         expect(after.openCount).toBe(before.openCount);
         expect(after.releaseCount).toBe(before.releaseCount);
 
-        // And it must not have landed on some OTHER creature. This is the
-        // oversized-collider check.
-        const landedElsewhere = after.selectedId !== null && after.selectedId !== before.selectedId;
-        expect(landedElsewhere).toBe(false);
+        // The panel closed. Playbook v3 §3.2.
+        expect(after.selectedId).toBe(null);
 
-        // Observed, not asserted — see the header comment.
-        if (after.selectedId === null) {
-            console.log(`[${ID}] NOTE selection was cleared by the miss`);
-        } else {
-            console.log(
-                `[${ID}] FINDING selection survived the miss (${after.selectedId}) — ` +
-                    `deselect-on-miss is not implemented; pressStart is only reachable from a creature's Interactable`
-            );
-        }
+        // And the hold ring is not left part-filled behind the closed panel.
+        expect(after.holdProgress).toBe(0);
 
-        console.log(`[${ID}] PASS — a pinch into empty space wrote nothing and hit no other creature`);
+        console.log(`[${ID}] PASS — a pinch into empty space deselected ${before.selectedId} and wrote nothing`);
     }
 }

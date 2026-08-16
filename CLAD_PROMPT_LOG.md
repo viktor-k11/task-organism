@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | Project | **Task Organism** — a spatial task manager for SPECS where tasks are living creatures |
-| Author | Viktor Kulaha — Snapchat: **[ВПИШИ СВОЙ ЮЗЕРНЕЙМ]** |
+| Author | Viktor Kulaha — Snapchat: **viktorkulaha** |
 | Dates | 2026-08-10 → 2026-08-16 (7 days) |
 | Tools | Lens Studio 5.23 (SPECS 27 target), Claude Code (+ 3 Codex sessions), `ls-clad` plugin, Lens Studio MCP server, LEAF test framework |
 | Sessions | **10 agent sessions on 2 machines** (7 Claude Code + 3 Codex, sequential, same repo, handoffs via `HANDOFF.md`) |

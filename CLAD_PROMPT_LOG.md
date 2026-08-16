@@ -23,16 +23,34 @@ Call counts are approximate, totalled across all ten sessions. **Every
 individual invocation — what was asked, what came back, how it was verified —
 is recorded case by case in [`prompts.md`](prompts.md).**
 
-| Surface | What was used |
-|---|---|
-| **CLAD skills** | `lens-studio-router`, `specs-project-init`, `specs-experience-builder`, `build-mesh` (SPECS text-to-3D — 7 generation jobs, 5 accepted species), `build-sfx` + `build-music` (8 license-clean audio cues), `shader-graph` (custom code-node urgency shader), `specs-capture-perf-trace` + `perfetto-trace-analysis` (10 traces, every perf number), `verify-preview`, LEAF install / write / run |
-| **Agents** | `ls-clad:specs-experience-builder` ×2, read-only `Explore` surveys ×2, `Plan` ×1 |
-| **MCP: verify & run** | `run_leaf_scenario` 90+ (20 scenarios), `RunAndCollectLogsTool` 75+ (runtime log analysis after every change), `RecompileTypeScriptTool` 45+ |
-| **MCP: see the result** | `CapturePanelScreenshotTool` 50+, `CaptureRuntimeViewTool` 45+ (isolated renders), `MovePreviewCamera` (aiming verification shots) |
-| **MCP: query the truth** | `QueryRuntimeSceneTool` 35+ (live transforms, bounds, interactables — including the query that proved the owl rendered 21 m while every runtime AABB said 28 cm), `scene-graphql` |
-| **MCP: build the scene & assets** | `ExecuteEditorCode` 40+, `VirtualScene`, `ConvertSvgToTexture` ×10 (window chrome, 6 species icons, sparkle motes), `FontSelector` |
-| **MCP: drive the input** | `InjectPreviewGesture` 15+ (keys, taps, touch sequences), `PreviewInteractTool` (synthetic SIK pinches) |
-| **Declined, with reasons on record** | `MergeMeshesTool`, `SimplifyMeshTool`, `specs-lens-perf-attribution`, FAST3D, texture/music library tools — the used/discarded/declined judgement for each is in the CLAD inventory at the top of [`prompts.md`](prompts.md) |
+| Capability | ~calls | What it produced |
+|---|---|---|
+| `run_leaf_scenario` | 90+ | the 20-scenario LEAF suite; the regression proof for every fix (controller survival, world-gating, done-flow) |
+| `RunAndCollectLogsTool` (`mode: refresh`) | 75+ | the only true Lens reset; every verification, harness frame and trace depends on it |
+| `CapturePanelScreenshotTool` / `PreviewPanelTool` screenshot | 50+ | every first-person capture: the golden set, every UI iteration, the font-swap check |
+| `RecompileTypeScriptTool` | 45+ | compile gate before every refresh |
+| `CaptureRuntimeViewTool` | 45+ | per-species acceptance renders; facing and scale comparisons |
+| `ExecuteEditorCode` | 40+ | SPECS text-to-3D create/poll for 6 generations; Perfetto start/stop for 10 captures; project saves |
+| `QueryRuntimeSceneTool` | 35+ | live transforms, bounds, interactables — including the query that proved the owl rendered 21 m while every runtime AABB said 28 cm |
+| `InjectPreviewGesture` | 15+ | keys, taps and touch sequences driving the real preview (onboarding, TODAY.TXT, ritual flows) |
+| `scene-graphql` | 12 | CreatureTemplate duplicate; controller component moves; enable/disable |
+| `PreviewInteractTool` | 10+ | synthetic SIK pinches against live creatures (gate6 development) |
+| `ConvertSvgToTexture` | 10 | window chrome, 6 species icons, sparkle motes — all UI artwork from agent-authored SVG |
+| `specs-capture-perf-trace` + `perfetto-trace-analysis` | 10 traces | every performance figure, incl. the 551 → 224 ms release-frame fix |
+| `VirtualScene` (read + apply) | 8 | scene introspection; Art Direction and TaskOrganism objects; Inspector defaults |
+| `build-sfx` / `build-music` | 8 cues | all audio, license-clean by construction (no samples) |
+| `build-mesh` (SPECS text-to-3D) | 7 jobs | 5 generated species + 2 rejected attempts (superseded on the final day by the six CC-BY animated models) |
+| `MovePreviewCamera` | 6 | aiming the verification captures (owl size, backdrop facing) |
+| `shader-graph` | 3 edits | `PetBody.graphShader` — vertex shading + the urgency rim/pulse channel |
+| LEAF install / write skills | 2 | the framework install and the scenario-writing passes behind the 20 scenarios |
+| Agents: `specs-experience-builder` ×2, `Explore` ×2, `Plan` ×1 | 5 runs | scene bootstrap, read-only survey passes, the day-1 plan |
+
+Routing/setup skills (`lens-studio-router`, `specs-project-init`,
+`verify-preview`) ran at the start of each session. **Declined with reasons on
+record** (`MergeMeshesTool`, `SimplifyMeshTool`, `specs-lens-perf-attribution`,
+FAST3D, texture/music library tools): the used / discarded / declined
+judgement for each is in the CLAD inventory at the top of
+[`prompts.md`](prompts.md).
 
 ---
 

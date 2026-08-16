@@ -12,7 +12,10 @@ Completing a task releases the creature.
 - Target platform: SPECS (not Snapchat). Lens Studio 5.22+
 - Preview-only development — no physical device available.
   Never write code that can only be verified on hardware.
-- ASR is OUT of scope this week (device-only API). Do not add voice input.
+- Voice task creation is IN scope (added 2026-08-16 by project owner): V key =
+  push-to-talk through AsrModule, single utterance -> one task, degrades to the
+  K keyboard with a status-line explanation when ASR is unavailable. The old
+  "device-only API" note was outdated — ASR works in Preview since LS 5.9.
 - Manual deadlines are OUT of scope. `deadlineAtMs` exists in the model but is
   populated by demo fixtures only. Never promise user-entered deadlines.
 - Max 6 creatures alive at once. Demo uses 3–4.
@@ -95,7 +98,8 @@ Never use the words: kill, die, destroy, "can't ignore", "forces you".
 
 ## Out of scope this week
 boids/flocking, generated meshes as a dependency, always-visible labels,
-voice input or voice completion, throw-to-defer, ambient music, full list UI,
+voice completion (voice CREATION is in scope, see hard constraints),
+throw-to-defer, ambient music, full list UI,
 cloud backend, room-anchor restoration.
 
 ## Resume After Codex

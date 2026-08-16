@@ -144,6 +144,7 @@ node Tools/visual-regression.js --candidate <dir>   # stage 3 on its own
 
 | File | For |
 |---|---|
+| `CLAD-PROMPT-LOG.md` | **Start here if you are judging this build.** One-page overview, the ten prompts that carried the project, the closed loop on two real bugs, and the gate/LEAF verification story. Raw transcript in `docs/CLAD-RAW-TRANSCRIPT.md` |
 | `HANDOFF-NEXT.md` | **Start here if you are taking the project over.** Honest state, open list in priority order, what remains for submission, and the traps this project has already paid for |
 | `HANDOFF-VISUAL.md` | **Start here if you are changing how it looks.** Designer panel, the additive-display colour rules, what not to touch, the build gate in detail (§8) |
 | `CLAUDE.md` | Scope, hard constraints, and the non-negotiable invariants |

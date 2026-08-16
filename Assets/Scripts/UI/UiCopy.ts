@@ -2,7 +2,7 @@
  * Every user-facing word in the experience, in one file.
  *
  * This is the designer's file. Edit any string here and press Preview —
- * nothing in it is logic. Written by Kateryna (2026-08-16 brief); the tone
+ * nothing in it is logic. Written from the designer's 2026-08-16 brief; the tone
  * rules from CLAUDE.md apply: creatures are small carriers of obligation,
  * completion is release and gratitude, never punishment. The words kill /
  * die / destroy / "can't ignore" / "forces you" must never appear here.

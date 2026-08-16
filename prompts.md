@@ -1437,3 +1437,129 @@ renamed parameter.
 4. **Assert the readback every run.** `assertDissolveParamsLive` names which
    parameter is undefined, because "undefined" alone does not distinguish
    never-exposed from exposure-lost.
+
+## Design-phase handover — full verification sweep, voice confirmed live, nothing committed by design
+
+**Session date: 2026-08-16.** Purpose: audit the project before the design
+phase, verify the uncommitted voice + interaction work, and stage everything
+for the partner to commit and push from their account (submission authorship
+requirement — this session deliberately made ZERO commits).
+
+### What ran
+
+- TypeScript recompile: clean.
+- The full LEAF suite, one scenario at a time, in Preview: **18/20 PASSED** —
+  task-organism-data-layer, all six gate2, all six gate3, gate4, gate5, and
+  gate6 pinch-select / pinch-hold-resolve / pinch-early-release / pinch-miss.
+- gate6-moving-chaser FAILED twice, identically: `Timed out waiting for
+  onTriggerStart for "Body" after 5000ms`. gate6-moving-chaser-hold FAILED the
+  same way. This is the documented instrument limitation from be9d406 (the
+  synthetic pinch aims at a once-sampled point; a 0.5 m/s chaser outruns it) —
+  reported as expected-red in HANDOFF.md, not "fixed" by pausing the creature.
+
+### Voice input, verified against the running Preview
+
+Injected a V key press (`InjectPreviewGesture`), read the log:
+`[VoiceInput] session started` — AsrModule loads in Preview, the session
+opens. Second V: `session stopped`, clean teardown, no stray task bound.
+The one remaining test is a real utterance, which needs a human with a
+microphone. Everything else about the feature — the V binding, module
+loading, degradation copy, task-creation path, live creature binding — is in
+place and exercised.
+
+### Housekeeping (working tree only)
+
+- Archived `AUDIT-2026-08-13.md`, `VERIFICATION-2026-08-13.md`,
+  `plan-day1-hero.md` to `docs/archive/` (staged renames).
+- Rewrote `HANDOFF.md`: inventory of the working tree, verification evidence,
+  suggested commit split, open decisions (dog.glb, golden re-baseline), and
+  the proposed Todoist opt-in start screen as next-phase scope.
+- No orphaned `.meta` files in Assets. All six `GeneratedMeshes/*_lo.glb` are
+  live `requireAsset` references in CreatureBehavior.ts — none removable.
+
+## Care-loop UI placeholder pass — retro-desktop screens built and verified live
+
+**Same session, after the design-phase audit.** the designer's brief: onboarding
+("YOUR TASKS HAVE ARRIVED" over a nostalgic hill), ambient HUD + sticky-note
+encouragements, three-button selection panel (attend/done/not yet), completion
+card ("You took care of it."), TODAY.TXT end-of-day document with a
+pattern-matched note. All strings live in `Assets/Scripts/UI/UiCopy.ts`.
+
+### Mechanisms found the hard way
+
+1. **A runtime-created Image has no material** — `mainPass` is null. Author a
+   material (UnlitMaterialPreset), flip `ENABLE_BASE_TEX` (the baseTex slot is
+   define-gated and setProperty on it silently no-ops while the define is
+   off), set `baseTex`, then `image.mainMaterial = mat.clone()` at runtime.
+2. **A dialog BackPlate's Interactable must stay enabled** — it provides the
+   InteractionPlane SIK targets through; disabling it made every button on the
+   dialog time out waiting for onTriggerStart. (The habitat label plates get
+   away with disabling theirs because nothing on them is a button.)
+3. **"P plays the story" was a stale promise** — the status line advertised
+   it, but the only binding was the staging panel's Play button, which
+   DEMO_CLIP_MODE hides. P is now genuinely bound to startSequence().
+4. **The AI-hand pinch is aim-limited near stacked buttons**: a pinch aimed at
+   [Mark as done] landed on [Give this one attention] one row up — which
+   accidentally live-verified the attending feature (creature left the
+   habitat, approached, and held close; `chasing=1` steady). Human aim will
+   not have this problem; keep it in mind when driving panels synthetically.
+
+### Verification
+
+Onboarding walked end-to-end with real pinches (intro -> manual -> voice ->
+review -> dismiss). Story-driven release produced the completion card and a
+TODAY.TXT with two completions and the "people" note template. LEAF
+regression after all changes: gate2-1-4, gate2-7, gate3-later,
+gate3-no-conflict, gate6-select, gate6-hold-resolve, gate6-miss — all PASSED.
+Autoplay now defaults OFF for manual design testing.
+
+## Screen-space ambient UI, and the FOV number behind it
+
+World-space HUD text kept getting cropped. The cause is measurable, not a
+matter of taste: `Component.Camera.fov` reads **0.6386 rad = 36.6 degrees**,
+so the visible cone is only about +/-0.33 * depth. At the habitat's 2.3m that
+is +/-69cm, and the sticky notes were placed at +/-62cm with a 34cm width —
+their outer edges fell outside.
+
+Fix: the headline, the notification slot and the encouragements are now
+ScreenTransform children of `Orthographic Camera > Full Frame Region`, which
+already existed in the project template. Screen space cannot crop.
+
+Three things cost time and are worth writing down:
+
+1. **Layer mask.** The orthographic camera renders `1048576`. Anything created
+   through scene-graphql or at runtime defaults to layer `1` and is silently
+   never drawn — no error, no warning, just nothing on screen. Authored
+   anchors got `setLayers(mask: 1048576)`; runtime children copy
+   `parent.layer`.
+2. **`anchors.left = x` silently no-ops** on ScreenTransform (the property
+   reads back a copy). Assign the whole Rect instead.
+3. The project template ships a `Screen Image` under Full Frame Region with a
+   placeholder mountain graphic. It only became visible once the preview
+   switched aspect. Disabled.
+
+Also: `DEMO_SEED_TASK_COUNT = 0` (empty habitat by default) broke every gate6
+scenario with "no creature slots alive". Rather than couple the tests to a
+designer-facing constant, `gestureHarnessEnsureCreatures()` seeds the fixtures
+when the harness arms. Tests are now independent of that setting.
+
+## Care loop pass — audio, the closing ritual, and removing a shortcut
+
+Completion is now ONLY the held gesture; the "Mark as done" button is gone.
+A tap and a hold are not equivalent here — the hold is the part that feels
+like giving something attention, and having a one-tap alternative next to it
+quietly argued the opposite.
+
+Two algorithmic beds via /build-music (no samples, license-clean):
+`FocusAmbience.wav` under the attending state at 0.35, `ClosingRitual.wav`
+under the ritual at 0.6. Both peak at -0.4 dB.
+
+The 1-minute ritual runs its countdown on the frame clock rather than on
+DelayedCallbackEvents, so the visible timer and the stage copy cannot drift
+apart — three 20s stages, then a closing card, with the bed still playing
+under it (cutting the music at zero felt abrupt).
+
+Also fixed: voice status was being routed into the ambient notification slot,
+so "listening…" and "added: …" appeared over the habitat as if they were
+world messages. Voice feedback belongs to the voice screen; the notification
+slot is for the gentle in-world reminders only.

@@ -8,7 +8,7 @@ import { UI_TEXT_SIZE } from "./UiLayout";
  *
  * Visual language: old-OS system dialogs — title bar, body copy, stacked
  * full-width buttons with small captions. Everything here is a stand-in for
- * Kateryna's real textures; the layout and wiring are what this file owns.
+ * the designer's real textures; the layout and wiring are what this file owns.
  * When the designed nine-slice frames arrive, they replace the BackPlate,
  * and nothing else changes.
  *

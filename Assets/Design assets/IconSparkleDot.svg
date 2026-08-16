@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <!-- Round pixel mote for the closing ritual's twinkle layer — the soft
+       sibling of IconSparkle's four-point star. Warm white on transparent. -->
+  <rect x="20" y="12" width="24" height="40" fill="#fff4d8"/>
+  <rect x="12" y="20" width="40" height="24" fill="#fff4d8"/>
+  <rect x="16" y="16" width="32" height="32" fill="#fff4d8"/>
+  <rect x="24" y="20" width="16" height="24" fill="#ffffff"/>
+  <rect x="20" y="24" width="24" height="16" fill="#ffffff"/>
+</svg>

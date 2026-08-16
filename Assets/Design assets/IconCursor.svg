@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <!-- Classic pixel arrow cursor: white fill, hard black outline, on
+       transparent. Tip at the top-left so the hotspot reads correctly. -->
+  <polygon points="10,2 10,46 20,37 27,54 35,50 28,34 42,34"
+           fill="#ffffff" stroke="#000000" stroke-width="4" stroke-linejoin="miter"/>
+</svg>

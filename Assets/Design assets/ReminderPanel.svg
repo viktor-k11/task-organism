@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="192" viewBox="0 0 512 192" shape-rendering="crispEdges">
+  <!--
+    Retro system-notification panel for the REMINDER block.
+    Grey body, blue title bar, hard bevelled angles — no rounded corners
+    anywhere, matching the "System message" reference.
+    The word "reminder" is part of the artwork; the Lens draws only the
+    message inside the sunken area (see PANEL_TEXT_INSET in AmbientHud.ts).
+  -->
+  <defs>
+    <linearGradient id="titleBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0a246a"/>
+      <stop offset="1" stop-color="#3a6ea5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer hard border -->
+  <rect x="0" y="0" width="512" height="192" fill="#000000"/>
+  <!-- Raised bevel: light top/left, dark bottom/right -->
+  <rect x="2" y="2" width="508" height="188" fill="#c0c0c0"/>
+  <rect x="2" y="2" width="508" height="3" fill="#ffffff"/>
+  <rect x="2" y="2" width="3" height="188" fill="#ffffff"/>
+  <rect x="2" y="187" width="508" height="3" fill="#808080"/>
+  <rect x="507" y="2" width="3" height="188" fill="#808080"/>
+
+  <!-- Title bar -->
+  <rect x="7" y="7" width="498" height="36" fill="url(#titleBar)"/>
+  <!-- x=26 matches the message text inset below, so label and message
+       share one left edge (see PANEL_TEXT_INSET in AmbientHud.ts). -->
+  <text x="26" y="34" font-family="Courier New, Courier, monospace" font-size="26"
+        font-weight="bold" fill="#ffffff" letter-spacing="0.5">reminder</text>
+
+  <!-- No close box: the panel is not interactive, and a control that looks
+       pressable but does nothing reads as broken. -->
+
+  <!--
+    Sunken message area, deliberately DARK rather than classic light grey:
+    the Specs display is additive, so dark pixels read as transparent and
+    bright text needs something dim behind it to stay legible. The chrome
+    (frame + title bar) stays bright because that is the window's identity.
+  -->
+  <rect x="12" y="50" width="488" height="130" fill="#23282b"/>
+  <rect x="12" y="50" width="488" height="2" fill="#808080"/>
+  <rect x="12" y="50" width="2" height="130" fill="#808080"/>
+  <rect x="12" y="178" width="488" height="2" fill="#ffffff"/>
+  <rect x="498" y="50" width="2" height="130" fill="#ffffff"/>
+</svg>

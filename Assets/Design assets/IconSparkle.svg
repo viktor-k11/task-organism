@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <!-- Pixel four-point sparkle for the closing ritual's twinkle layer.
+       Warm white on transparent, same hard-edged language as the UI icons. -->
+  <rect x="30" y="2"  width="4"  height="60" fill="#fff4d8"/>
+  <rect x="2"  y="30" width="60" height="4"  fill="#fff4d8"/>
+  <rect x="26" y="18" width="12" height="28" fill="#fff4d8"/>
+  <rect x="18" y="26" width="28" height="12" fill="#fff4d8"/>
+  <rect x="28" y="28" width="8"  height="8"  fill="#ffffff"/>
+</svg>

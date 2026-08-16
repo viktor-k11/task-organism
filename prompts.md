@@ -1563,3 +1563,151 @@ Also fixed: voice status was being routed into the ambient notification slot,
 so "listening…" and "added: …" appeared over the habitat as if they were
 world messages. Voice feedback belongs to the voice screen; the notification
 slot is for the gentle in-world reminders only.
+
+---
+
+# Session 10 — final design-and-menagerie session (2026-08-16, second machine)
+
+The closing session, run in Claude Code on a second machine against the same
+Lens Studio instance. Every cycle below followed the same loop: edit →
+`RecompileTypeScriptTool` → `RunAndCollectLogsTool` (refresh) →
+`CapturePanelScreenshotTool` / `run_leaf_scenario`. Prompts are quoted
+verbatim, typos included.
+
+## Retro-UI polish across every window
+
+> "lets remove the intro image then because of looks really ugly / then for all
+> the windows - make the header on the window bigger and in bold text + remove
+> the cross icon if its not functional / for the start window make the body
+> text bigger… / …make the reminder smaller / [completion] remove it and make
+> the window smaller / for the finish screen Make a text bigger in the middle -
+> add icons in line and put tasks in line"
+
+Six changes in one pass: onboarding backdrop removed; dialog title 30 → 48;
+close boxes removed from `WindowPanel.svg`/`ReminderPanel.svg` and re-rasterized
+via `ConvertSvgToTexture` over the same asset UUIDs; per-dialog
+`bodyTextSize`/`bodyMono`/`bodyAlign` in `RetroUi.ts`; reminder block at 66%
+pinned top-right; completion card de-duplicated and narrowed; TODAY.TXT mono
+".txt" treatment. Two sizing iterations, verified by screenshot each round.
+
+## End-screen icon gallery + the ritual's sparkle animation
+
+> "Let first be the icons of animals and under each of it let it be the task
+> itself / For the meditation screen - lets add a nice animation happening on
+> the background then - i imported a sparkles inside the assets, can you check
+> it?"
+
+Six pixel-art species icons authored as SVG from scratch and rasterized; an
+icon-gallery row added to `RetroDialog` (icons in one line, tasks under them).
+The imported "Sparkles Post Effect" package was read and identified as a
+camera-feed brightness detector — nothing to detect in a dim room — so the
+ritual got its own guaranteed twinkle layer (44 billboarded motes, two shapes,
+per-mote phase, upward drift). Placement took three diagnosed iterations:
+world-anchored yaw math landed outside the view once the preview camera
+wandered (found by `QueryRuntimeSceneTool` position sampling), camera-space
+fixed visibility but exceeded the narrow display FOV, the third fit it.
+
+## The animated menagerie — six downloaded GLBs replace the static species
+
+> "also i want to replace the 3D models with the following - can you keep their
+> animation so they will be moving more naturally across the scene"
+
+Six Sketchfab GLBs (cat, shar-pei, owl, elephant, rabbit, penguin), parsed at
+the byte level for clips/tris/bounds — authored sizes span five orders of
+magnitude. `CreaturePetVisual` rewritten: runtime auto-scale normalization,
+feet re-seating, `AnimationPlayer` clip selection by name. First integration
+kept the tint/dissolve shader and rendered garbage (no baked COLOR_0);
+switched to per-instance clones of the models' own textured materials with a
+`supportsTint=false` gate. Preview fps fell 30 → 16 with six lit skinned
+models; decimation with `gltf-transform` (elephant 19,248 → 3,740 tris,
+penguin −68% file size, rigs and clips preserved) restored 30 fps, and
+`gate6-pinch-select` went from timing out to passing in 2.6 s.
+
+## Rest-still / move-animate, and the owl that could not stand
+
+> "Overall for the models let them stand still and when moving to use
+> animation, is that doable?"
+
+Done as asked: each creature holds a frozen natural pose (a looping sliver of
+its idle clip) and plays its walk/waddle clip only while measured horizontal
+speed crosses an 8/3 cm/s hysteresis gate. The first owl's "random mesh" was
+diagnosed from the GLB bytes: parts authored exploded in bind pose, assembled
+only by scale-compensation joints Lens Studio does not apply — reported as
+unfixable rather than worked around. The user supplied a replacement
+(EagleOwl rig, 670 tris); its joint-scale rig makes every runtime AABB lie
+(reported 28 cm, rendered ~21 m — proven against the editor-side bounds
+query), so it carries a calibrated manual root scale.
+
+## The done-flow crash, read off a screenshot
+
+> "the done process is still not functional"
+
+The attached editor screenshot included the Logger:
+`TypeError: Cannot read property 'x' of undefined` in `forceOpaque` — the
+release path assumed every body material exposes `baseColor`; the textured
+GLB materials don't. All three baseColor readers guarded, warm-white particle
+fallback added, and the dissolve melt (impossible without the old shader)
+replaced by an eased shrink synced to the particle bloom, scale restored at
+teardown. `gate6-pinch-hold-resolve` green with the full card flow.
+
+## Restart hygiene: world-gating and the fresh day
+
+> "when restarted the models are not disappearing and keep standing - check it
+> pls" · "the tasks are storing somewhere… make it renew every time"
+
+Not a rendering bug — persistence was correctly restoring LEAF fixture tasks,
+and the world had never been gated behind onboarding. Implemented
+`setWorldVisible()` (creatures hidden while onboarding owns the stage, shown
+on every close path) and `startFreshDay()` on the intro's buttons (six
+`[CareLoop] discarded` log lines on click, typing list opens clean).
+**Self-inflicted regression, self-caught:** the gating made LEAF scenarios
+seed creatures disabled, so pinches timed out twice — fixed by having the
+gesture harness close onboarding *before* seeding, re-proven with two
+consecutive green runs.
+
+## The invisible end-screen image — a facing bug, not a missing asset
+
+> "i still cant see the end screen image anywhere on the location, double
+> check it pls"
+
+`buildBackdrop` positioned the quad along the look direction but rotated it by
++yaw instead of −yaw, so at any heading off world-north its front faced away
+and backface culling erased it — the long-standing "backdrop shows in some
+runs, vanishes in others" mystery (spawn pose has yaw ≈ 0). Fixed the sign,
+made the quad two-sided, moved it 4.5 m → 3 m (it also hid behind most rooms'
+real walls). Verified at an arbitrary heading: welcome hills behind the
+intro, ritual landscape around the meditation card.
+
+## Sizing, size budget, shake, and smoothness — one prompt, four findings
+
+> "wow the owl is huge , make it like other animals pls / +I am checing the
+> size of the lens and lets make it more size optimised - find what can be
+> decreased / Also when standing still - the models are shaking a little… /
+> +now the disappearing is less smooth then it used to be…"
+
+Owl manual scale calibrated (rendered height 27 cm on target); the standing
+shake was the 60 ms frozen-pose loop window drifting — cut to 10 ms, below
+visible threshold; ~15 MB removed from packed size (ambient WAVs 18.9 →
+4.7 MB at 22 kHz mono via `afconvert`, hill backdrops resized 75%, elephant
+textures 1024 → 512); release smoothed by the shrink described above. The
+"no sound" report checked against logs: the cue fires on every release —
+left as a preview-audio setting to confirm by ear.
+
+## Licensing and cleanup pass before the demo
+
+> "все модели должны быть CC-BY , укажи авторство и проверь все подобные
+> моменты финальный раз перед записью демо чтобы у нас не возникло проблем"
+
+All six models verified **CC-BY-4.0 from their embedded `asset.extras`
+metadata** (matching the five provided source links; the rabbit's source
+recovered from its own file). `LICENSES.md` rewritten, README gained a
+Credits section. Found unprompted: proprietary Microsoft fonts (Segoe UI,
+Courier New) tracked in a public repo — replaced with Open Sans (SIL OFL) and
+Cousine (Apache-2.0), every `requireAsset` repointed including one hiding in
+`TaskSelectionView.ts` that would have crashed the Lens. Removed: 19 MB of
+superseded generated meshes, the legacy CC-BY dog, the unused Sparkles
+package and its dead code, and eight Finder "file 2.*" duplicates (two of
+them duplicate UI scripts that could have double-registered components).
+Verified after every removal: clean compile, clean boot, fonts render,
+`gate6-pinch-select` and `gate6-pinch-hold-resolve` green. Project frozen at
+that state.

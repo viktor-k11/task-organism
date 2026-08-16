@@ -144,7 +144,6 @@ node Tools/visual-regression.js --candidate <dir>   # stage 3 on its own
 | File | For |
 |---|---|
 | `CLAD_PROMPT_LOG.md` | **Start here if you are judging this build.** How CLAD was used end to end across 10 sessions on two machines: the prompts that carried the project, the iterations-and-fixes table, highlights and learnings |
-| `docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md` | The final session's twelve prompts verbatim, with the reaction to each |
 | `CLAUDE.md` | Scope, hard constraints, and the non-negotiable invariants |
 | `AGENTS.md` | Lens Studio conventions and the MCP rules for agents |
 | `prompts.md` | The full working log — every measurement and decision, with the reasoning |

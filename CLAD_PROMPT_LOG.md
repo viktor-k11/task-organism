@@ -11,12 +11,11 @@
 | Sessions | **10 agent sessions on 2 machines** (7 Claude Code + 3 Codex, sequential, same repo, handoffs via `HANDOFF.md`) |
 | Repo | https://github.com/viktor-k11/task-organism |
 
-*This file is the submission-facing summary. The full engineering log is
-[`prompts.md`](prompts.md) (~1,560 lines, every cycle with its measurements and
-wrong turns); the final session's prompts verbatim, with the reaction to each,
-are in
-[`docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md`](docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md);
-before/after captures are in [`docs/evidence/`](docs/evidence/).*
+*This file is the submission-facing summary. Everything it claims is backed by
+[`prompts.md`](prompts.md) — the full engineering log (~1,700 lines): every
+cycle of all ten sessions with its prompts, measurements and wrong turns,
+ending with the final session's prompts verbatim and the reaction to each.
+Before/after captures are in [`docs/evidence/`](docs/evidence/).*
 
 ---
 
@@ -99,11 +98,10 @@ Python GLB introspection to diagnose rigs.
 ## 3. Prompt Log (Chronological)
 
 Sessions 1–9 (two machines, 99 instructions total) are summarized with their
-highest-yield prompts, quoted verbatim; the full cycle-by-cycle account of
-those sessions is [`prompts.md`](prompts.md). Session 10 — the final
-design-and-menagerie session — is logged in detail here, and its twelve
-instructions, verbatim *with the reaction to each*, are in
-[`docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md`](docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md).
+highest-yield prompts, quoted verbatim; Session 10 — the final
+design-and-menagerie session — is logged in detail here. The full
+cycle-by-cycle account of all ten sessions, including Session 10's prompts
+verbatim with the reaction to each, is [`prompts.md`](prompts.md).
 
 ### Phase A — Scaffolding with a hard boundary (08-10)
 

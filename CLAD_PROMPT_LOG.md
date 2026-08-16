@@ -17,6 +17,23 @@ cycle of all ten sessions with its prompts, measurements and wrong turns,
 ending with the final session's prompts verbatim and the reaction to each.
 Before/after captures are in [`docs/evidence/`](docs/evidence/).*
 
+## CLAD Usage at a Glance
+
+Call counts are approximate, totalled across all ten sessions. **Every
+individual invocation — what was asked, what came back, how it was verified —
+is recorded case by case in [`prompts.md`](prompts.md).**
+
+| Surface | What was used |
+|---|---|
+| **CLAD skills** | `lens-studio-router`, `specs-project-init`, `specs-experience-builder`, `build-mesh` (SPECS text-to-3D — 7 generation jobs, 5 accepted species), `build-sfx` + `build-music` (8 license-clean audio cues), `shader-graph` (custom code-node urgency shader), `specs-capture-perf-trace` + `perfetto-trace-analysis` (10 traces, every perf number), `verify-preview`, LEAF install / write / run |
+| **Agents** | `ls-clad:specs-experience-builder` ×2, read-only `Explore` surveys ×2, `Plan` ×1 |
+| **MCP: verify & run** | `run_leaf_scenario` 90+ (20 scenarios), `RunAndCollectLogsTool` 75+ (runtime log analysis after every change), `RecompileTypeScriptTool` 45+ |
+| **MCP: see the result** | `CapturePanelScreenshotTool` 50+, `CaptureRuntimeViewTool` 45+ (isolated renders), `MovePreviewCamera` (aiming verification shots) |
+| **MCP: query the truth** | `QueryRuntimeSceneTool` 35+ (live transforms, bounds, interactables — including the query that proved the owl rendered 21 m while every runtime AABB said 28 cm), `scene-graphql` |
+| **MCP: build the scene & assets** | `ExecuteEditorCode` 40+, `VirtualScene`, `ConvertSvgToTexture` ×10 (window chrome, 6 species icons, sparkle motes), `FontSelector` |
+| **MCP: drive the input** | `InjectPreviewGesture` 15+ (keys, taps, touch sequences), `PreviewInteractTool` (synthetic SIK pinches) |
+| **Declined, with reasons on record** | `MergeMeshesTool`, `SimplifyMeshTool`, `specs-lens-perf-attribution`, FAST3D, texture/music library tools — the used/discarded/declined judgement for each is in the CLAD inventory at the top of [`prompts.md`](prompts.md) |
+
 ---
 
 ## 1. Project Summary
@@ -76,22 +93,12 @@ What CLAD built end-to-end, by layer:
   3.7k tris), and a **~15 MB packed-size cut** (audio 18.9 → 4.7 MB via 22 kHz
   mono, textures resized).
 
-**Lens Studio MCP capabilities exercised** (call counts across the week):
-`RunAndCollectLogsTool` 60+ (runtime log analysis after every change),
-`run_leaf_scenario` 80+, `RecompileTypeScriptTool` 30+,
-`CapturePanelScreenshotTool` / `CaptureRuntimeViewTool` 70+ (visual
-verification of every UI/creature change), `QueryRuntimeSceneTool` 25+
-(live transforms, bounds, interactable discovery), `ExecuteEditorCode` 40+,
-`scene-graphql`, `VirtualScene`, `ConvertSvgToTexture` (10 UI textures),
-`InjectPreviewGesture` (keyboard/touch driving of the real preview),
-`PreviewInteractTool` (synthetic SIK pinches), `MovePreviewCamera`
-(aiming verification captures), `open_leaf_panel`. CLAD skills:
-`lens-studio-router`, `specs-project-init`, `specs-experience-builder`,
-`build-mesh` (SPECS text-to-3D), `build-sfx`, `shader-graph`,
-`specs-capture-perf-trace` + `perfetto-trace-analysis`, LEAF
-install/write/run. Outside MCP, CLAD also drove `gltf-transform`
-(mesh decimation preserving skins/animations), `afconvert`, `sips`, and ad-hoc
-Python GLB introspection to diagnose rigs.
+The full inventory of CLAD skills and MCP tools, with call counts, is the
+**"CLAD Usage at a Glance"** table at the top of this file; every individual
+invocation is recorded case by case in [`prompts.md`](prompts.md). Outside
+MCP, CLAD also drove `gltf-transform` (mesh decimation preserving
+skins/animations), `afconvert`, `sips`, and ad-hoc Python GLB introspection to
+diagnose rigs.
 
 ---
 

@@ -1,4 +1,4 @@
-# Prompt history — Task Organism
+# Prompt history — Task Habitat
 
 Every instruction typed to an agent during the build, **verbatim**, grouped by
 date. Two machines: sessions 1–9 (entries 1–99, extracted programmatically
@@ -20,15 +20,15 @@ documentation/repo-administration instructions.
 
 
 > SETUP TASK FOR CLAUDE CODE
-> Скопируй всё, что ниже разделителя, и вставь в Claude Code одним сообщением.
-> Условия перед запуском:
+> *(preamble translated from Russian)* Copy everything below the divider and paste it into Claude Code as a single message.
+> Preconditions before starting:
 >
-> * Lens Studio открыт с проектом `task-organism`
-> * Claude Code запущен из папки проекта (`cd ~/Desktop/hackaton/task-organism && claude`)
-> * `/mcp` показывает `lens-studio`
-> * CLAD-плагин установлен (`list available CLAD skills` возвращает список)
+> * Lens Studio is open with the `task-organism` project
+> * Claude Code is started from the project folder (`cd ~/Desktop/hackaton/task-organism && claude`)
+> * `/mcp` shows `lens-studio`
+> * The CLAD plugin is installed (`list available CLAD skills` returns a list)
 >
-> Файл `CLAUDE.md` скопируй в корень проекта вручную ДО запуска — агент не должен его сочинять.
+> Copy the `CLAUDE.md` file into the project root by hand BEFORE starting — the agent must not invent it.
 > Set up the project scaffolding for a CLAD hackathon build. Do all of this in one pass, then report what you did and anything that failed.
 > 1. Validate the project
 > Run `/specs-project-init`. Fix every issue it reports. If something can't be fixed automatically, list it for me explicitly rather than silently skipping it.
@@ -2924,8 +2924,8 @@ documentation/repo-administration instructions.
 
 > i still cant see the end screen image anywhere on the location, double check it pls
 
-### 112. ≈23:30 — Claude Code
+### 112. ≈23:30 — Claude Code *(translated from Russian)*
 
-> проверь гитхаб основательно и почисти весь мусор , так же проверь файл readme на сооветствие и добавь туда лицензии
+> check GitHub thoroughly and clean out all the junk; also check the README for accuracy and add the licenses there
 > [5 Sketchfab model links]
-> все модели должны быть CC-BY , укажи авторство и проверь все подобные моменты финальный раз перед записью демо чтобы у нас не возникло проблем
+> all models must be CC-BY; state the attribution and check all such issues one final time before recording the demo, so we don't run into problems

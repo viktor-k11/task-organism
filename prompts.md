@@ -1,4 +1,4 @@
-# Task Organism — CLAD development log
+# Task Habitat — CLAD development log
 
 Chronological engineering log, 2026-08-10 → 2026-08-16. Each entry: the
 instruction given, the tools used, what came back (including wrong results),

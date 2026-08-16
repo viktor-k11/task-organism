@@ -1,4 +1,4 @@
-# Task Organism
+# Task Habitat
 
 A spatial task manager for SPECS where unfinished tasks are living creatures.
 Six animated animals stand in a habitat in front of you; ignored tasks grow

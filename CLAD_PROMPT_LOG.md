@@ -1,10 +1,10 @@
-# CLAD Prompt Log — Task Organism
+# CLAD Prompt Log — Task Habitat
 
 **CLAD Summer Hackathon, Week 1: "Organize" (Aug 10–16, 2026) — submission document**
 
 | | |
 |---|---|
-| Project | **Task Organism** — a spatial task manager for SPECS where tasks are living creatures |
+| Project | **Task Habitat** — a spatial task manager for SPECS where tasks are living creatures (repository: `task-organism`) |
 | Author | Viktor Kulaha — Snapchat: **viktorkulaha** |
 | Dates | 2026-08-10 → 2026-08-16 (7 days) |
 | Tools | Lens Studio 5.23 (SPECS 27 target), Claude Code (+ 3 Codex sessions), `ls-clad` plugin, Lens Studio MCP server, LEAF test framework |
@@ -56,7 +56,7 @@ judgement for each is in the CLAD inventory at the top of
 
 ## 1. Project Summary
 
-**Task Organism** turns a to-do list into a small ecosystem you share a room
+**Task Habitat** turns a to-do list into a small ecosystem you share a room
 with: each open task is a living, animated creature standing in a habitat in
 front of you. Urgency is *derived from data and time* — never stored — and the
 single most urgent task gently approaches you like a cat asking for attention;

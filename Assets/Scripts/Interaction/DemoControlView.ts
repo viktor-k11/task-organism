@@ -22,6 +22,8 @@ export interface StagingActions {
 
 /** The only judge-facing demo control. Raw inspector triggers stay hidden. */
 export class DemoControlView {
+    private root: SceneObject;
+    private stagingPanel: SceneObject | null = null;
     private status: Text;
     private button: Button;
     private buttonLabel: Text;
@@ -29,6 +31,7 @@ export class DemoControlView {
     constructor(onAdvance: () => void, staging?: StagingActions) {
         const camera = this.findCamera();
         const root = global.scene.createSceneObject("WednesdayDemoControl");
+        this.root = root;
         if (camera) root.setParent(camera);
         root.getTransform().setLocalPosition(new vec3(0, -26, -90));
         root.createComponent("Component.Canvas");
@@ -78,6 +81,7 @@ export class DemoControlView {
      */
     private buildStagingRow(camera: SceneObject | null, staging: StagingActions): void {
         const panel = global.scene.createSceneObject("WednesdayStagingControl");
+        this.stagingPanel = panel;
         if (camera) panel.setParent(camera);
         if (DEMO_CLIP_MODE) { panel.enabled = false; return; }
         // Above centre, not below the main control. The main control already
@@ -127,6 +131,13 @@ export class DemoControlView {
     }
 
     setStatus(text: string): void { this.status.text = text; }
+
+    /** Hides the whole operator panel (development furniture) without
+     *  disturbing any code that keeps pushing status text at it. */
+    setPanelVisible(visible: boolean): void {
+        this.root.enabled = visible;
+        if (this.stagingPanel) this.stagingPanel.enabled = visible;
+    }
 
     setAdvanced(advanced: boolean): void {
         this.buttonLabel.text = advanced ? "Time advanced" : "Advance Demo Time";

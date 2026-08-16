@@ -47,11 +47,23 @@ export class OrderedTaskIdentitySource implements TaskIdentitySource {
 
 /** The single record-construction and repository path used by all inputs. */
 export class TaskCreationService {
+    /**
+     * Fired after a record is accepted by the repository. The controller uses
+     * this to bind a creature slot for tasks created at runtime (keyboard,
+     * voice) — the startup bindCreatureSlots pass only covers seeded tasks.
+     * Left unset during seeding, so fixtures never double-bind.
+     */
+    private onCreated: ((task: TaskRecord) => void) | null = null;
+
     constructor(
         private repository: TaskRepository,
         private clock: Clock,
         private identities: TaskIdentitySource,
     ) {}
+
+    setOnCreated(callback: (task: TaskRecord) => void): void {
+        this.onCreated = callback;
+    }
 
     create(text: string): TaskRecord | null {
         const cleanText = text.trim();
@@ -66,6 +78,8 @@ export class TaskCreationService {
             status: "open",
             appearanceSeed: identity.appearanceSeed,
         };
-        return this.repository.add(record) ? { ...record } : null;
+        if (!this.repository.add(record)) return null;
+        if (this.onCreated) this.onCreated({ ...record });
+        return { ...record };
     }
 }

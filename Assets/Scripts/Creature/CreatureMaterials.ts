@@ -22,8 +22,11 @@ export function cloneMaterialOnto(rmv: RenderMeshVisual): Material {
 
 /** Hardens a cloned presentation material against accidental transparency. */
 export function forceOpaque(mat: Material): Material {
-    const base = mat.mainPass.baseColor as vec4;
-    mat.mainPass.baseColor = new vec4(base.x, base.y, base.z, 1);
+    // Imported GLB materials (the animated pets) may not expose baseColor at
+    // all — reading it returns undefined, and `.x` on that crashed the whole
+    // release flow. Guard every baseColor read in this file the same way.
+    const base = mat.mainPass.baseColor as vec4 | undefined;
+    if (base) mat.mainPass.baseColor = new vec4(base.x, base.y, base.z, 1);
     // The stock unlit graph exposes its scalar opacity fallback under this
     // generated port name even when the opacity texture define is disabled.
     // Pin both fallbacks so graph evaluation cannot inherit translucent data.
@@ -42,7 +45,7 @@ export function forceOpaque(mat: Material): Material {
  */
 export function brightenMaterial(rmv: RenderMeshVisual, amount: number): Material {
     const mat = cloneMaterialOnto(rmv);
-    const base = mat.mainPass.baseColor as vec4;
-    mat.mainPass.baseColor = vec4.lerp(base, new vec4(1, 1, 1, base.w), amount);
+    const base = mat.mainPass.baseColor as vec4 | undefined;
+    if (base) mat.mainPass.baseColor = vec4.lerp(base, new vec4(1, 1, 1, base.w), amount);
     return mat;
 }

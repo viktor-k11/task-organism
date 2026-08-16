@@ -51,7 +51,16 @@ export class CreatureInteractionState {
         }
     }
 
-    pressEnd(): void {
+    /**
+     * Ends the active gesture. `sourceTaskId` identifies which creature's
+     * Interactable reported the end: every creature's onTriggerEnd is wired to
+     * this one method, so without the identity check a stray pinch-release on a
+     * NEIGHBOURING creature would cancel an in-flight hold on the selected one
+     * (reachable with two hands). Calls without an id (scripted paths, tests)
+     * keep the old unconditional behaviour.
+     */
+    pressEnd(sourceTaskId?: string): void {
+        if (sourceTaskId !== undefined && this.activeTaskId !== null && sourceTaskId !== this.activeTaskId) return;
         if (this.role === "select" && this.activeTaskId) {
             this.selectedTaskId = this.activeTaskId;
             this.hooks.onSelectionChanged(this.selectedTaskId);

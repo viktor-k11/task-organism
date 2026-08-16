@@ -41,6 +41,11 @@ export class ReleaseEffect {
     private cleanupEvent: DelayedCallbackEvent | null = null;
     /** Latches on the first cue so a repeat play() cannot retrigger the sound. */
     private hasPlayedAudio = false;
+    /** The creature's visual root, shrunk over the effect as the modern
+     *  stand-in for the dissolve melt; scale restored at teardown so a debug
+     *  reset() gets an intact creature back. */
+    private bodyRoot: SceneObject | null = null;
+    private bodyRootScale0: vec3 | null = null;
 
     /**
      * Builds the particle pool AHEAD of the release, at creature startup.
@@ -82,8 +87,15 @@ export class ReleaseEffect {
         eyeRmvs: RenderMeshVisual[],
         audio: AudioComponent | null,
         onComplete: () => void,
+        bodyRoot: SceneObject | null = null,
     ): void {
         console.log("[ReleaseEffect] play");
+        // The textured animated pets have no dissolve channel, so the body
+        // SHRINKS over the same duration instead — anchored at the model
+        // root, it reads as the creature gently folding away. Runs alongside
+        // the dissolve write, which stays a no-op on these materials.
+        this.bodyRoot = bodyRoot;
+        this.bodyRootScale0 = bodyRoot ? bodyRoot.getTransform().getLocalScale() : null;
 
         // Cue FIRST, before any visual setup. Measured: with this block at the
         // end of play() (after the brighten, the mesh build and 30 particle
@@ -123,7 +135,9 @@ export class ReleaseEffect {
         // the particle colour derives from the creature's BRIGHTENED body, which
         // does not exist until this moment. One clone is cheap; it was the 30
         // object creations and the mesh upload that cost.
-        this.particleBaseColor = brightBody.mainPass.baseColor as vec4;
+        // Textured pet materials may not expose baseColor — warm white keeps
+        // the particles alive instead of crashing the release.
+        this.particleBaseColor = (brightBody.mainPass.baseColor as vec4 | undefined) ?? new vec4(1, 0.95, 0.8, 1);
         this.particleMaterial = brightBody.clone();
         this.particleMaterial.mainPass.baseColor = this.particleBaseColor;
 
@@ -178,6 +192,14 @@ export class ReleaseEffect {
             p.object.enabled = false;
         }
         this.particles = [];
+        // The owner disables the whole creature right after this, so restoring
+        // the shrunk scale is invisible now — but a debug reset() re-enables
+        // the same instance and must find it full-sized.
+        if (this.bodyRoot && this.bodyRootScale0) {
+            this.bodyRoot.getTransform().setLocalScale(this.bodyRootScale0);
+            this.bodyRoot = null;
+            this.bodyRootScale0 = null;
+        }
         if (this.updateEvent) {
             this.updateEvent.enabled = false;
         }
@@ -200,6 +222,14 @@ export class ReleaseEffect {
         // read as one event rather than two overlapping ones.
         if (this.bodyMaterial) {
             this.bodyMaterial.mainPass.dissolveAmount = t;
+        }
+        // Textured pets melt by shrinking instead (no dissolve channel).
+        // Ease-in keeps the creature nearly whole while the particles bloom,
+        // then lets it slip away in the back half of the effect.
+        if (this.bodyRoot && this.bodyRootScale0) {
+            const keep = Math.pow(Math.max(0, 1 - t), 1.4);
+            const s0 = this.bodyRootScale0;
+            this.bodyRoot.getTransform().setLocalScale(new vec3(s0.x * keep, s0.y * keep, s0.z * keep));
         }
 
         if (this.particleMaterial) {

@@ -37,7 +37,10 @@ export const HABITAT_HOME_DEPTH_CM = 240;
  * in Preview at HABITAT_HOME_DEPTH_CM, leaving room for body width), or they
  * clip against the edge of the additive render region mid-walk. 36 + 16 = 52.
  */
-export const HABITAT_HOME_LATERAL_SPACING_CM = 36;
+// 40 + 16 roam = 56, still inside the +/-58 edge measured above. Widened
+// from 36 when the animated quadrupeds (long bodies, not round blobs)
+// started reading as stacked on one another.
+export const HABITAT_HOME_LATERAL_SPACING_CM = 40;
 /**
  * Group centered on the habitat forward axis. Previously -24, which shifted
  * all three creatures left; harmless when they sat 18cm apart, but once
@@ -47,7 +50,9 @@ export const HABITAT_HOME_LATERAL_SPACING_CM = 36;
  * back the asymmetric half.
  */
 export const HABITAT_HOME_GROUP_LATERAL_CM = 0;
-export const HABITAT_HOME_SIDE_DEPTH_OFFSET_CM = 6;
+// Deeper stagger than the old 6: depth separation is free (no FOV cost)
+// and it is what keeps the long animated bodies from overlapping.
+export const HABITAT_HOME_SIDE_DEPTH_OFFSET_CM = 14;
 export const HABITAT_HOME_WANDER_RADIUS_CM = 3;
 
 // ── Capacity layout (up to 6 creatures, CLAUDE.md max) ────────────────────
@@ -622,7 +627,59 @@ export const DEMO_BEAT_SECOND_SELECT_READ_S = 2.0;
  * the chaser approaches and is resolved away ~17s later whether or not you
  * were ready — see the staging key map in TaskOrganismController.)
  */
-export const DEMO_AUTOPLAY_ON_START = true;
+export const DEMO_AUTOPLAY_ON_START = false;
+
+/**
+ * Show the retro onboarding flow (hill backdrop + "YOUR TASKS HAVE ARRIVED")
+ * as soon as the Lens starts. O still toggles it at any time. LEAF gesture
+ * scenarios dismiss it automatically when they arm, so leaving this on does
+ * not obstruct the test suite.
+ */
+export const SHOW_ONBOARDING_ON_START = true;
+
+/**
+ * How many demo creatures exist when the Lens starts, 0..6.
+ *
+ * 0 means the habitat starts EMPTY and every creature is one you added —
+ * which is what the onboarding flow is for. Raise it only when you want
+ * ready-made company for a recording or to give the P story something to
+ * play with (it needs at least 2).
+ *
+ * The repository caps open tasks at MAX_OPEN_TASKS (6), so with 6 seeded
+ * there is NO ROOM for a task you type or speak — the add is refused and no
+ * creature appears. Set this low (0 for a genuinely empty habitat, 2 to
+ * still have company) when testing your own task entry.
+ *
+ * The scripted story (P) needs at least 2 seeded tasks to have anything to
+ * tell; below that it simply has less to show, which is not an error.
+ */
+export const DEMO_SEED_TASK_COUNT = 0;
+
+/**
+ * The small operator panel at the bottom of the view ("6 tasks • staging —
+ * P to play") plus its hidden habitat-placement buttons. Development
+ * furniture from the judge demo, not part of the experience — turn it off
+ * for design review and recordings. Its status messages still run, they
+ * just have nowhere to draw.
+ */
+export const SHOW_DEMO_CONTROL_PANEL = false;
+
+/**
+ * Backdrop size in cm at ~1.2m, for the onboarding hill and the ritual sky.
+ *
+ * The backdrop is a WORLD-anchored wall (see buildBackdrop): 16x9m standing
+ * 4.5m in front of where the user was looking when the screen opened. That
+ * covers about +/-60 degrees of head turn horizontally and +/-45 vertically
+ * — look well around and the picture is still there, like a room. (16:9
+ * matches the generated textures, so nothing distorts.)
+ */
+export const BACKDROP_WIDTH_CM = 1600;
+export const BACKDROP_HEIGHT_CM = 900;
+/** How far in front of the user the backdrop wall stands. */
+// 300, down from 450: at 4.5m the wall landed BEHIND most preview rooms'
+// real walls and was fully occluded indoors. 3m keeps it just behind the
+// habitat (240cm) and inside typical room bounds.
+export const BACKDROP_DISTANCE_CM = 300;
 /**
  * CLIP MODE — for recording. Hides the staging panel and the "Advance Demo
  * Time" button so nothing operator-facing is in frame, while KEEPING the status
@@ -716,6 +773,8 @@ export const PET_CREATURE_HALF_HEIGHT_CM = 18.5;
  * habitat-floor / chase-Y math and the shared floor plane below both stay
  * correct without per-species branching).
  */
+// 34: the 28 that fixed overlap read as too small once the creatures stood
+// still and the habitat spacing widened — +20% by design request 2026-08-16.
 export const READYMADE_PET_TARGET_HEIGHT_CM = 34;
 export const READYMADE_PET_HALF_HEIGHT_CM = READYMADE_PET_TARGET_HEIGHT_CM / 2;
 export const READYMADE_PET_YAW_CORRECTION_DEG = 180;

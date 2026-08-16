@@ -6,10 +6,8 @@
 
 *.esproj text linguist-language=yaml
 
-# LFS filters removed deliberately: git-lfs was never installed on the authoring
-# machine, so every file was committed as an ordinary blob and no LFS objects or
-# LFS remote exist. Leaving the filters declared makes any clone on a machine
-# that DOES have git-lfs try to resolve pointers that are not there.
+Assets/**/* filter=lfs diff=lfs merge=lfs -text
+Packages/**/* filter=lfs diff=lfs merge=lfs -text
 
 Assets/**/*.css !filter !diff !merge text eol=lf
 Packages/**/*.css !filter !diff !merge text eol=lf

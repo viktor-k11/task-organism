@@ -7,6 +7,9 @@ import {
     RESOLVE_HOLD_DURATION_S,
     URGENCY_AGE_WINDOW_MS,
     DEMO_AUTOPLAY_ON_START,
+    SHOW_ONBOARDING_ON_START,
+    DEMO_SEED_TASK_COUNT,
+    SHOW_DEMO_CONTROL_PANEL,
     HABITAT_DEPTH_STEP_CM,
     HABITAT_LATERAL_STEP_CM,
     HABITAT_DEPTH_MIN_CM,
@@ -28,6 +31,18 @@ import { CreatureBehavior } from "../Creature/CreatureBehavior";
 import { findChildByName } from "../Creature/CreatureMovement";
 import { DEMO_TASK_FIXTURES, DemoInput } from "../Input/DemoInput";
 import { KeyboardInput } from "../Input/KeyboardInput";
+import { VoiceInput } from "../Input/VoiceInput";
+import { AmbientHud } from "../UI/AmbientHud";
+import { OnboardingFlow } from "../UI/OnboardingFlow";
+import { CompletedEntry, EndOfDayView } from "../UI/EndOfDayView";
+import { ClosingRitual } from "../UI/ClosingRitual";
+
+/** Quiet loop for the attending state — see setFocusAudio. */
+const focusTrack = requireAsset("../../GeneratedSFX/FocusAmbience.wav") as AudioTrackAsset;
+import { ICON_COMPUTER, RetroDialog, skinCursorVisuals } from "../UI/RetroUi";
+import { resolveAnchor, UI_ANCHORS } from "../UI/UiLayout";
+import { COMPLETION, DAY_COMPLETE, HUD, RELEASE_TOASTS } from "../UI/UiCopy";
+import { speciesForSeed } from "../Creature/CreaturePetVisual";
 import { OrderedTaskIdentitySource, TaskCreationService } from "../Input/TaskCreationService";
 import { AttentionArbiter } from "../State/AttentionArbiter";
 import { StateEngine } from "../State/StateEngine";
@@ -48,7 +63,12 @@ import { InteractorInputType } from "SpectaclesInteractionKit.lspkg/Core/Interac
 // v5: appearanceSeed semantics changed (OrderedTaskIdentitySource), and seeds
 // are persisted — a v4 save would restore the old hash seeds and silently undo
 // the species/colour spread. Bumping the key retires those saves instead.
-const DEMO_STORAGE_KEY = "task-organism.wednesday-demo.v5.presentation";
+// v6: DEMO_SEED_TASK_COUNT arrived. A v5 save holds six tasks, which restores
+// straight over the new smaller seed and leaves no room under the six-task cap
+// for anything the user types or speaks — the exact symptom the knob exists to
+// fix. Retiring the old key makes the setting take effect on the next run
+// instead of after a manual R.
+const DEMO_STORAGE_KEY = "task-organism.wednesday-demo.v6.presentation";
 /**
  * Creation ages as fractions of URGENCY_AGE_WINDOW_MS, oldest first. After
  * advancing to DEMO_ADVANCE_TARGET_MS (1.8W) each task's age is
@@ -123,10 +143,40 @@ export class TaskOrganismController extends BaseScriptComponent {
     private arbiter!: AttentionArbiter;
     private interaction!: CreatureInteractionState;
     private keyboard!: KeyboardInput;
+    private voice!: VoiceInput;
     private demoControl!: DemoControlView;
     private slots: CreatureSlot[] = [];
+    /** True while onboarding owns the stage — restored/live creatures stay
+     *  hidden until the flow finishes (see setWorldVisible). */
+    private worldHidden = false;
     private activeChaserId: string | null = null;
     private heldInteractionId: string | null = null;
+    // ── Care-loop UI layer (placeholder pass, 2026-08-16 design brief) ──────
+    private hud: AmbientHud | null = null;
+    private onboarding: OnboardingFlow | null = null;
+    private endOfDay: EndOfDayView | null = null;
+    private ritual: ClosingRitual | null = null;
+    /** Quiet bed that plays only while a creature is being attended. */
+    private focusAudio: AudioComponent | null = null;
+    private resolutionService!: TaskResolutionService;
+    private creator!: TaskCreationService;
+    /**
+     * The task the user invited close with "Give this one attention".
+     * PRESENTATION-ONLY override: the arbiter still selects its single chaser
+     * at the data level (invariants 3/4 untouched); while attending, that
+     * arbiter choice simply doesn't present, so at most ONE creature is ever
+     * approaching — the attended one.
+     */
+    private attendingTaskId: string | null = null;
+    /** What the attending layer last presented, so requestChase/endChase fire
+     *  once per change instead of every frame (per-frame endChase would
+     *  interrupt live holds). */
+    private presentedAttendingId: string | null = null;
+    /** Task text + species per id, kept for TODAY.TXT after the repository
+     *  forgets completed tasks (storage invariant 8 caps them). */
+    private taskInfoById = new Map<string, { text: string; seed: number }>();
+    private completedToday: CompletedEntry[] = [];
+    private completionCard: RetroDialog | null = null;
     private demoAdvanced = false;
     private resolveProgressMilestone = 0;
     private sequence!: DemoSequence;
@@ -169,6 +219,7 @@ export class TaskOrganismController extends BaseScriptComponent {
     private frameCounter = 0;
     private pinchDownFrame = -1;
     private creaturePressFrame = -1;
+    private uiPressFrame = -1;
     private missCheckAtFrame = -1;
     private harnessReported = false;
 
@@ -231,10 +282,38 @@ export class TaskOrganismController extends BaseScriptComponent {
         // staging control that also moves the viewpoint you are framing with
         // is worse than no control, and there is no keyboard on device anyway.
         this.createEvent("KeyPressEvent").bind((event: KeyPressEvent) => {
+            // While the text keyboard is open every letter belongs to the task
+            // being typed, not to a shortcut — otherwise "call THE dentist"
+            // opens TODAY.TXT on each T and plays the story on the P.
+            if (this.keyboard && this.keyboard.isOpen) return;
             if (event.key === Keys.K && this.keyboard) this.keyboard.show();
+            // V is push-to-talk: one press listens, the first completed phrase
+            // becomes a task, a second press cancels. Same creation path as K.
+            if (event.key === Keys.V && this.voice) this.voice.toggle();
             if (event.key === Keys.R) {
                 global.persistentStorageSystem.store.remove(DEMO_STORAGE_KEY);
                 console.log("[WednesdayDemo] cleared demo storage; restart Preview to reseed");
+            }
+            // P plays the scripted story — the staging status line has always
+            // promised this key, but the binding only existed as the staging
+            // panel's Play button, which DEMO_CLIP_MODE hides. Bound for real
+            // now that autoplay defaults off.
+            if (event.key === Keys.P) this.startSequence();
+            // O opens/closes the retro onboarding flow (design review + real
+            // entry point once the world is gated behind it).
+            if (event.key === Keys.O) this.toggleOnboarding();
+            // T opens/closes TODAY.TXT — closing the day is the user's
+            // gesture, never automatic.
+            if (event.key === Keys.T && this.endOfDay) {
+                this.closeOnboarding();
+                // One window per anchor: a completion card still holding the
+                // stage would interleave with TODAY.TXT into an unreadable
+                // double-exposure (both dialogs share DialogAnchor).
+                if (this.completionCard) {
+                    this.completionCard.destroy();
+                    this.completionCard = null;
+                }
+                this.endOfDay.toggle(this.completedToday);
             }
         });
     }
@@ -297,6 +376,9 @@ export class TaskOrganismController extends BaseScriptComponent {
      */
     private startSequence(): void {
         if (!this.sequence) return;
+        // The story is about the habitat; an onboarding window left open would
+        // sit in front of it (and stack with the completion card at the end).
+        this.closeOnboarding();
         this.sequence.start();
         console.log("[WednesdayStaging] story started manually");
     }
@@ -318,22 +400,53 @@ export class TaskOrganismController extends BaseScriptComponent {
             this.repository = new TaskRepository(new PersistentTaskStorage(global.persistentStorageSystem.store, DEMO_STORAGE_KEY), this.clock);
             tasks = [];
         }
+        // A LEAF gesture run seeds the demo fixtures through the REAL repository
+        // (gestureHarnessEnsureCreatures), so they persist into the same save
+        // the designer's own habitat restores from. When the project is
+        // configured to start empty, a restored set made entirely of fixture
+        // text is that leftover — and because it fills all six slots, the next
+        // task the user types is refused. Drop it instead.
+        if (DEMO_SEED_TASK_COUNT === 0 && tasks.length > 0
+            && tasks.every((task) => DEMO_TASK_FIXTURES.indexOf(task.text) >= 0)) {
+            console.log(`[WednesdayDemo] cleared ${tasks.length} leftover fixture task(s) — starting empty`);
+            global.persistentStorageSystem.store.remove(DEMO_STORAGE_KEY);
+            this.repository = new TaskRepository(new PersistentTaskStorage(global.persistentStorageSystem.store, DEMO_STORAGE_KEY), this.clock);
+            tasks = [];
+        }
         if (tasks.length > 0) this.clock.setNowMs(this.latestCreationTime(tasks));
 
         const creator = new TaskCreationService(this.repository, this.clock, new OrderedTaskIdentitySource("demo", tasks.length));
+        this.creator = creator;
         const demo = new DemoInput(creator);
         this.keyboard = new KeyboardInput(creator);
+        this.voice = new VoiceInput(creator, {
+            // Voice feedback belongs to the voice SCREEN, not to the ambient
+            // notification slot — routing it there put onboarding chrome
+            // ("listening…", "added: …") over the living habitat.
+            onStatus: (text) => {
+                if (this.demoControl) this.demoControl.setStatus(text);
+                if (this.onboarding && this.onboarding.isOpen) this.onboarding.setVoiceStatus(text);
+            },
+        }, this);
         if (tasks.length === 0) tasks = this.seedStaggeredDemoTasks(demo);
 
         this.stateEngine = new StateEngine(this.clock);
         this.arbiter = new AttentionArbiter(this.stateEngine);
         const resolution = new TaskResolutionService(this.repository, (taskId) => this.releaseTask(taskId));
+        this.resolutionService = resolution;
         this.interaction = new CreatureInteractionState(this.repository, resolution, {
             onSelectionChanged: (taskId) => this.onSelectionChanged(taskId),
             onResolveProgress: (progress) => this.onResolveProgress(progress),
         });
 
         this.bindCreatureSlots(tasks);
+        // From here on, anything the creation service accepts (keyboard task,
+        // voice task) must also become a visible creature. Set AFTER seeding
+        // and the startup bind so fixtures never double-bind.
+        creator.setOnCreated((task) => {
+            this.bindLiveTask(task);
+            if (this.onboarding) this.onboarding.notifyTaskAdded();
+        });
         this.bindDeselectOnMiss();
         this.cameraObject = this.findSceneObject("Camera Object");
         this.ensureAudioListener();
@@ -347,7 +460,17 @@ export class TaskOrganismController extends BaseScriptComponent {
             onRecenter: () => this.recenterHabitat(),
             onPlay: () => this.startSequence(),
         });
+        if (!SHOW_DEMO_CONTROL_PANEL) this.demoControl.setPanelVisible(false);
         this.demoControl.setStatus(`${tasks.length} tasks • all calm`);
+        // The care-loop text layer: headline + notification slot, wandering
+        // encouragements, and the end-of-day document (opened with T).
+        this.hud = new AmbientHud();
+        this.endOfDay = new EndOfDayView(this.cameraObject);
+        this.ritual = new ClosingRitual(this.cameraObject);
+        this.endOfDay.setRitualHandler(() => {
+            this.closeOnboarding();
+            if (this.ritual) this.ritual.start();
+        });
         this.syncArbiter();
 
         // Captured before the story runs, so the gesture harness can put the
@@ -366,6 +489,17 @@ export class TaskOrganismController extends BaseScriptComponent {
         }
 
         console.log(`[WednesdayDemo] ready open=${tasks.length} hold=${RESOLVE_HOLD_DURATION_S}s chaser=none autoplay=${DEMO_AUTOPLAY_ON_START}`);
+
+        // SIK spawns its cursor visuals during its own start, so the retro
+        // arrow is applied a beat later.
+        const cursorSkin = this.createEvent("DelayedCallbackEvent") as DelayedCallbackEvent;
+        cursorSkin.bind(() => console.log(`[RetroCursor] skinned ${skinCursorVisuals()} cursor(s)`));
+        cursorSkin.reset(1.5);
+
+        // The start screen: hill backdrop now, system message after its 2s
+        // beat. LEAF gesture scenarios dismiss it when they arm (see
+        // gestureHarnessJumpTo), so auto-show never obstructs the suite.
+        if (SHOW_ONBOARDING_ON_START) this.toggleOnboarding();
     }
 
     /**
@@ -455,6 +589,9 @@ export class TaskOrganismController extends BaseScriptComponent {
         // which is exactly the failure the non-visual checks exist for.
         if (VISUAL_HARNESS_FRAME < 0) this.interaction.update(dt);
         this.syncArbiter();
+        if (this.voice) this.voice.update(dt);
+        if (this.ritual) this.ritual.update(dt);
+        if (this.hud) this.hud.update(dt);
 
         // Capacity instrumentation: rolling FPS plus a live assertion that
         // invariant 4 (at most ONE chaser) still holds with a full habitat.
@@ -479,8 +616,12 @@ export class TaskOrganismController extends BaseScriptComponent {
     private openApproachGate(): void {
         if (this.approachGateOpen) return;
         this.approachGateOpen = true;
+        // While the user is attending a creature, the arbiter's pick waits at
+        // home — the attended one is the single approacher (invariant 4).
+        if (this.attendingTaskId) return;
         const slot = this.slots.find((candidate) => candidate.taskId === this.activeChaserId);
         if (slot) slot.creature.requestChase();
+        if (slot && this.hud) this.hud.notify(HUD.chaserHeadline, HUD.chaserBody, 9);
         console.log(`[WednesdayEvidence] approach begins task=${this.activeChaserId ?? "none"}`);
     }
 
@@ -517,7 +658,9 @@ export class TaskOrganismController extends BaseScriptComponent {
 
     private seedStaggeredDemoTasks(demo: DemoInput): TaskRecord[] {
         const created: TaskRecord[] = [];
-        const count = Math.min(DEMO_TASK_COUNT, DEMO_TASK_FIXTURES.length, MAX_CREATURE_SLOTS);
+        // DEMO_SEED_TASK_COUNT leaves room under the repository's 6-task cap
+        // for tasks the user types or speaks — at 6 seeded, every add is refused.
+        const count = Math.min(DEMO_SEED_TASK_COUNT, DEMO_TASK_COUNT, DEMO_TASK_FIXTURES.length, MAX_CREATURE_SLOTS);
         for (let i = 0; i < count; i++) {
             this.clock.setNowMs(URGENCY_AGE_WINDOW_MS * DEMO_TASK_AGE_FRACTIONS[i]);
             const task = demo.submit(DEMO_TASK_FIXTURES[i]);
@@ -619,17 +762,13 @@ export class TaskOrganismController extends BaseScriptComponent {
                 continue;
             }
 
-            const view = new TaskSelectionView(visualRoot, () => {
-                if (this.interaction.selectedId === task.id && this.interaction.later()) {
-                    creature.endChase();
-                    // Acknowledge the deferral audibly. Fired here, after the
-                    // repository write succeeded, so the sound never claims a
-                    // snooze that did not happen.
-                    creature.playSnoozeCue();
-                    this.demoControl.setStatus(`${this.repository.listOpen().length} tasks • deferred`);
-                }
-            });
+            const view = new TaskSelectionView(
+                visualRoot,
+                this.selectionActionsFor(task.id, creature),
+                () => { this.uiPressFrame = this.frameCounter; },
+            );
             view.setTaskText(task.text);
+            this.taskInfoById.set(task.id, { text: task.text, seed: task.appearanceSeed });
             // Identity color from the task's own persisted seed, so the same
             // task is always the same creature (see CreatureBehavior.setAppearanceSeed).
             creature.setAppearanceSeed(task.appearanceSeed);
@@ -646,6 +785,70 @@ export class TaskOrganismController extends BaseScriptComponent {
         }
     }
 
+    /**
+     * Binds ONE task created after startup (keyboard, voice) to a creature.
+     *
+     * Startup binding covers seeded tasks only; before this method existed a
+     * runtime-created task landed in the repository but never appeared in the
+     * habitat. Slot reuse is deliberately avoided — a released slot's
+     * Interactable handlers and Later closure capture the OLD taskId — so a
+     * fresh root is cloned from the authored template instead. The repository's
+     * MAX_OPEN_TASKS cap has already passed by the time this runs, so the live
+     * creature count stays bounded.
+     */
+    private bindLiveTask(task: TaskRecord): void {
+        const root = this.acquireFreeRoot();
+        if (!root) {
+            console.error(`[WednesdayDemo] no creature root available for live task ${task.id}`);
+            return;
+        }
+        // A task typed DURING onboarding must not pop up behind the dialog —
+        // it appears with the rest of the world when the flow finishes.
+        root.enabled = !this.worldHidden;
+        const creature = root.getComponent(CreatureBehavior.getTypeName()) as CreatureBehavior;
+        const visualRoot = findChildByName(root, "VisualRoot");
+        const body = visualRoot ? findChildByName(visualRoot, "Body") : null;
+        if (!creature || !visualRoot || !body) {
+            console.error(`[WednesdayDemo] incomplete live slot for task ${task.id}`);
+            return;
+        }
+        const view = new TaskSelectionView(
+            visualRoot,
+            this.selectionActionsFor(task.id, creature),
+            () => { this.uiPressFrame = this.frameCounter; },
+        );
+        view.setTaskText(task.text);
+        this.taskInfoById.set(task.id, { text: task.text, seed: task.appearanceSeed });
+        creature.setAppearanceSeed(task.appearanceSeed);
+        const layout = this.slotLayout(this.slots.length, this.slots.length + 1);
+        creature.setHabitatHome(
+            this.habitatLateralCm + layout.lateralCm,
+            this.habitatDepthCm + layout.depthCm,
+            ART.groundYOffsetCm,
+            HABITAT_HOME_WANDER_RADIUS_CM,
+        );
+        this.attachInteraction(body, task.id);
+        this.slots.push({ taskId: task.id, root, creature, view });
+        this.syncArbiter();
+        console.log(`[WednesdayEvidence] live task bound task=${task.id} slots=${this.slots.length}`);
+    }
+
+    /** An authored slot not yet used by any binding, else a fresh template clone. */
+    private acquireFreeRoot(): SceneObject | null {
+        const used = new Set(this.slots.map((slot) => slot.root));
+        for (const name of SLOT_NAMES) {
+            const found = this.findSceneObject(name);
+            if (found && !used.has(found)) return found;
+        }
+        const template = this.findSceneObject(CREATURE_TEMPLATE_NAME);
+        if (!template) return null;
+        if (!this.cloneContainer) this.cloneContainer = global.scene.createSceneObject("CreatureSlotClones");
+        const clone = this.cloneContainer.copyWholeHierarchy(template);
+        clone.name = `MovementRoot_live_${this.slots.length + 1}`;
+        clone.enabled = true;
+        return clone;
+    }
+
     /* ══════════════════════════════════════════════════════════════════════
      * GESTURE HARNESS — read/controlled by the gate6 LEAF scenarios only.
      *
@@ -658,12 +861,45 @@ export class TaskOrganismController extends BaseScriptComponent {
      * ══════════════════════════════════════════════════════════════════════ */
 
     /**
+     * Fills an empty habitat with the demo fixtures, staggered exactly as
+     * startup seeding would have. Creation runs through the normal
+     * TaskCreationService, so `onCreated` binds each creature for us.
+     */
+    gestureHarnessEnsureCreatures(): void {
+        if (this.slots.length > 0 || !this.creator) return;
+        const restoreNowMs = this.clock.nowMs();
+        const count = Math.min(DEMO_TASK_COUNT, DEMO_TASK_FIXTURES.length, MAX_CREATURE_SLOTS);
+        for (let i = 0; i < count; i++) {
+            this.clock.setNowMs(URGENCY_AGE_WINDOW_MS * DEMO_TASK_AGE_FRACTIONS[i]);
+            this.creator.create(DEMO_TASK_FIXTURES[i]);
+        }
+        this.clock.setNowMs(restoreNowMs);
+        this.storyStartNowMs = this.clock.nowMs();
+        this.sequence = this.buildSequence();
+        this.syncArbiter();
+        console.log(`[WednesdayDemo] harness seeded ${this.slots.length} creatures (design seed is ${DEMO_SEED_TASK_COUNT})`);
+    }
+
+    /**
      * Jumps the story to a named beat in one call and holds it there, so a
      * gesture fires against a known state rather than whatever the wall clock
      * happened to reach. Same beat-jump the golden-image harness relies on.
      */
     gestureHarnessJumpTo(beat: DemoBeat, pause: boolean): void {
         if (!this.sequence) return;
+        // A test is taking over: the onboarding overlay (auto-shown on start
+        // for design review) would sit between the camera and every creature,
+        // and SIK would reject the scenario's pinches as obstructed. Closed
+        // BEFORE seeding, and via closeOnboarding — a bare dismiss() leaves
+        // the world-gating active, so every seeded creature would spawn with
+        // its root disabled and no pinch could ever land (that was exactly
+        // the gate6 timeout after world-gating shipped).
+        this.closeOnboarding();
+        // DEMO_SEED_TASK_COUNT is a DESIGN setting and is normally 0, so the
+        // habitat a designer sees contains only their own tasks. The gesture
+        // scenarios still need creatures to pinch, so they seed their own here
+        // rather than depending on that number.
+        this.gestureHarnessEnsureCreatures();
         // Pause FIRST. Everything below reads the story's position, and on a
         // slow preview autoplay can advance between the read and the jump.
         this.gestureHarnessPaused = true;
@@ -849,9 +1085,11 @@ export class TaskOrganismController extends BaseScriptComponent {
         this.frameCounter++;
         if (this.missCheckAtFrame < 0 || this.frameCounter < this.missCheckAtFrame) return;
         this.missCheckAtFrame = -1;
-        // A creature press that started at or after the pinch means the pinch
-        // found something. Anything else is "elsewhere".
+        // A creature press OR a UI press (Later button, open panel) that
+        // started at or after the pinch means the pinch found something.
+        // Anything else is "elsewhere".
         if (this.creaturePressFrame >= this.pinchDownFrame) return;
+        if (this.uiPressFrame >= this.pinchDownFrame) return;
         if (this.interaction && this.interaction.deselect()) {
             console.log("[WednesdayEvidence] deselected — pinch landed on no creature");
         }
@@ -874,9 +1112,212 @@ export class TaskOrganismController extends BaseScriptComponent {
             this.creaturePressFrame = this.frameCounter;
             this.interaction.pressStart(taskId);
         });
-        interactable.onTriggerEnd.add(() => this.interaction.pressEnd());
-        interactable.onTriggerEndOutside.add(() => this.interaction.pressEnd());
-        interactable.onTriggerCanceled.add(() => this.interaction.pressEnd());
+        // Pass the creature's identity so a release reported by a NEIGHBOURING
+        // creature (second hand brushing another collider) cannot cancel the
+        // hold in flight on this one.
+        interactable.onTriggerEnd.add(() => this.interaction.pressEnd(taskId));
+        interactable.onTriggerEndOutside.add(() => this.interaction.pressEnd(taskId));
+        interactable.onTriggerCanceled.add(() => this.interaction.pressEnd(taskId));
+    }
+
+    /** The three panel actions, shared by authored slots and live-bound tasks. */
+    private selectionActionsFor(taskId: string, creature: CreatureBehavior) {
+        return {
+            onLater: () => {
+                if (this.interaction.selectedId === taskId && this.interaction.later()) {
+                    if (this.attendingTaskId === taskId) this.clearAttending();
+                    creature.endChase();
+                    // Acknowledge the deferral audibly. Fired here, after the
+                    // repository write succeeded, so the sound never claims a
+                    // snooze that did not happen.
+                    creature.playSnoozeCue();
+                    this.demoControl.setStatus(`${this.repository.listOpen().length} tasks • deferred`);
+                }
+            },
+            onAttend: () => this.inviteAttention(taskId),
+        };
+    }
+
+    /**
+     * "Give this one attention" — the creature comes and stays close while
+     * the user works. Presentation-only: syncArbiter presents the attended
+     * creature as the single approacher and holds everyone else home, so
+     * invariant 4 (at most ONE approaching creature) survives by construction.
+     */
+    private inviteAttention(taskId: string): void {
+        const info = this.taskInfoById.get(taskId);
+        this.attendingTaskId = taskId;
+        this.interaction.deselect();
+        if (this.hud) this.hud.setAttending(info ? info.text : null);
+        this.setFocusAudio(true);
+        console.log(`[CareLoop] attending task=${taskId}`);
+        this.syncArbiter();
+    }
+
+    private clearAttending(): void {
+        this.attendingTaskId = null;
+        if (this.hud) this.hud.setAttending(null);
+        this.setFocusAudio(false);
+    }
+
+    /**
+     * The focus bed. Deliberately quiet and loop-only: it exists to make
+     * sitting with one task easier, so it must never become something the
+     * user notices as music.
+     */
+    private setFocusAudio(on: boolean): void {
+        if (on) {
+            if (this.focusAudio) return;
+            const host = this.cameraObject ?? global.scene.createSceneObject("FocusAudio");
+            const audio = host.createComponent("Component.AudioComponent") as AudioComponent;
+            audio.audioTrack = focusTrack;
+            audio.volume = 0.35;
+            audio.play(-1);
+            this.focusAudio = audio;
+        } else if (this.focusAudio) {
+            this.focusAudio.stop(true);
+            this.focusAudio = null;
+        }
+    }
+
+    /**
+     * Closes the onboarding overlay and lets the ambient layer speak. Any
+     * screen that takes over the view (the story, TODAY.TXT, the ritual) calls
+     * this first — two stacked windows read as a glitch.
+     */
+    private closeOnboarding(): void {
+        if (!this.onboarding || !this.onboarding.isOpen) return;
+        this.onboarding.dismiss();
+        this.setWorldVisible(true);
+        if (this.hud) this.hud.setVisible(true);
+    }
+
+    /**
+     * Drops the most recently added task and its creature while the user is
+     * still writing the list. A discard, not a completion — no release effect
+     * and nothing recorded for TODAY.TXT.
+     */
+    private removeLastTask(): boolean {
+        if (this.slots.length === 0) return false;
+        const slot = this.slots[this.slots.length - 1];
+        if (!this.repository.discard(slot.taskId)) return false;
+        if (this.interaction.selectedId === slot.taskId) this.interaction.deselect();
+        if (this.attendingTaskId === slot.taskId) this.clearAttending();
+        // The root goes back in the pool: acquireFreeRoot looks for roots that
+        // no slot is using, so simply dropping the entry frees it for reuse.
+        slot.root.enabled = false;
+        this.slots.pop();
+        this.taskInfoById.delete(slot.taskId);
+        this.syncArbiter();
+        console.log(`[CareLoop] discarded task=${slot.taskId} slots=${this.slots.length}`);
+        return true;
+    }
+
+    /**
+     * ADD TODAY'S TASKS means TODAY's: the moment the user commits to
+     * entering a fresh list (the intro's buttons), whatever a previous
+     * session left in storage is discarded — repository, creatures, and the
+     * TODAY.TXT ledger. Restore-across-restart still works (invariant); it
+     * just yields to an explicit fresh start.
+     */
+    private startFreshDay(): void {
+        let guard = this.slots.length;
+        while (guard-- > 0 && this.removeLastTask()) { /* slot-by-slot discard */ }
+        this.completedToday = [];
+        console.log("[CareLoop] fresh day — previous session's tasks cleared");
+    }
+
+    private toggleOnboarding(): void {
+        if (this.onboarding && this.onboarding.isOpen) {
+            this.onboarding.dismiss();
+            // Closed without finishing (O toggle) — the world comes back.
+            this.setWorldVisible(true);
+            return;
+        }
+        this.onboarding = new OnboardingFlow(this, this.cameraObject, {
+            openKeyboard: () => { if (this.keyboard) this.keyboard.show(); },
+            removeLastTask: () => this.removeLastTask(),
+            startFreshDay: () => this.startFreshDay(),
+            startVoice: () => { if (this.voice && !this.voice.isListening) this.voice.start(); },
+            listTasks: () => this.repository.listOpen().map((task) => task.text),
+            status: (text) => this.demoControl.setStatus(text),
+            onFinished: () => {
+                // The world is on stage now — creatures appear and the
+                // ambient layer may speak.
+                this.setWorldVisible(true);
+                if (this.hud) this.hud.setVisible(true);
+                    const open = this.repository.listOpen().length;
+                this.demoControl.setStatus(`${open} ${open === 1 ? "creature" : "creatures"} • here with you`);
+            },
+        });
+        this.onboarding.show();
+        // Onboarding owns the stage: restored tasks (persistence works across
+        // restarts by design) wait hidden rather than standing behind the
+        // welcome dialog — the world-gating pass the flow always promised.
+        this.setWorldVisible(false);
+    }
+
+    /** Hides/shows every creature slot root. Roots, not creatures: a released
+     *  creature's own disabled sceneObject survives the round trip untouched. */
+    private setWorldVisible(visible: boolean): void {
+        this.worldHidden = !visible;
+        for (const slot of this.slots) slot.root.enabled = visible;
+    }
+
+    /**
+     * The completion beat: card first, farewell toast on [Let it go]. The
+     * repository was already saved before this runs (invariant 5).
+     *
+     * When this was the LAST open task the card becomes the end-of-day one,
+     * and its button opens TODAY.TXT — so finishing everything is an event
+     * rather than an empty habitat and silence.
+     */
+    private showCompletionCard(taskText: string, lastOne: boolean): void {
+        if (this.completionCard) this.completionCard.destroy();
+        const anchor = resolveAnchor(this.cameraObject, UI_ANCHORS.dialog);
+        const copy = lastOne ? DAY_COMPLETE : COMPLETION;
+        console.log(`[CareLoop] completion card lastOne=${lastOne} task="${taskText}" headline="${copy.headline}"`);
+        // The task text is NOT repeated on the card — the user just released
+        // that creature and knows what it was; naming it again read as noise.
+        this.completionCard = new RetroDialog(anchor, {
+            name: "Completion",
+            title: copy.title,
+            headline: copy.headline,
+            body: copy.body,
+            bodyHeightCm: lastOne ? 12 : 4,
+            // Narrower than the onboarding windows: these cards carry one short
+            // message and a single action — the ordinary one smaller still.
+            widthCm: lastOne ? 52 : 46,
+            buttonWidthCm: 24,
+            icon: ICON_COMPUTER,
+            onClose: () => {
+                if (this.completionCard) this.completionCard.destroy();
+                this.completionCard = null;
+            },
+            buttons: [{
+                label: copy.button,
+                action: () => {
+                    if (this.completionCard) this.completionCard.destroy();
+                    this.completionCard = null;
+                    if (this.hud) {
+                        const toast = RELEASE_TOASTS[this.releaseEventCount % RELEASE_TOASTS.length];
+                        this.hud.toast(toast, 6);
+                    }
+                    // The day is over — this press is the "open TODAY.TXT"
+                    // gesture, so the document is never forced on the user.
+                    if (lastOne && this.endOfDay) this.endOfDay.open(this.completedToday);
+                },
+            }].concat(lastOne ? [{
+                // The day is only over if the user says so — they may have
+                // remembered something.
+                label: DAY_COMPLETE.addMoreButton,
+                action: () => {
+                    if (this.completionCard) this.completionCard.destroy();
+                    this.completionCard = null;
+                    if (this.keyboard) this.keyboard.show();
+                },
+            }] : []),
+        });
     }
 
     private advanceDemoTime(): void {
@@ -898,13 +1339,39 @@ export class TaskOrganismController extends BaseScriptComponent {
             for (const slot of this.slots) {
                 // Selection happened here regardless; only the presentation
                 // transition waits for the approach gate (see its field doc).
+                // While attending, the arbiter choice stays data-only: the
+                // attended creature owns the approach, and the endChase sweep
+                // must not send it home.
                 if (slot.taskId === nextId) {
-                    if (this.approachGateOpen) slot.creature.requestChase();
-                } else {
+                    if (this.approachGateOpen && !this.attendingTaskId) {
+                        slot.creature.requestChase();
+                        if (this.hud) this.hud.notify(HUD.chaserHeadline, HUD.chaserBody, 9);
+                    }
+                } else if (slot.taskId !== this.attendingTaskId) {
                     slot.creature.endChase();
                 }
             }
             console.log(`[WednesdayDemo] arbiter chaser=${nextId ?? "none"} approaching=${this.approachGateOpen}`);
+        }
+
+        // ── Attending presentation (change-tracked, so holds are never
+        // interrupted by per-frame endChase sweeps) ──────────────────────────
+        if (this.attendingTaskId && !openTasks.some((task) => task.id === this.attendingTaskId)) {
+            this.clearAttending();
+        }
+        if (this.attendingTaskId !== this.presentedAttendingId) {
+            this.presentedAttendingId = this.attendingTaskId;
+            if (this.attendingTaskId) {
+                for (const slot of this.slots) {
+                    if (slot.taskId === this.attendingTaskId) {
+                        slot.creature.requestChase();
+                    } else if (slot.taskId === this.activeChaserId) {
+                        // The arbiter's chaser yields the floor while the user
+                        // attends — one approacher at a time, always.
+                        slot.creature.endChase();
+                    }
+                }
+            }
         }
 
         // Presentation-only CALM/URGENT signal for every non-chasing slot —
@@ -930,6 +1397,14 @@ export class TaskOrganismController extends BaseScriptComponent {
     private onSelectionChanged(taskId: string | null): void {
         for (const slot of this.slots) slot.view.setSelected(slot.taskId === taskId);
         if (taskId) {
+            // Switching selection must first let the previously held creature
+            // go, or it stays frozen in INTERACTING (its release only ran in
+            // the null branch, which a direct A->B switch never visits).
+            if (this.heldInteractionId && this.heldInteractionId !== taskId) {
+                const previous = this.slots.find((candidate) => candidate.taskId === this.heldInteractionId);
+                if (previous) previous.creature.endChase();
+                this.heldInteractionId = null;
+            }
             const slot = this.slots.find((candidate) => candidate.taskId === taskId);
             if (slot) {
                 slot.creature.holdForInteraction();
@@ -971,6 +1446,18 @@ export class TaskOrganismController extends BaseScriptComponent {
         PerfGate.markRelease(this.slots.length);
         this.releaseEventCount += 1;
         console.log(`[WednesdayEvidence] release requested task=${taskId} remaining=${remaining}`);
+        // The care-loop beat: remember the day's release for TODAY.TXT, close
+        // any attending, and show the farewell card. All of it AFTER the
+        // repository write above (invariant 5).
+        const info = this.taskInfoById.get(taskId);
+        if (info) this.completedToday.push({ text: info.text, species: speciesForSeed(info.seed) });
+        if (this.attendingTaskId === taskId) this.clearAttending();
+        // Nothing is left to carry: quiet the ambient layer so the closing
+        // card and TODAY.TXT are the only things on screen.
+        if (remaining === 0) {
+            if (this.hud) this.hud.setVisible(false);
+        }
+        this.showCompletionCard(info ? info.text : "", remaining === 0);
         this.activeChaserId = null;
         // Close the gate again so the next-most-urgent task (which is also
         // past the threshold in the demo fixture set) does not immediately

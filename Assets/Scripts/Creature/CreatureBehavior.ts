@@ -141,17 +141,25 @@ const releaseSfxTracks: Record<ReleaseSfxVariant, AudioTrackAsset> = {
     bloom: requireAsset("../../GeneratedSFX/ReleaseBloom.wav") as AudioTrackAsset,
 };
 
+/** Speed gates for the movement clip, cm/s. Start above stop = hysteresis. */
+const LOCOMOTION_MOVE_START_CM_PER_S = 8;
+const LOCOMOTION_MOVE_STOP_CM_PER_S = 3;
+
 const bodyBaseMaterialAsset = requireAsset("../../Materials/PetBody.mat") as Material;
 const eyeBaseMaterialAsset = requireAsset("../../Materials/BlobEye.mat") as Material;
-/** Ready-made Sketchfab dog/cat GLBs (Assets/3d assets/, see LICENSES.md),
- *  simplified for SPECS — see CreaturePetVisual.ts and CreatureConfig's
- *  READYMADE_PET_* doc comment. */
-const dogPrefab = requireAsset("../../GeneratedMeshes/dog_lo.glb") as ObjectPrefab;
-const catPrefab = requireAsset("../../GeneratedMeshes/cat_lo.glb") as ObjectPrefab;
-const owlPrefab = requireAsset("../../GeneratedMeshes/owl_lo.glb") as ObjectPrefab;
-const elephantPrefab = requireAsset("../../GeneratedMeshes/elephant_lo.glb") as ObjectPrefab;
-const rabbitPrefab = requireAsset("../../GeneratedMeshes/rabbit_lo.glb") as ObjectPrefab;
-const penguinPrefab = requireAsset("../../GeneratedMeshes/penguin_lo.glb") as ObjectPrefab;
+/** Ready-made ANIMATED Sketchfab GLBs (Assets/3d assets/AnimatedPets/) —
+ *  each ships a rig and at least one clip; CreaturePetVisual auto-scales
+ *  them and starts a looping idle so the creatures move naturally. The old
+ *  static simplified meshes stay in GeneratedMeshes/ as a fallback. */
+const dogPrefab = requireAsset("../../3d assets/AnimatedPets/dog_anim.glb") as ObjectPrefab;
+const catPrefab = requireAsset("../../3d assets/AnimatedPets/cat_anim.glb") as ObjectPrefab;
+// owl_anim.glb is the "EagleOwl_Rig" low-poly owl (2026-08-16, the
+// designer's replacement) — the FIRST downloaded owl never assembled in
+// Lens Studio (scale-compensation rig) and was overwritten in place.
+const owlPrefab = requireAsset("../../3d assets/AnimatedPets/owl_anim.glb") as ObjectPrefab;
+const elephantPrefab = requireAsset("../../3d assets/AnimatedPets/elephant_anim.glb") as ObjectPrefab;
+const rabbitPrefab = requireAsset("../../3d assets/AnimatedPets/rabbit_anim.glb") as ObjectPrefab;
+const penguinPrefab = requireAsset("../../3d assets/AnimatedPets/penguin_anim.glb") as ObjectPrefab;
 /** Species -> prefab. Table rather than a conditional for the same reason as
  *  PET_DISPLAY_SCALE: adding a species should be adding a row. */
 const petPrefabs: Record<PetSpecies, ObjectPrefab> = {
@@ -186,6 +194,10 @@ enum CreaturePresentationState {
  */
 interface CreatureVisual {
     readonly renderMeshVisual: RenderMeshVisual | null;
+    /** False when the visual keeps its authored textures (the animated
+     *  GLBs) — updateColorTint must not write baseColor over them. Absent
+     *  means tintable, which every solid-color body is. */
+    readonly supportsTint?: boolean;
     /**
      * Distance (cm) from Body's local origin DOWN to the mesh's ground-
      * contact point (feet/base), at rest scale. Lets applyBodyScale() scale
@@ -263,6 +275,9 @@ export class CreatureBehavior extends BaseScriptComponent {
     /** Same object as `body`, kept at its concrete type so the species swap in
      *  setAppearanceSeed can tear the old prefab down. */
     private petVisual: CreaturePetVisual | null = null;
+    /** Locomotion-animation state — see updateLocomotionAnimation. */
+    private lastLocomotionPos: vec3 | null = null;
+    private locomotionMoving = false;
     private currentSpecies: PetSpecies | null = null;
     /** Continuous urgency, 0..1, from StateEngine via setUrgencyLevel01. Drives
      *  the PetBody shader's emissive channel; 0 is an exact no-op there. */
@@ -607,6 +622,9 @@ export class CreatureBehavior extends BaseScriptComponent {
                 // destroy) so the debug trigger can reset() for repeat testing.
                 this.sceneObject.enabled = false;
             },
+            // The visual root, so the effect can shrink the textured pets
+            // (their materials have no dissolve channel to melt with).
+            this.petVisual ? this.petVisual.root : null,
         );
     }
 
@@ -843,6 +861,7 @@ export class CreatureBehavior extends BaseScriptComponent {
         this.updatePresentationScale(dt);
         this.applyBodyScale(dt);
         this.updateColorTint(dt);
+        this.updateLocomotionAnimation(dt);
         this.updateStateAudio();
         this.updatePendingCue();
         this.updateExpression(dt);
@@ -1455,6 +1474,32 @@ export class CreatureBehavior extends BaseScriptComponent {
         return audio;
     }
 
+    /**
+     * REST-STILL / MOVE-ANIMATE: measures the creature's own horizontal
+     * speed and tells the pet visual to play its movement clip only while
+     * genuinely translating (wander walk, chase approach). Hysteresis keeps
+     * a boundary speed from flickering the clip on and off; vertical motion
+     * is ignored so the breathing bob can never register as walking.
+     */
+    private updateLocomotionAnimation(dt: number): void {
+        if (!this.petVisual || !this.bodyObject || dt <= 0) return;
+        this.petVisual.tick(dt);
+        const position = this.bodyObject.getTransform().getWorldPosition();
+        if (this.lastLocomotionPos) {
+            const dx = position.x - this.lastLocomotionPos.x;
+            const dz = position.z - this.lastLocomotionPos.z;
+            const speed = Math.sqrt(dx * dx + dz * dz) / dt;
+            if (!this.locomotionMoving && speed > LOCOMOTION_MOVE_START_CM_PER_S) {
+                this.locomotionMoving = true;
+                this.petVisual.setMoving(true);
+            } else if (this.locomotionMoving && speed < LOCOMOTION_MOVE_STOP_CM_PER_S) {
+                this.locomotionMoving = false;
+                this.petVisual.setMoving(false);
+            }
+        }
+        this.lastLocomotionPos = position;
+    }
+
     /** Warm-shifts the per-instance body material toward the state's tint
      *  target. The target is always this creature's OWN baseBodyColor blended
      *  a fraction toward TINT_HEAT_COLOR (CALM = the identity color itself,
@@ -1462,6 +1507,9 @@ export class CreatureBehavior extends BaseScriptComponent {
      *  rather than every creature converging on one shared orange. */
     private updateColorTint(dt: number): void {
         if (!this.body || !this.body.renderMeshVisual) return;
+        // Textured visuals own their look — a palette tint over a texture
+        // reads as a stain, not as identity.
+        if (this.body.supportsTint === false) return;
         const profile = this.emotionalProfile();
         const blend = profile === "CALM" ? 0 : profile === "URGENT" ? TINT_URGENT_HEAT_BLEND : TINT_CHASE_HEAT_BLEND;
         const heat = new vec4(TINT_HEAT_COLOR[0], TINT_HEAT_COLOR[1], TINT_HEAT_COLOR[2], TINT_HEAT_COLOR[3]);

@@ -2,6 +2,7 @@ import { forceOpaque } from "./CreatureMaterials";
 import {
     BLOB_COLOR,
     READYMADE_PET_HALF_HEIGHT_CM,
+    READYMADE_PET_TARGET_HEIGHT_CM,
     READYMADE_PET_YAW_CORRECTION_DEG,
     DOG_DISPLAY_SCALE,
     CAT_DISPLAY_SCALE,
@@ -148,8 +149,42 @@ export function speciesForSeed(seed: number): PetSpecies {
  * during verification — so this reuses the project's existing solid
  * warm-tint system (BLOB_COLOR, CALM/URGENT/CHASE-tintable) instead.
  */
+/**
+ * Species whose rendered size CANNOT be measured at runtime: rigs built on
+ * joint scaling (the eagle owl) render tens of times larger than any AABB
+ * the Lens API reports, so auto-normalization silently produces a giant.
+ * These get a fixed root scale, calibrated against the editor-side bounds
+ * query (owl: rendered 2130cm at scale 4604 → ~28cm at 60, scaled with the
+ * roster's +20%).
+ */
+const MANUAL_ROOT_SCALE: Partial<Record<PetSpecies, number>> = { owl: 72 };
+
+/** How long the looping "frozen pose" sliver of a rest clip runs, seconds.
+ *  Long enough for the engine to evaluate a pose, short enough that the
+ *  loop's pose delta is invisible — 60ms was long enough to read as a
+ *  subtle SHAKE on standing creatures. */
+const REST_FREEZE_WINDOW_S = 0.01;
+
+/** One AnimationPlayer's chosen clips + their authored ranges, so the rest
+ *  freeze can shrink a clip's window and moving can restore it. */
+interface PetAnimationChannel {
+    player: AnimationPlayer;
+    restName: string;
+    moveName: string;
+    restBegin: number;
+    moveBegin: number;
+    moveEnd: number;
+}
+
 export class CreaturePetVisual {
     readonly root: SceneObject;
+    private channels: PetAnimationChannel[] = [];
+    private moving = false;
+    private alwaysAnimating = false;
+    /** Deferred re-normalize (owl) — armed in setUpAnimation, fires in tick. */
+    private lateNormalizeCountdownS = -1;
+    private bodyObjectRef: SceneObject;
+    private speciesRef: PetSpecies;
     /** See CreatureVisual.baseOffsetCm (CreatureBehavior.ts) — the prefab root
      *  is placed at local Y = -READYMADE_PET_HALF_HEIGHT_CM (below), which is
      *  exactly the mesh's feet-to-center distance at rest scale. */
@@ -158,17 +193,226 @@ export class CreaturePetVisual {
 
     constructor(bodyObject: SceneObject, prefab: ObjectPrefab, species: PetSpecies, baseMaterial: Material) {
         this.root = prefab.instantiate(bodyObject);
+        this.bodyObjectRef = bodyObject;
+        this.speciesRef = species;
 
-        const displayScale = PET_DISPLAY_SCALE[species];
         this.root.getTransform().setLocalPosition(new vec3(0, -READYMADE_PET_HALF_HEIGHT_CM, 0));
         this.root.getTransform().setLocalRotation(quat.fromEulerAngles(0, (READYMADE_PET_YAW_CORRECTION_DEG * Math.PI) / 180, 0));
-        this.root.getTransform().setLocalScale(new vec3(displayScale, displayScale, displayScale));
+        this.root.getTransform().setLocalScale(vec3.one());
 
         this.renderMeshVisuals = CreaturePetVisual.findRenderMeshVisuals(this.root);
         if (this.renderMeshVisuals.length === 0) {
             console.error(`[CreaturePetVisual] no RenderMeshVisual found in instantiated ${species} prefab.`);
         }
-        this.applyBaseMaterial(baseMaterial);
+        // MEASURED, not tabled: the animated GLBs are authored at scales
+        // several orders of magnitude apart, so each instance normalizes
+        // itself to the shared creature height — except the joint-scale rigs
+        // whose bounds lie, which use their calibrated manual scale.
+        const manualScale = MANUAL_ROOT_SCALE[species];
+        if (manualScale !== undefined) {
+            this.root.getTransform().setLocalScale(new vec3(manualScale, manualScale, manualScale));
+            console.log(`[AnimatedPet] ${species} manual scale=${manualScale}`);
+        } else {
+            this.normalizeSize(bodyObject, species);
+        }
+        this.setUpAnimation(species);
+        // All models keep their authored textures; baseMaterial (the old
+        // tint/dissolve shader) stays only for the constructor signature.
+        void baseMaterial;
+        this.adoptSourceMaterials();
+    }
+
+    /**
+     * These animated GLBs keep their AUTHORED textures — the toon cat is the
+     * toon cat, not a solid-color blob. (The old PetBody tint/dissolve shader
+     * expects baked COLOR_0 vertex data these meshes don't have; swapping it
+     * in rendered visible garbage.) Identity therefore comes from the model,
+     * not from a palette tint — supportsTint tells CreatureBehavior to skip
+     * its per-frame baseColor writes. Every material is still cloned per
+     * instance, so ReleaseEffect's brighten writes never bleed onto siblings
+     * of the same species.
+     */
+    readonly supportsTint = false;
+
+    private adoptSourceMaterials(): void {
+        for (const rmv of this.renderMeshVisuals) {
+            const count = rmv.getMaterialsCount();
+            const clones: Material[] = [];
+            for (let i = 0; i < count; i++) {
+                const material = rmv.getMaterial(i);
+                clones.push(material ? material.clone() : material);
+            }
+            rmv.clearMaterials();
+            for (const clone of clones) if (clone) rmv.addMaterial(clone);
+        }
+    }
+
+    /**
+     * Scales the instantiated model so its bind-pose height equals
+     * READYMADE_PET_TARGET_HEIGHT_CM, and re-seats its feet at
+     * -READYMADE_PET_HALF_HEIGHT_CM in body space (the same feet-to-center
+     * convention every earlier body used, so habitat/chase Y math is
+     * untouched). Bounds come from the world AABB right after instantiation
+     * — mesh-space AABBs lie about size whenever the GLB carries unit
+     * conversions in its node scales, which several of these do.
+     */
+    private normalizeSize(bodyObject: SceneObject, species: PetSpecies, gentle = false): void {
+        let minY = Number.POSITIVE_INFINITY;
+        let maxY = Number.NEGATIVE_INFINITY;
+        for (const rmv of this.renderMeshVisuals) {
+            const lo = rmv.worldAabbMin();
+            const hi = rmv.worldAabbMax();
+            minY = Math.min(minY, lo.y);
+            maxY = Math.max(maxY, hi.y);
+        }
+        const worldHeight = maxY - minY;
+        if (!isFinite(worldHeight) || worldHeight <= 0) {
+            console.log(`[AnimatedPet] ${species} bounds unreadable — leaving authored scale`);
+            return;
+        }
+        // The body's own world scale (posture squash is ~1 at construction)
+        // converts between world cm and body-local cm. Scale-agnostic: works
+        // from whatever the root's current scale is, so the deferred re-pass
+        // can call it again after the rig has posed the mesh.
+        const bodyScaleY = bodyObject.getTransform().getWorldScale().y || 1;
+        const currentScale = this.root.getTransform().getLocalScale().x || 1;
+        const factor = (READYMADE_PET_TARGET_HEIGHT_CM * bodyScaleY) / worldHeight;
+        // The gentle re-pass only corrects models whose bind pose LIED about
+        // size (the owl measured ~0cm and blew up room-sized) — a mid-scene
+        // 10-20% size pop on an already-correct creature is worse than the
+        // small posture-vs-bind measurement error it would fix.
+        if (gentle && factor > 0.6 && factor < 1.6) return;
+        const scale = currentScale * factor;
+        this.root.getTransform().setLocalScale(new vec3(scale, scale, scale));
+        // Feet measured relative to the root's own origin at the CURRENT
+        // scale (so the offset rescales by `factor`), re-seated to land
+        // exactly HALF_HEIGHT below body center.
+        const rootWorldY = this.root.getTransform().getWorldPosition().y;
+        const feetWorldOffset = minY - rootWorldY;
+        const position = this.root.getTransform().getLocalPosition();
+        position.y = -READYMADE_PET_HALF_HEIGHT_CM - (feetWorldOffset * factor) / bodyScaleY;
+        this.root.getTransform().setLocalPosition(position);
+        console.log(
+            `[AnimatedPet] ${species} worldH=${worldHeight.toFixed(1)}cm scale=${scale.toFixed(4)} feetWorldOffset=${feetWorldOffset.toFixed(1)}`
+        );
+    }
+
+    /**
+     * Per-frame hook (driven by CreatureBehavior). Its one job: the owl's
+     * deferred re-normalization — the constructor measured the EXPLODED bind
+     * pose (that model only assembles once its animation is playing), so
+     * size and feet are re-measured once, shortly after the rig has posed.
+     */
+    tick(dt: number): void {
+        if (this.lateNormalizeCountdownS < 0) return;
+        this.lateNormalizeCountdownS -= dt;
+        if (this.lateNormalizeCountdownS > 0) return;
+        this.lateNormalizeCountdownS = -1;
+        this.normalizeSize(this.bodyObjectRef, this.speciesRef, true);
+    }
+
+    /**
+     * REST-STILL / MOVE-ANIMATE.
+     *
+     * Standing creatures hold a frozen pose (a looping sliver at the start
+     * of their calmest clip — a real pose, never the bind pose) so they are
+     * easy to pinch and hold; the movement clip (walk/waddle/run) plays only
+     * while the creature is actually translating (CreatureBehavior measures
+     * its own speed and calls setMoving). Clip names are whatever the artist
+     * exported, so matching is by substring with a first-clip fallback.
+     *
+     * THE OWL IS THE EXCEPTION: its mesh parts are exploded in bind pose
+     * (eyes and beak authored tens of units apart) and only the playing
+     * skeleton assembles them into an owl — freezing it scatters it, so it
+     * always animates.
+     */
+    private setUpAnimation(species: PetSpecies): void {
+        const players = CreaturePetVisual.findAnimationPlayers(this.root);
+        if (players.length === 0) {
+            console.log(`[AnimatedPet] ${species} has no AnimationPlayer — static`);
+            return;
+        }
+        // No current model needs the always-animate escape hatch (the
+        // exploded-bind-pose owl that did was replaced); it stays for the
+        // next model whose rig only assembles while playing.
+        this.alwaysAnimating = false;
+        for (const player of players) {
+            const names = player.getActiveClips().concat(player.getInactiveClips());
+            if (names.length === 0) continue;
+            const restName =
+                names.find((n) => /idle/i.test(n)) ??
+                names.find((n) => /sit|stand|sleep/i.test(n)) ??
+                names.find((n) => /scene|take|baselayer/i.test(n)) ??
+                names[0];
+            const moveName =
+                names.find((n) => /walk|waddle|run|fly|move/i.test(n)) ??
+                restName;
+            const restClip = player.getClip(restName);
+            const moveClip = player.getClip(moveName);
+            if (!restClip || !moveClip) continue;
+            this.channels.push({
+                player,
+                restName,
+                moveName,
+                restBegin: restClip.begin,
+                moveBegin: moveClip.begin,
+                moveEnd: moveClip.end,
+            });
+            console.log(`[AnimatedPet] ${species} rest="${restName}" move="${moveName}" of [${names.join(" | ")}]`);
+        }
+        if (this.alwaysAnimating) {
+            for (const channel of this.channels) {
+                const clip = channel.player.getClip(channel.moveName);
+                if (clip) clip.playbackMode = PlaybackMode.Loop;
+                channel.player.playClip(channel.moveName);
+            }
+            this.lateNormalizeCountdownS = 0.5;
+            return;
+        }
+        // Creatures are born standing: force the frozen rest pose.
+        this.moving = true;
+        this.setMoving(false);
+        // Auto-normalized models re-measure once the pose has applied
+        // (bind-pose bounds can lie). Manual-scale species skip it — their
+        // bounds lie ALWAYS, which is why they are manual.
+        if (MANUAL_ROOT_SCALE[this.speciesRef] === undefined) this.lateNormalizeCountdownS = 0.5;
+    }
+
+    /**
+     * Switches between the frozen rest pose and the looping movement clip.
+     * Idempotent per state; driven every frame by CreatureBehavior's speed
+     * measurement, so it must be cheap when nothing changes.
+     */
+    setMoving(moving: boolean): void {
+        if (this.alwaysAnimating || moving === this.moving) return;
+        this.moving = moving;
+        for (const channel of this.channels) {
+            channel.player.stopAll();
+            const name = moving ? channel.moveName : channel.restName;
+            const clip = channel.player.getClip(name);
+            if (!clip) continue;
+            if (moving) {
+                clip.begin = channel.moveBegin;
+                clip.end = channel.moveEnd;
+            } else {
+                // A looping sliver of the rest clip = a held natural pose.
+                clip.begin = channel.restBegin;
+                clip.end = channel.restBegin + REST_FREEZE_WINDOW_S;
+            }
+            clip.playbackMode = PlaybackMode.Loop;
+            channel.player.playClip(name);
+        }
+    }
+
+    private static findAnimationPlayers(obj: SceneObject): AnimationPlayer[] {
+        const found: AnimationPlayer[] = [];
+        const player = obj.getComponent("Component.AnimationPlayer") as AnimationPlayer;
+        if (player) found.push(player);
+        const count = obj.getChildrenCount();
+        for (let i = 0; i < count; i++) {
+            found.push(...CreaturePetVisual.findAnimationPlayers(obj.getChild(i)));
+        }
+        return found;
     }
 
     /** Removes the instantiated prefab from the scene. Used when a creature's
@@ -177,56 +421,15 @@ export class CreaturePetVisual {
         this.root.destroy();
     }
 
-    /** ONE fresh clone-before-mutate per creature, shared across every mesh
-     *  part of that creature — called at construction and again from
-     *  CreatureBehavior.resetToIdle().
-     *
-     *  The clone is per-creature (never the shared base asset), so tinting one
-     *  creature still cannot bleed onto its siblings. But it is deliberately
-     *  ONE clone for all of this creature's parts: updateColorTint mutates a
-     *  single material every frame, so giving each part its own clone (as this
-     *  did previously) meant a multi-part prefab only ever tinted the part the
-     *  renderMeshVisual getter happened to return, leaving the rest stuck at
-     *  the base color. That was harmless while every creature shared one
-     *  color; it breaks visibly now that color is per-creature identity. */
+    /** Interface obligation only (CreatureBehavior calls this at construction
+     *  and resetToIdle). The animated GLBs keep their authored textures — see
+     *  adoptSourceMaterials — so there is nothing to (re)apply: swapping the
+     *  PetBody tint/dissolve shader onto these meshes rendered garbage (they
+     *  carry no baked COLOR_0 gradient), and the tint identity is replaced by
+     *  the model's own look. */
     applyBaseMaterial(baseMaterial: Material, color?: vec4): void {
-        const fresh = baseMaterial.clone();
-        fresh.mainPass.baseColor = color ?? new vec4(BLOB_COLOR[0], BLOB_COLOR[1], BLOB_COLOR[2], 1);
-        forceOpaque(fresh);
-        // These source GLBs' winding/normals aren't verified against this
-        // project's back-face-culling convention (see PetCreatureBody's
-        // identical fix) — render both sides rather than risk the same
-        // "see-through" artifact on an unfamiliar mesh.
-        fresh.mainPass.twoSided = true;
-        // Enables PetBody.graphShader's multiply of the mesh's baked COLOR_0
-        // gradient into baseColor — the shading that makes the body read as a
-        // volume. Free at runtime: the gradient is baked into the GLB
-        // (Tools/bake-vertex-shading.js), so this is one interpolated vertex
-        // attribute and a multiply, no lighting and no extra fetch.
-        fresh.mainPass.vertexShadingAmount = VERTEX_SHADING_AMOUNT;
-        // Dissolve channel. Static settings go on every clone; the amount is
-        // driven per-creature during release/spawn. Setting the amount here at
-        // all is what makes the parameter exist on the material — PetBody.mat
-        // carries no entry for it, so an unwritten parameter arrives as 0,
-        // which is the shader's no-op.
-        // Measured from THIS mesh, not looked up in a table. The meshes are
-        // authored at scales two orders of magnitude apart (dog ~205 object
-        // units, generated species ~1), and a wrong height makes a creature
-        // vanish silently rather than error — which is exactly how five of six
-        // disappeared when a single constant was used. Reading the bounds means
-        // a seventh species needs no entry anywhere and cannot be forgotten.
-        const bounds = this.measureBodyBounds();
-        // baseY is not passed: measurement shows every pet mesh is authored
-        // feet-at-origin, so the base is 0. One fewer parameter is one fewer
-        // thing that can silently fail to be exposed.
-        fresh.mainPass.dissolveHeightCm = bounds.height;
-        fresh.mainPass.dissolveEdgeGain = DISSOLVE_EDGE_GAIN;
-        fresh.mainPass.dissolveDirection = DISSOLVE_DEBUG_AMOUNT >= 0 ? DISSOLVE_DEBUG_DIRECTION : 1;
-        fresh.mainPass.dissolveAmount = DISSOLVE_DEBUG_AMOUNT >= 0 ? DISSOLVE_DEBUG_AMOUNT : 0;
-        this.assertDissolveParamsLive(fresh, bounds);
-        for (const rmv of this.renderMeshVisuals) {
-            rmv.mainMaterial = fresh;
-        }
+        void baseMaterial;
+        void color;
     }
 
 

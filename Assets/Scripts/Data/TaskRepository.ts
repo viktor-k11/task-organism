@@ -45,6 +45,20 @@ export class TaskRepository {
         return true;
     }
 
+    /**
+     * Removes a task WITHOUT completing it — used while the user is still
+     * writing their list. Distinct from resolve() on purpose: discarding is
+     * not an achievement, so it must not release a creature, play the
+     * completion effect, or appear in TODAY.TXT.
+     */
+    discard(id: string): boolean {
+        const before = this.tasks.length;
+        this.tasks = this.tasks.filter((candidate) => candidate.id !== id);
+        if (this.tasks.length === before) return false;
+        this.persist();
+        return true;
+    }
+
     /** Idempotent: only the first resolve mutates and persists. */
     resolve(id: string): boolean {
         const task = this.tasks.find((candidate) => candidate.id === id && candidate.status === "open");

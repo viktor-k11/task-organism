@@ -57,3 +57,8 @@ Packages/Utilities.lspkg.meta
 
 # Per-machine Lens Studio plugin state, keyed by a local install UUID.
 Plugins/
+
+# Per-machine Lens Studio TypeScript config — regenerated on open, and extra
+# copies ("jsconfig 2.json") appear when a foreign one cannot be reconciled.
+/jsconfig*.json
+/.virtual-scene.json

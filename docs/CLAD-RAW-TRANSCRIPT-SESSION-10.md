@@ -1,11 +1,12 @@
 # CLAD raw prompt transcript — Session 10 (prompts + reactions)
 
-Continuation of [`CLAD-RAW-TRANSCRIPT.md`](CLAD-RAW-TRANSCRIPT.md), which holds
-instructions 1–99 (sessions 1–9, 2026-08-10 → 08-16) verbatim and *without*
-agent replies. This file covers the final build session — **session 10,
-2026-08-16, second machine, Claude Code** — and, unlike the base transcript,
-records **the reaction to every prompt**: what the agent changed, which
-CLAD/MCP tools carried the work, and how the result was verified.
+Instructions are numbered from 100 to continue the count of sessions 1–9
+(99 instructions across two machines, 2026-08-10 → 08-16, whose
+cycle-by-cycle account is [`../prompts.md`](../prompts.md)). This file covers
+the final build session — **session 10, 2026-08-16, second machine, Claude
+Code** — and records **the reaction to every prompt**: what the agent
+changed, which CLAD/MCP tools carried the work, and how the result was
+verified.
 
 Prompts are quoted verbatim, typos included — they are evidence, not prose.
 Most prompts arrived with Lens Studio screenshots attached; where a screenshot
@@ -271,8 +272,8 @@ ritual landscape filling the view around the meditation card.
 > Create a file named CLAD_PROMPT_LOG.md in the project root. It is a required submission document for the CLAD Summer Hackathon … Build the file from OUR ACTUAL CONVERSATION HISTORY in this session — use my real prompts verbatim … never invent or embellish anything. …
 
 **Reaction.** Read both uploaded logs from the first machine, verified every
-referenced file exists in the repo (`prompts.md`,
-`docs/CLAD-RAW-TRANSCRIPT.md`, `docs/evidence/`), pulled the repo URL from
+referenced file exists in the repo (`prompts.md`, `docs/evidence/`, the
+earlier transcripts), pulled the repo URL from
 `git remote`, and wrote [`CLAD_PROMPT_LOG.md`](../CLAD_PROMPT_LOG.md) in the
 required 7-section structure: header, project summary, CLAD-usage overview
 with an honest AI-vs-human share estimate and the full MCP capability

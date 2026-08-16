@@ -2,8 +2,8 @@ import { HUD, REMINDER_MESSAGES } from "./UiCopy";
 import { RETRO } from "./RetroUi";
 import { resolveScreenAnchor, UI_SCREEN_ANCHORS, UI_TEXT_SIZE } from "./UiLayout";
 
-const segoe = requireAsset("../../Design assets/Fonts UI/Segoe UI.ttf") as Font;
-const segoeBold = requireAsset("../../Design assets/Fonts UI/Segoe UI Bold.ttf") as Font;
+const segoe = requireAsset("../../Design assets/Fonts UI/Open Sans.ttf") as Font;
+const segoeBold = requireAsset("../../Design assets/Fonts UI/Open Sans Bold.ttf") as Font;
 
 /**
  * The designed reminder panel. The word "reminder" is part of the ARTWORK, so

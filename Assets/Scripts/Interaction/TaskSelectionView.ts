@@ -82,7 +82,7 @@ export class TaskSelectionView {
         titleText.text = SELECTION_PANEL.title;
         titleText.horizontalAlignment = HorizontalAlignment.Left;
         // Courier Bold — the same face as the "reminder" label and every title bar.
-        titleText.font = requireAsset("../../Design assets/Fonts UI/Courier New Bold.ttf") as Font;
+        titleText.font = requireAsset("../../Design assets/Fonts UI/Cousine Bold.ttf") as Font;
         // A pinch that starts on the open panel is a UI hit, not a miss. Without
         // this stamp the deselect-on-miss check (which only knows about creature
         // presses) closes the panel out from under the reader.

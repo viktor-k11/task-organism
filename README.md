@@ -1,10 +1,14 @@
 # Task Organism
 
 A spatial task manager for SPECS where unfinished tasks are living creatures.
-Ignored tasks grow restless. The single most urgent one gently follows you.
-Completing a task releases its creature.
+Six animated animals stand in a habitat in front of you; ignored tasks grow
+restless, the single most urgent one gently comes over to ask for attention,
+and pinch-and-hold takes care of a task and releases its creature. An
+end-of-day TODAY.TXT screen shows everything you cared for, with an optional
+1-minute closing ritual.
 
-Built for CLAD Hackathon Week 1 (Organize). Lens Studio 5.22+, preview-only.
+Built for CLAD Hackathon Week 1 (Organize) with Claude Code + the `ls-clad`
+plugin over the Lens Studio MCP. Lens Studio 5.23, preview-only.
 
 ---
 
@@ -20,13 +24,10 @@ git clone git@github.com:viktor-k11/task-organism.git
 cd task-organism
 ```
 
-**You do not need git-lfs.** `.gitattributes` marks `*.glb` as `filter=lfs`, but
-git-lfs was never installed on the machine these were committed from, so the
-meshes went in as ordinary blobs and a clone gets the real files — verified:
-`dog_lo.glb` arrives as 5,975,012 bytes beginning with the `glTF` magic number,
-not a pointer stub. If you *do* have git-lfs installed, take care committing new
-`.glb` files: they would become real LFS pointers, and no LFS remote is
-configured for this repo.
+**You do not need git-lfs.** The `.glb` meshes are committed as ordinary blobs,
+so a plain clone gets the real files (each begins with the `glTF` magic number,
+not a pointer stub). If you *do* have git-lfs installed, take care committing
+new `.glb` files: no LFS remote is configured for this repo.
 
 ### 2. Open the project in Lens Studio 5.22+ once, before anything else
 
@@ -63,9 +64,7 @@ editor-driven half is captured.
 - **npm install** — there are no npm dependencies anywhere in `Tools/`.
 - **RemoteServiceGateway, SnapDecorators or Utilities packages** — all three are
   gitignored and none is required to build. Verified by removing all three and
-  compiling clean. RemoteServiceGateway is needed only by
-  `Assets/Scripts/Debug/TaskUnderstandingProbe.ts`, a parked AI experiment that
-  is itself untracked; install it from the Asset Library if that work resumes.
+  compiling clean.
 
 ---
 
@@ -144,13 +143,12 @@ node Tools/visual-regression.js --candidate <dir>   # stage 3 on its own
 
 | File | For |
 |---|---|
-| `CLAD-PROMPT-LOG.md` | **Start here if you are judging this build.** One-page overview, the ten prompts that carried the project, the closed loop on two real bugs, and the gate/LEAF verification story. Raw transcript in `docs/CLAD-RAW-TRANSCRIPT.md` |
-| `HANDOFF-NEXT.md` | **Start here if you are taking the project over.** Honest state, open list in priority order, what remains for submission, and the traps this project has already paid for |
-| `HANDOFF-VISUAL.md` | **Start here if you are changing how it looks.** Designer panel, the additive-display colour rules, what not to touch, the build gate in detail (§8) |
+| `CLAD_PROMPT_LOG.md` | **Start here if you are judging this build.** How CLAD was used end to end across 10 sessions on two machines: the prompts that carried the project, the iterations-and-fixes table, highlights and learnings |
+| `docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md` | The final session's twelve prompts verbatim, with the reaction to each |
 | `CLAUDE.md` | Scope, hard constraints, and the non-negotiable invariants |
 | `AGENTS.md` | Lens Studio conventions and the MCP rules for agents |
 | `prompts.md` | The full working log — every measurement and decision, with the reasoning |
-| `LICENSES.md` | Asset provenance |
+| `LICENSES.md` | Asset provenance and third-party attributions |
 
 ## Layout
 
@@ -159,10 +157,14 @@ Assets/Scripts/
   Config/       all thresholds, distances, speeds, timings
   Data/         TaskRecord, repository, persistence
   State/        clock, urgency, attention arbiter
-  Input/        demo fixtures and input sources
+  Input/        keyboard/voice/demo input sources
   Interaction/  controller, gesture handling, selection UI
-  Creature/     presentation, movement, release effect
+  Creature/     presentation, locomotion animation, release effect
+  UI/           retro-desktop dialogs, onboarding, reminder HUD,
+                TODAY.TXT, closing ritual
   Debug/        probes, including PerfGateProbe (feeds gate stage 4)
+Assets/3d assets/AnimatedPets/   the six CC-BY creature models (see LICENSES.md)
+Assets/Design assets/            window chrome, icons, fonts (SVG sources + PNGs)
 Assets/Tests/   20 LEAF scenarios + LeafIndex
 Tools/          build-gate.js, visual-regression.js, asset scripts
 docs/golden/    the 7 committed reference frames
@@ -186,3 +188,22 @@ Creatures are small carriers of obligation, not monsters or debt collectors. The
 one that approaches behaves like a cat asking for attention. Completion is
 release and gratitude — never death or punishment. This governs naming, copy,
 and UI text.
+
+## Credits & licenses
+
+The six creature models are third-party **CC-BY-4.0** assets from Sketchfab,
+used with attribution:
+
+- **"Toon Cat FREE"** by [Omabuarts Studio](https://sketchfab.com/omabuarts) — [source](https://sketchfab.com/3d-models/toon-cat-free-b2bd1ee7858444bda366110a2d960386)
+- **"Free Shar Pei Animated Dog"** by [Artsiom Savelyeu](https://sketchfab.com/artsiom) — [source](https://sketchfab.com/3d-models/free-shar-pei-animated-dog-ed151fd59a894b3290d9eee3f716f0bf)
+- **"Owl - Animated Low Poly"** by [WildPoly3D](https://sketchfab.com/WildPoly3D) — [source](https://sketchfab.com/3d-models/owl-animated-low-poly-48db0c0e608741cf9132312fb61a7430)
+- **"Cocofanto Elefanto"** by [aimodels3d](https://sketchfab.com/aimodels3d) — [source](https://sketchfab.com/3d-models/cocofanto-elefanto-8bdd92cd91d144c18550be8e6ff34829)
+- **"Rabbit Baby - Animated Low Poly"** by [WildPoly3D](https://sketchfab.com/WildPoly3D) — [source](https://sketchfab.com/3d-models/rabbit-baby-animated-low-poly-936f7b3cfa0e44f482e917b64d4d69ed)
+- **"Manchot The Penguin"** by [A308 Digital](https://sketchfab.com/A308) — [source](https://sketchfab.com/3d-models/manchot-the-penguin-9d388e4c095a4c12b690b33a680b599a)
+
+All six under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/);
+modifications (mesh decimation, texture resizing, runtime scaling) are listed
+in [`LICENSES.md`](LICENSES.md). UI fonts are **Open Sans** (SIL OFL 1.1) and
+**Cousine** (Apache 2.0) via Google Fonts. All UI artwork, icons, textures and
+audio are generated or hand-authored for this project — full provenance in
+[`LICENSES.md`](LICENSES.md).

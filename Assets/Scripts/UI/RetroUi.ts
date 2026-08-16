@@ -19,13 +19,13 @@ import { UI_TEXT_SIZE } from "./UiLayout";
  * never resolve which one a pinch meant.
  */
 
-const segoe = requireAsset("../../Design assets/Fonts UI/Segoe UI.ttf") as Font;
-const segoeBold = requireAsset("../../Design assets/Fonts UI/Segoe UI Bold.ttf") as Font;
+const segoe = requireAsset("../../Design assets/Fonts UI/Open Sans.ttf") as Font;
+const segoeBold = requireAsset("../../Design assets/Fonts UI/Open Sans Bold.ttf") as Font;
 /** Regular-weight mono, for document-style bodies (TODAY.TXT's aligned list). */
-const courier = requireAsset("../../Design assets/Fonts UI/Courier New.ttf") as Font;
-/** Courier New Bold — the same face baked into the "reminder" artwork, so
+const courier = requireAsset("../../Design assets/Fonts UI/Cousine.ttf") as Font;
+/** Cousine Bold (Courier-metric mono) — the same face baked into the "reminder" artwork, so
  *  every window title matches the reminder label. */
-export const courierBold = requireAsset("../../Design assets/Fonts UI/Courier New Bold.ttf") as Font;
+export const courierBold = requireAsset("../../Design assets/Fonts UI/Cousine Bold.ttf") as Font;
 
 /**
  * Window and button artwork, authored as SVG in `Assets/Design assets/` and

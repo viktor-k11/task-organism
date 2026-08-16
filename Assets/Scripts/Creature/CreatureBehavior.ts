@@ -150,7 +150,7 @@ const eyeBaseMaterialAsset = requireAsset("../../Materials/BlobEye.mat") as Mate
 /** Ready-made ANIMATED Sketchfab GLBs (Assets/3d assets/AnimatedPets/) —
  *  each ships a rig and at least one clip; CreaturePetVisual auto-scales
  *  them and starts a looping idle so the creatures move naturally. The old
- *  static simplified meshes stay in GeneratedMeshes/ as a fallback. */
+ *  earlier static meshes were removed once these replaced them. */
 const dogPrefab = requireAsset("../../3d assets/AnimatedPets/dog_anim.glb") as ObjectPrefab;
 const catPrefab = requireAsset("../../3d assets/AnimatedPets/cat_anim.glb") as ObjectPrefab;
 // owl_anim.glb is the "EagleOwl_Rig" low-poly owl (2026-08-16, the

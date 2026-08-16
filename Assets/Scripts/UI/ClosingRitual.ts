@@ -6,17 +6,6 @@ const ritualTrack = requireAsset("../../GeneratedSFX/ClosingRitual.wav") as Audi
 /** Wide rolling hills to rest the eyes on for the minute. */
 const ritualSky = requireAsset("../../Generated Textures/RitualHillsWide.png") as Texture;
 
-/** The imported Sparkles post effect — glitter over the bright spots of the
- *  camera view. NOTE: it is a brightness detector, so in a dim room it draws
- *  nothing; the twinkle layer below is what guarantees the ritual an
- *  animation. Optional: a clone without the package just skips it. */
-let sparklesPrefab: ObjectPrefab | null = null;
-try {
-    sparklesPrefab = requireAsset("../../Sparkles Post Effect.lspkg/Sparkles__PLACE_IN_SCENE.prefab") as ObjectPrefab;
-} catch (error) {
-    print("[ClosingRitual] Sparkles package not found — ritual runs without the effect");
-}
-
 /** The always-on twinkle layer: pixel motes filling the room, gently pulsing.
  *  Two shapes — mostly round dots, with four-point stars in between. */
 let sparkleTexture: Texture | null = null;
@@ -71,10 +60,6 @@ export class ClosingRitual {
     private dialog: RetroDialog | null = null;
     private backdrop: SceneObject | null = null;
     private audio: AudioComponent | null = null;
-    /** Instantiated ONCE and toggled: the sparkles setup script spawns helper
-     *  cameras and render targets at the scene root every time it runs, so
-     *  re-instantiating each ritual would pile them up. */
-    private sparkles: SceneObject | null = null;
     /** The twinkle layer, rebuilt each ritual and destroyed with it. */
     private starsRoot: SceneObject | null = null;
     private stars: TwinkleStar[] = [];
@@ -95,12 +80,10 @@ export class ClosingRitual {
         // Something restful to look at for the whole minute, the same full
         // wallpaper treatment the welcome screen uses.
         this.backdrop = buildBackdrop(this.camera, ritualSky);
-        // The imported Sparkles POST EFFECT stays off: it keys on bright
-        // spots in the camera view, and in a lit scene (evening street
-        // lamps) it painted giant glare streaks across the whole view —
-        // including over the dialogs. The twinkle motes below are the
-        // ritual's animation. Re-enable with startSparkles() if a future
-        // build tames the detector.
+        // (A Sketchfab-era "Sparkles Post Effect" package was tried here and
+        // removed: it keys on bright camera-feed spots and painted glare
+        // streaks across lit scenes. The twinkle motes below are the
+        // ritual's animation.)
         this.buildStars();
         this.playBed();
         this.showStage(0);
@@ -121,7 +104,6 @@ export class ClosingRitual {
             this.backdrop.destroy();
             this.backdrop = null;
         }
-        if (this.sparkles) this.sparkles.enabled = false;
         if (this.starsRoot) {
             this.starsRoot.destroy();
             this.starsRoot = null;
@@ -129,11 +111,6 @@ export class ClosingRitual {
         this.stars = [];
     }
 
-    private startSparkles(): void {
-        if (!sparklesPrefab) return;
-        if (!this.sparkles) this.sparkles = sparklesPrefab.instantiate(null);
-        this.sparkles.enabled = true;
-    }
 
     /**
      * The twinkle layer: pixel motes filling the room around the user —

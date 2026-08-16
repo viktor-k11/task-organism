@@ -2,131 +2,134 @@
 
 Every binary asset shipped in this repository, and where it came from.
 
-There is exactly **one** third-party asset left: the dog. Every other creature
-is generated, and the audio is synthesised from code.
+Third-party content: **six creature models (all CC-BY-4.0, attributed below)**
+and **two open-licensed UI fonts**. Everything else — UI artwork, textures,
+audio — is generated or hand-authored for this project and carries no
+third-party rights.
 
 ---
 
-## Third-party: the dog
+## Third-party: the six creatures (Sketchfab, CC-BY-4.0)
 
-| | |
-|---|---|
-| **Files** | `Assets/3d assets/dog.glb` (source), `Assets/GeneratedMeshes/dog_lo.glb` (shipped) |
-| **Title** | Animated Dog Sits Rolls Over Shake Paw |
-| **Author** | LasquetiSpice — https://sketchfab.com/LasquetiSpice |
-| **Source** | https://sketchfab.com/3d-models/animated-dog-sits-rolls-over-shake-paw-d9020159339145e6b9ecd5f3d830830f |
-| **License** | CC-BY-4.0 — http://creativecommons.org/licenses/by/4.0/ |
+All six live in `Assets/3d assets/AnimatedPets/`. Attribution fields are
+copied verbatim from each GLB's embedded `asset.extras` metadata (written by
+Sketchfab's exporter), not retyped by hand, and match the source pages.
 
-Attribution fields are copied verbatim from the GLB's embedded `asset.extras`
-metadata (written by Sketchfab's exporter), not retyped by hand.
+| File | Title | Author | Source |
+|---|---|---|---|
+| `cat_anim.glb` | Toon Cat FREE | [Omabuarts Studio](https://sketchfab.com/omabuarts) | [sketchfab.com/3d-models/toon-cat-free-b2bd1ee7858444bda366110a2d960386](https://sketchfab.com/3d-models/toon-cat-free-b2bd1ee7858444bda366110a2d960386) |
+| `dog_anim.glb` | Free Shar Pei Animated Dog | [Artsiom Savelyeu](https://sketchfab.com/artsiom) | [sketchfab.com/3d-models/free-shar-pei-animated-dog-ed151fd59a894b3290d9eee3f716f0bf](https://sketchfab.com/3d-models/free-shar-pei-animated-dog-ed151fd59a894b3290d9eee3f716f0bf) |
+| `owl_anim.glb` | Owl - Animated Low Poly | [WildPoly3D](https://sketchfab.com/WildPoly3D) | [sketchfab.com/3d-models/owl-animated-low-poly-48db0c0e608741cf9132312fb61a7430](https://sketchfab.com/3d-models/owl-animated-low-poly-48db0c0e608741cf9132312fb61a7430) |
+| `elephant_anim.glb` | Cocofanto Elefanto | [aimodels3d](https://sketchfab.com/aimodels3d) | [sketchfab.com/3d-models/cocofanto-elefanto-8bdd92cd91d144c18550be8e6ff34829](https://sketchfab.com/3d-models/cocofanto-elefanto-8bdd92cd91d144c18550be8e6ff34829) |
+| `rabbit_anim.glb` | Rabbit Baby - Animated Low Poly | [WildPoly3D](https://sketchfab.com/WildPoly3D) | [sketchfab.com/3d-models/rabbit-baby-animated-low-poly-936f7b3cfa0e44f482e917b64d4d69ed](https://sketchfab.com/3d-models/rabbit-baby-animated-low-poly-936f7b3cfa0e44f482e917b64d4d69ed) |
+| `penguin_anim.glb` | Manchot The Penguin | [A308 Digital](https://sketchfab.com/A308) | [sketchfab.com/3d-models/manchot-the-penguin-9d388e4c095a4c12b690b33a680b599a](https://sketchfab.com/3d-models/manchot-the-penguin-9d388e4c095a4c12b690b33a680b599a) |
+
+**License for all six:** [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/).
 
 ### Required attribution
 
-> "Animated Dog Sits Rolls Over Shake Paw" by LasquetiSpice, licensed under
-> CC-BY-4.0.
-> Source: https://sketchfab.com/3d-models/animated-dog-sits-rolls-over-shake-paw-d9020159339145e6b9ecd5f3d830830f
+> "Toon Cat FREE" by Omabuarts Studio, "Free Shar Pei Animated Dog" by Artsiom
+> Savelyeu, "Owl - Animated Low Poly" and "Rabbit Baby - Animated Low Poly" by
+> WildPoly3D, "Cocofanto Elefanto" by aimodels3d, and "Manchot The Penguin" by
+> A308 Digital — all licensed under
+> [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/), via Sketchfab
+> (source links above).
 
 ### What we modified
 
 CC-BY-4.0 permits modification and requires that modifications be indicated.
-Applied to the dog:
+Applied uniformly by this project's pipeline (details in `prompts.md`):
 
-- **Decimated** for the SPECS polycount budget with `@gltf-transform/cli
-  simplify` (meshoptimizer). Shipped at 3,672 vertices / 5,002 triangles.
-- **Vertex colours baked** by `Tools/bake-vertex-shading.js`, which writes a
-  `COLOR_0` attribute the source did not have: a height ramp combined with a
-  `normal.y` dome term, used by `Assets/Materials/PetBody.graphShader` to fake
-  vertical shading in an unlit pipeline.
-- **Textures discarded at runtime.** The source ships PBR materials; this
-  project is unlit end to end, so the shipped mesh is rendered with a flat
-  per-creature base colour multiplied by the baked vertex shading. The original
-  textures are neither used nor redistributed in the runtime material.
-- **Orientation and scale corrected at runtime** (not baked): a 180° yaw and a
-  uniform display scale applied by `CreaturePetVisual.ts`.
-
-The skeleton and animation clips remain in the file but are unused — the
-project drives all motion by direct transform control.
+- **Decimated for the SPECS polycount budget** with `@gltf-transform/cli`
+  (meshoptimizer `simplify`), skeletons, skinning weights and animation clips
+  preserved: elephant 19,248 → 3,740 triangles; owl and penguin passed through
+  `optimize`/`resize` as well.
+- **Textures resized** (penguin and elephant to 1024/512 px) to fit the lens
+  size budget. Original texture content otherwise unchanged.
+- **Orientation, scale and placement corrected at runtime** (not baked): yaw
+  correction, per-instance auto-scale normalization, and feet re-seating by
+  `Assets/Scripts/Creature/CreaturePetVisual.ts`.
+- **Materials cloned per instance at runtime** so completion effects never
+  mutate the shared source materials; the authored textures are used as-is.
+- Animation clips are *selected* (idle at rest, walk/waddle while moving) but
+  not edited.
 
 ---
 
-## Generated: the other five creatures
+## Third-party: UI fonts (open licenses)
 
-Six species ship; five of them are generated. The sixth is the dog above, which
-is the project's only third-party asset.
+| File | Family | License |
+|---|---|---|
+| `Assets/Design assets/Fonts UI/Open Sans.ttf`, `Open Sans Bold.ttf` | Open Sans (via Google Fonts) | [SIL Open Font License 1.1](https://openfontlicense.org/) |
+| `Assets/Design assets/Fonts UI/Cousine.ttf`, `Cousine Bold.ttf` | Cousine (via Google Fonts) | [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
 
-| File | Species |
-|---|---|
-| `Assets/GeneratedMeshes/cat_lo.glb` | cat |
-| `Assets/GeneratedMeshes/owl_lo.glb` | owl |
-| `Assets/GeneratedMeshes/elephant_lo.glb` | baby elephant |
-| `Assets/GeneratedMeshes/rabbit_lo.glb` | rabbit |
-| `Assets/GeneratedMeshes/penguin_lo.glb` | baby penguin |
-
-These were produced with the **SPECS text-to-3D generation API** from prompts
-written for this project (recorded in full in `prompts.md`). They are not
-derived from any third-party model, so **they carry no third-party rights at
-all** — there is no upstream author to credit, no license to comply with, and
-no attribution requirement. That is the reason they exist: generating the cat
-retired a licensing question rather than documenting one.
-
-Each was then processed by this project's own pipeline, in this order. What each
-step actually changes in the file:
-
-| Step | What it modifies |
-|---|---|
-| `Tools/prepare-pet-glb.js` | Strips skins, animations, and the `JOINTS_0` / `WEIGHTS_0` / `COLOR_0` attributes. Bakes each node's world matrix into `POSITION` and `NORMAL`, then flattens the scene to a single node, so the mesh is self-contained and carries no inherited transform. Rewrites accessor `min`/`max`, which glTF treats as normative. |
-| `Tools/seat-pet-glb.js` | Translates every vertex so the mesh's min-Y is exactly 0 — feet at the origin, the convention `CreaturePetVisual` assumes when it seats a prefab. Optionally bakes a 180° yaw by negating X and Z on `POSITION` and `NORMAL`, so facing is a property of the asset rather than a per-species runtime correction. Rewrites accessor `min`/`max` again. Measures but does not alter body height. |
-| `Tools/bake-vertex-shading.js` | Adds a `COLOR_0` attribute the generated file does not have: a gamma'd height ramp combined with a `normal.y` dome term, written as normalised unsigned bytes. Reads positions and normals, so it must run last. Skips any primitive that already carries `COLOR_0`. |
-
-None of these steps adds or removes geometry — vertex and triangle counts are
-unchanged by all three. The dog goes through `bake-vertex-shading.js` only; it
-predates the other two tools and keeps its original node transform and skeleton.
+An earlier iteration used Segoe UI and Courier New; both are proprietary
+Microsoft/Monotype typefaces and were **removed from the repository** and
+replaced with the open-licensed families above before submission.
 
 ---
 
 ## Generated: audio
 
-| File | |
-|---|---|
-| `Assets/GeneratedSFX/ReleaseBreath.wav` | 1.10 s, stereo |
-| `Assets/GeneratedSFX/ReleaseHum.wav` | 1.10 s, stereo |
-| `Assets/GeneratedSFX/ReleaseBloom.wav` | 1.10 s, stereo |
+All eight cues in `Assets/GeneratedSFX/` (`ClosingRitual.wav`,
+`FocusAmbience.wav`, `ReleaseBreath.wav`, `ReleaseHum.wav`,
+`ReleaseBloom.wav`, `StatePad.wav`, `StateSettle.wav`, `StateStir.wav`) were
+synthesised procedurally by the CLAD `build-sfx` / `build-music` DSP engines —
+**no samples, no recordings, no datasets, no model weights** — so they are
+license-clean by construction. The two ambient beds were later downsampled to
+22 kHz mono for lens size.
 
-Three variants of the task-completion release cue; one is selected by
-`RELEASE_SFX_VARIANT`. Synthesised procedurally by the CLAD `build-sfx` DSP
-engine — **no samples, no recordings, no datasets, no model weights** — so they
-are license-clean by construction and carry no third-party rights.
+## Generated / hand-authored: everything else
+
+- `Assets/Generated Textures/` — backdrops generated with the Lens Studio MCP
+  texture generation tool from prompts written for this project.
+- `Assets/Design assets/*.svg` + their PNGs — window chrome, buttons, species
+  icons, sparkle motes: authored as SVG in-session by the agent for this
+  project and rasterized via the Lens Studio MCP. No third-party sources.
+- `Assets/Materials/`, `Assets/*.graphShader` — authored in-project.
 
 ---
 
 ## Removed
 
 Assets deleted from the repository, recorded so their absence is not mistaken
-for an oversight:
+for an oversight (full history remains in git):
 
-- **`Assets/3d assets/cat.glb`** — "Bengal Cat Non Commercial" by
-  osmanarici2004_1. Removed over an unresolved licence conflict: the model's
-  own *title* asserted non-commercial use while its embedded license field said
-  CC-BY-4.0, which permits commercial use. Rather than resolve the ambiguity we
-  replaced the asset with a generated cat, which removes the question entirely.
-- **`Assets/3d assets/cat_quaternius.glb`** — a CC0 replacement candidate,
-  never shipped. Rejected because its face was textural rather than geometric:
-  its eyes lived in a texture atlas that this project's unlit pipeline
-  discards, leaving a blank face.
-- **`Assets/GeneratedMeshes/PetCreature.glb`** — an earlier procedurally
-  generated body, unreferenced by any code path once the ready-made and
-  generated models replaced it.
+- **`Assets/GeneratedMeshes/*_lo.glb`** — the six earlier static creature
+  bodies (five generated with SPECS text-to-3D, one derived from the CC-BY dog
+  below). Superseded by the animated models above and no longer referenced by
+  any code path.
+- **`Assets/3d assets/dog.glb`** — "Animated Dog Sits Rolls Over Shake Paw" by
+  [LasquetiSpice](https://sketchfab.com/LasquetiSpice), CC-BY-4.0
+  ([source](https://sketchfab.com/3d-models/animated-dog-sits-rolls-over-shake-paw-d9020159339145e6b9ecd5f3d830830f)).
+  Used in earlier builds; superseded by the shar-pei above and removed. Credit
+  retained here for the git history in which it appears.
+- **`Assets/Sparkles Post Effect.lspkg`** — a Lens Studio Asset Library
+  package briefly evaluated for the closing ritual and replaced by this
+  project's own generated sparkle textures.
+- **Fonts** — Segoe UI (4 files) and Courier New (2 files); see the fonts
+  section above.
+- **`Assets/3d assets/cat.glb`**, **`cat_quaternius.glb`**,
+  **`GeneratedMeshes/PetCreature.glb`** — earlier-phase removals; reasons
+  recorded in `prompts.md`.
 
 ---
 
 ## Verification
 
-To confirm the claim that the dog is the only third-party binary:
+To re-check the third-party inventory from a clone:
 
 ```bash
-ls "Assets/3d assets/" Assets/GeneratedMeshes/ Assets/GeneratedSFX/
+ls "Assets/3d assets/AnimatedPets/"        # exactly six CC-BY GLBs (+ .meta)
+ls "Assets/Design assets/Fonts UI/"        # Open Sans + Cousine only
+python3 - <<'EOF'
+import json, struct, glob
+for p in sorted(glob.glob('Assets/3d assets/AnimatedPets/*.glb')):
+    d = open(p,'rb').read()
+    n = struct.unpack('<I', d[12:16])[0]
+    e = json.loads(d[20:20+n]).get('asset',{}).get('extras',{})
+    print(p, '|', e.get('title'), '|', e.get('author'), '|', e.get('license'))
+EOF
 ```
 
-Everything under `Assets/GeneratedMeshes/` except `dog_lo.glb` is generated,
-everything under `Assets/GeneratedSFX/` is synthesised, and `Assets/3d assets/`
-should contain only `dog.glb` and its `.meta`.
+The embedded metadata printed by that snippet is the license evidence itself.

@@ -13,9 +13,10 @@
 
 *This file is the submission-facing summary. The full engineering log is
 [`prompts.md`](prompts.md) (~1,560 lines, every cycle with its measurements and
-wrong turns); every instruction verbatim is in
-[`docs/CLAD-RAW-TRANSCRIPT.md`](docs/CLAD-RAW-TRANSCRIPT.md); before/after
-captures are in [`docs/evidence/`](docs/evidence/).*
+wrong turns); the final session's prompts verbatim, with the reaction to each,
+are in
+[`docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md`](docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md);
+before/after captures are in [`docs/evidence/`](docs/evidence/).*
 
 ---
 
@@ -97,11 +98,11 @@ Python GLB introspection to diagnose rigs.
 
 ## 3. Prompt Log (Chronological)
 
-Sessions 1–9 (two machines) are summarized with their highest-yield prompts;
-Session 10 — the final design-and-menagerie session — is logged in detail.
-All 99 earlier instructions are verbatim in
-[`docs/CLAD-RAW-TRANSCRIPT.md`](docs/CLAD-RAW-TRANSCRIPT.md); Session 10's
-twelve instructions, verbatim *with the reaction to each*, are in
+Sessions 1–9 (two machines, 99 instructions total) are summarized with their
+highest-yield prompts, quoted verbatim; the full cycle-by-cycle account of
+those sessions is [`prompts.md`](prompts.md). Session 10 — the final
+design-and-menagerie session — is logged in detail here, and its twelve
+instructions, verbatim *with the reaction to each*, are in
 [`docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md`](docs/CLAD-RAW-TRANSCRIPT-SESSION-10.md).
 
 ### Phase A — Scaffolding with a hard boundary (08-10)

@@ -1,68 +1,88 @@
-# CLAD Development Cycles — Task Organism
+# Task Organism — CLAD development log
 
-A chronological process log for the CLAD hackathon build. Each entry records the
-instruction given, the CLAD skill / agent / MCP tool used, what actually came
-back (including when it was wrong), and how the result was verified.
+Chronological engineering log, 2026-08-10 → 2026-08-16. Each entry: the
+instruction given, the tools used, what came back (including wrong results),
+and how it was verified.
 
-Failures are recorded as failures. Several of the most useful entries below are
-wrong turns that were isolated cleanly — the isolation is the point, not the
-polish. Where a cycle predates the transcript that produced this log, the
-instruction is summarised faithfully rather than quoted; verbatim quotes are
-used only where the exact wording is on record.
+**Shipped state at freeze (2026-08-16):**
+
+- Task manager for SPECS: up to 6 open tasks rendered as animated creatures in
+  a world-anchored habitat. Task CRUD via keyboard and voice (AsrModule),
+  persistence with schema versioning and corrupt-payload recovery.
+- Behaviour states (`CALM | URGENT | CHASING`) computed from data + time via
+  `StateEngine`/`AttentionArbiter`; at most one chaser, threshold-gated.
+- Interaction: SIK short-pinch select, 0.7 s hold-to-resolve, snooze; release
+  effect with pooled particles and audio cue.
+- Creature models: six third-party CC-BY-4.0 animated GLBs (integrated on
+  08-16, replacing the earlier text-to-3D-generated static set), runtime
+  auto-scale normalization, idle-freeze / walk-on-move locomotion.
+- UI: retro-desktop dialog system (onboarding, reminder HUD, task panel,
+  TODAY.TXT end-of-day screen, 1-minute closing ritual), all text/artwork
+  authored in-project; fonts Open Sans (OFL) and Cousine (Apache-2.0).
+- Verification at freeze: TypeScript compile clean, 20 LEAF scenarios
+  registered, `gate6-pinch-select` and `gate6-pinch-hold-resolve` green,
+  30 fps in Preview with 6 creatures. Known-red: the two `gate6-moving-chaser*`
+  scenarios (synthetic hand cannot track a moving target — instrument limit,
+  documented below).
 
 Environment throughout: Lens Studio 5.23, SPECS target, Preview-only (no device).
 All Lens Studio interaction went through the `lens-studio` MCP server —
 `ExecuteEditorCode`, `scene-graphql`, `QueryRuntimeSceneTool`,
 `RecompileTypeScriptTool`, `RunAndCollectLogsTool`, `PreviewPanelTool`,
 `PreviewInteractTool`, `InjectPreviewGesture`, `MovePreviewCamera`,
-`QueryLensStudioKnowledgeBase` — plus the `ls-clad` skill pack
-(`lens-studio-router`, `specs-experience-builder`, `shader-graph`,
-`verify-preview`, LEAF skills).
+`ConvertSvgToTexture`, `QueryLensStudioKnowledgeBase` — plus the `ls-clad`
+skill pack (`lens-studio-router`, `specs-experience-builder`, `shader-graph`,
+`verify-preview`, `build-mesh`, `build-sfx`/`build-music`, LEAF skills).
 
 ---
 
 ## CLAD inventory — what was used, discarded, and declined
 
-Rebuilt 2026-08-14 from the session history and the Lens Studio log. Call counts
-are approximate. Full evidence in `VERIFICATION-2026-08-13.md`.
+First compiled 2026-08-14 from the session history and the Lens Studio log;
+updated 2026-08-16 after the final session. Call counts are approximate.
 
-### Which capabilities carried the most weight
+### Usage profile
 
-Three did the real work. **SPECS text-to-3D** (`build-mesh`) has the largest
-product consequence: it produced five of the six creature species and, in doing
-so, **retired the project's licensing problem outright rather than documenting
-it** — a generated asset carries no third-party rights at all, so replacing the
-encumbered cat removed the question instead of annotating it. **The Preview
-instrumentation trio** — `RunAndCollectLogsTool` for the only true Lens reset,
-`QueryRuntimeSceneTool` for object-graph truth, and `CaptureRuntimeViewTool` for
-isolated renders — is what turned this project's method from assertion into
-evidence; nearly every correction recorded below was found by one of them
-contradicting something that looked right. And **LEAF** carried the domain,
-with a limit this log is precise about: the suite was 13/13 green throughout the
-entire period when completing the first task silently disabled the composition
-root, because the scenarios exercise the domain and not the object graph's
-lifetime. That gap is now closed by `gate4-controller-survives-release`, and the
-lesson is a more valuable output than the fix.
+By call volume, most of the work is the verification loop: `run_leaf_scenario`
+(90+), `RunAndCollectLogsTool` (75+), screenshots (50+) and
+`RecompileTypeScriptTool` (45+) — every change in this log was compiled, run
+and observed before it was reported. `QueryRuntimeSceneTool` and
+`CaptureRuntimeViewTool` found most of the corrections recorded below by
+contradicting results that looked correct. `build-mesh` (SPECS text-to-3D)
+produced five species used in the mid-week builds; on 08-16 all creature
+models were replaced by six CC-BY-4.0 animated GLBs (see `LICENSES.md`), so
+the generated set does not ship in the final build. LEAF carried the domain
+tests, with one documented limit: the suite was 13/13 green during the period
+when completing the first task disabled the composition root, because the
+scenarios exercised the domain and not the object graph's lifetime — closed by
+`gate4-controller-survives-release`.
 
-### Used and load-bearing — the result is in the shipped build
+### Used and load-bearing
+
+Totals through 2026-08-16, final session included.
 
 | Capability | ~calls | What it produced |
 |---|---|---|
+| `run_leaf_scenario` | 90+ | The 20-scenario suite; the regression proof for the controller fix, the done-flow fix and the world-gating fix |
+| `RunAndCollectLogsTool` (`mode: refresh`) | 75+ | The only true Lens reset; every verification, harness frame and trace depends on it |
+| `CapturePanelScreenshotTool` / `PreviewPanelTool screenshot` | 50+ | Every first-person capture: the golden set, every UI iteration, the font-swap check |
+| `RecompileTypeScriptTool` | 45+ | Compile gate before every refresh |
+| `CaptureRuntimeViewTool` | 45+ | Per-species acceptance renders; facing and scale comparisons |
 | `ExecuteEditorCode` | 40+ | SPECS text-to-3D create/poll for 6 generations; Perfetto start/stop for 10 captures; project save (twice — without it the scene changes never reached disk) |
-| `RunAndCollectLogsTool` (`mode: refresh`) | 60+ | The only true Lens reset; every verification, harness frame and trace depends on it |
-| `run_leaf_scenario` | 80+ | The 13-scenario suite; the regression proof for the controller fix |
-| `CapturePanelScreenshotTool` / `PreviewPanelTool screenshot` | 30+ | Every first-person capture, the golden set, clip-mode verification |
-| `CaptureRuntimeViewTool` | 40+ | Per-species acceptance renders; facing and scale comparisons |
-| `QueryRuntimeSceneTool` | 25+ | Transforms, worldScale, 180 pooled particles, the single controller |
-| `RecompileTypeScriptTool` | 30+ | Compile gate before every refresh |
+| `QueryRuntimeSceneTool` | 35+ | Transforms, worldScale, 180 pooled particles, the single controller; the editor-side bounds query that exposed the owl rendering 21 m while runtime AABBs reported 28 cm |
+| `InjectPreviewGesture` | 15+ | Keys, taps and touch sequences driving onboarding / TODAY.TXT / ritual verification in session 10 |
 | `scene-graphql` | 12 | CreatureTemplate duplicate; controller component removal; enable/disable |
-| `VirtualScene` (read + apply) | 8 | Scene introspection; Art Direction and TaskOrganism objects; Inspector defaults |
-| `build-mesh` (SPECS text-to-3D) | 7 jobs | 5 shipped species + 2 rejected attempts |
-| `build-sfx` | 2 runs | 3 release cues + 3 state cues, all shipped |
-| `shader-graph` | 1 | `PetBody.graphShader` — vertex shading and the urgency halo |
+| `PreviewInteractTool` | 10+ | Synthetic SIK pinches during gate6 development |
+| `ConvertSvgToTexture` | 10 | Window chrome, six species icons, sparkle motes — the UI artwork pipeline (SVG authored in-project) |
 | `specs-capture-perf-trace` | 10 captures | Every performance number in this log |
+| `VirtualScene` (read + apply) | 8 | Scene introspection; Art Direction and TaskOrganism objects; Inspector defaults |
+| `build-mesh` (SPECS text-to-3D) | 7 jobs | 5 species used in mid-week builds + 2 rejected attempts; superseded on 08-16 by six CC-BY animated models |
 | `perfetto-trace-analysis` | 6 | Frame-time distributions and slice attribution |
+| `MovePreviewCamera` | 6 | Aiming the session-10 verification captures (owl size, backdrop facing) |
+| `build-sfx` / `build-music` | 4 runs | 8 shipped cues: release ×3, state ×3, two ambient beds |
+| `shader-graph` | 3 | `PetBody.graphShader` — vertex shading and the urgency halo |
 | `ShowPropertyControlsTool` | 1 | Ten live sliders for the designer handoff |
+| `FontSelector` | 1 | Attempted for the session-10 font swap; required a selected Text target, so the fonts were imported directly instead |
 
 ### Used and discarded
 
@@ -71,7 +91,7 @@ lesson is a more valuable output than the fix.
 | Graph-shader editing of `unlit.graphShader` | Rendered every body **silently black**, no compile error. Isolated to the graph, then abandoned for the codeNode route. Root cause never found |
 | `SearchLensStudioAssetLibrary` / `InstallLensStudioPackage` (Kitty.lspkg) | Reverted: FBX + skinned + autoplaying AnimationPlayer + PBR, no local Blender/FBX2glTF |
 | Synthetic bright-backdrop quad | Never rendered in the ortho path; abandoned for the real Preview environment, which was the better test |
-| `InjectPreviewGesture` / `PreviewInteractTool` | Used for staging buttons; dropped as the harness driver in favour of deterministic beat-jumping |
+| `InjectPreviewGesture` / `PreviewInteractTool` as the golden-harness driver | Dropped for that role in favour of deterministic beat-jumping; both returned as load-bearing tools in session 10 (see the table above) |
 | `normalize_glb.js` | Miscomputed scale on simplified GLBs (AABB collapsed to ~0.5 cm); replaced by `prepare-pet-glb` → `seat-pet-glb` |
 | `GetBoundingBox` | Returned no bounds (no colliders); fell back to parsing the GLB directly |
 | FAST3D | Deliberately not used — the skill makes it a user-granted speed exception and the user granted the opposite |
@@ -80,15 +100,18 @@ lesson is a more valuable output than the fix.
 
 | Capability | Judgement |
 |---|---|
-| `MergeMeshesTool` | **Theatre.** Every species is already one primitive, one material; merging across creatures is forbidden |
-| `SimplifyMeshTool` | **Real value, but not yet.** The overage is seam duplication, which simplify does not address, and the trace shows no vertex pressure in Preview |
-| `specs-lens-perf-attribution` | **Theatre today.** Needs a problem to attribute; the one spike found was attributed and fixed by pooling |
-| `MovePreviewCamera` | **Real value, unused.** Would give controlled framing for the golden set |
-| `GenerateTexture` / `ResizeRasterTexture` / `ConvertSvgToTexture` | **Theatre.** Unlit project, textures discarded by design |
-| `GenerateLensIcon` / `IconSelector` | **Real value for submission**, not the build — nobody has produced a Lens icon |
-| `SearchLensStudioMusicLibrary` / `InstallLicensedMusic` | **Theatre, and against the brief** — ambient music is out of scope |
-| `live-lens-tester` agent | **Partial** — LEAF used heavily, but via direct tool calls |
-| `specs-project-migrator`, `sync-kit-validator`, `editor-api-specialist` | **Not applicable** — no migration, no SyncKit, no bulk Editor API work |
+| `MergeMeshesTool` | Not needed: every species is one primitive, one material; merging across creatures is forbidden by the design |
+| `SimplifyMeshTool` | Not used; the final-day decimation of the animated models was done with `gltf-transform` instead, because rigs and animation clips had to survive |
+| `specs-lens-perf-attribution` | Not needed: the one spike found (release-frame construction) was attributed and fixed by pooling without a full attribution run |
+| `GenerateLensIcon` / `IconSelector` | Still open for submission — no Lens icon produced |
+| `SearchLensStudioMusicLibrary` / `InstallLicensedMusic` | Against the brief — ambient music is out of scope; the two beds were synthesised instead |
+| `live-lens-tester` agent | LEAF used heavily, but via direct tool calls rather than the agent wrapper |
+| `specs-project-migrator`, `sync-kit-validator`, `editor-api-specialist` | Not applicable — no migration, no SyncKit, no bulk Editor API work |
+
+*(Two entries from the 08-14 revision of this table were removed because the
+final session invalidated them: `MovePreviewCamera` and `ConvertSvgToTexture`
+were both classified "unused" then, and both became load-bearing on 08-16 —
+they now appear in the table above.)*
 
 ---
 
@@ -350,9 +373,11 @@ were accepted deliberately. Blender is absent on this machine, so the voxel
 backend and the Blender preview step were unavailable and in-engine capture was
 used for every acceptance test instead.
 
-A generated asset carries no third-party rights at all. That does not merely
-document the licence question — it **retires** it, which is why this run
-replaced a working asset rather than annotating it.
+A generated asset carries no third-party rights, which is why this run
+replaced a working asset rather than annotating its licence. *(Final-build
+note, 2026-08-16: the generated set was itself later replaced by six animated
+CC-BY-4.0 models, so the shipped build does carry third-party assets again —
+attributed in `LICENSES.md`.)*
 
 ### Cat — attempt 1 REJECTED, the eyes were never geometry
 
